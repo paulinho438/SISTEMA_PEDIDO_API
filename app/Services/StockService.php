@@ -1,0 +1,583 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Stock;
+use App\Models\StockMovement;
+use App\Models\Asset;
+use App\Models\AssetMovement;
+use App\Services\StockAccessService;
+use App\Services\AssetService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Carbon\Carbon;
+
+class StockService
+{
+    protected $accessService;
+    protected $assetService;
+
+    public function __construct(StockAccessService $accessService, AssetService $assetService)
+    {
+        $this->accessService = $accessService;
+        $this->assetService = $assetService;
+    }
+
+    public function list(Request $request, $user)
+    {
+        $perPage = (int) $request->get('per_page', 15);
+        $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
+        
+        $companyId = $request->header('company-id');
+        $query = Stock::where('stocks.company_id', $companyId)
+            ->with(['product', 'location']);
+
+        // Aplicar filtro de acesso
+        $this->accessService->applyLocationFilter($query, $user, $companyId, 'stock_location_id');
+
+        if ($request->filled('product_id')) {
+            $query->where('stock_product_id', $request->get('product_id'));
+        }
+
+        if ($request->filled('location_id')) {
+            $query->where('stock_location_id', $request->get('location_id'));
+        }
+
+        if ($request->filled('has_available')) {
+            if ($request->boolean('has_available')) {
+                $query->where('quantity_available', '>', 0);
+            }
+        }
+
+        if ($request->filled('has_reserved')) {
+            if ($request->boolean('has_reserved')) {
+                $query->where('quantity_reserved', '>', 0);
+            }
+        }
+
+        if ($request->filled('low_stock')) {
+            if ($request->boolean('low_stock')) {
+                $query->whereRaw('quantity_available <= min_stock AND min_stock IS NOT NULL');
+            }
+        }
+
+        return $query->orderByDesc('last_movement_at')->paginate($perPage);
+    }
+
+    public function find($id)
+    {
+        return Stock::with(['product', 'location', 'movements'])->findOrFail($id);
+    }
+
+    public function reservar(Stock $stock, float $quantity, ?string $observation = null): Stock
+    {
+        $validator = Validator::make(['quantity' => $quantity], [
+            'quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stock->quantity_available < $quantity) {
+            throw new \Exception('Quantidade disponível insuficiente.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $quantityBefore = $stock->quantity_available;
+            $quantityAfter = $stock->quantity_available - $quantity;
+            $reservedBefore = $stock->quantity_reserved;
+            $reservedAfter = $stock->quantity_reserved + $quantity;
+
+            $stock->update([
+                'quantity_available' => $quantityAfter,
+                'quantity_reserved' => $reservedAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // Criar movimentação
+            StockMovement::create([
+                'stock_id' => $stock->id,
+                'stock_product_id' => $stock->stock_product_id,
+                'stock_location_id' => $stock->stock_location_id,
+                'movement_type' => 'ajuste',
+                'quantity' => -$quantity,
+                'quantity_before' => $quantityBefore,
+                'quantity_after' => $quantityAfter,
+                'reference_type' => 'ajuste_manual',
+                'observation' => $observation ?? 'Reserva de quantidade',
+                'user_id' => auth()->id(),
+                'company_id' => $stock->company_id,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return $stock->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    public function liberar(Stock $stock, float $quantity, ?string $observation = null): Stock
+    {
+        $validator = Validator::make(['quantity' => $quantity], [
+            'quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stock->quantity_reserved < $quantity) {
+            throw new \Exception('Quantidade reservada insuficiente.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $reservedBefore = $stock->quantity_reserved;
+            $reservedAfter = $stock->quantity_reserved - $quantity;
+            $availableBefore = $stock->quantity_available;
+            $availableAfter = $stock->quantity_available + $quantity;
+
+            $stock->update([
+                'quantity_available' => $availableAfter,
+                'quantity_reserved' => $reservedAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // Criar movimentação
+            StockMovement::create([
+                'stock_id' => $stock->id,
+                'stock_product_id' => $stock->stock_product_id,
+                'stock_location_id' => $stock->stock_location_id,
+                'movement_type' => 'ajuste',
+                'quantity' => $quantity,
+                'quantity_before' => $availableBefore,
+                'quantity_after' => $availableAfter,
+                'reference_type' => 'ajuste_manual',
+                'observation' => $observation ?? 'Liberação de quantidade',
+                'user_id' => auth()->id(),
+                'company_id' => $stock->company_id,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return $stock->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Cancelar reserva informando que o produto não está mais disponível
+     * Libera a quantidade reservada de volta para disponível
+     */
+    public function cancelarReserva(Stock $stock, float $quantity, string $motivo): Stock
+    {
+        $validator = Validator::make([
+            'quantity' => $quantity,
+            'motivo' => $motivo,
+        ], [
+            'quantity' => 'required|numeric|min:0.0001',
+            'motivo' => 'required|string|min:10|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stock->quantity_reserved < $quantity) {
+            throw new \Exception('Quantidade reservada insuficiente.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $reservedBefore = $stock->quantity_reserved;
+            $reservedAfter = $stock->quantity_reserved - $quantity;
+            $availableBefore = $stock->quantity_available;
+            $availableAfter = $stock->quantity_available + $quantity;
+
+            $stock->update([
+                'quantity_available' => $availableAfter,
+                'quantity_reserved' => $reservedAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // Criar movimentação com motivo do cancelamento
+            StockMovement::create([
+                'stock_id' => $stock->id,
+                'stock_product_id' => $stock->stock_product_id,
+                'stock_location_id' => $stock->stock_location_id,
+                'movement_type' => 'ajuste',
+                'quantity' => $quantity,
+                'quantity_before' => $availableBefore,
+                'quantity_after' => $availableAfter,
+                'reference_type' => 'ajuste_manual',
+                'observation' => 'Cancelamento de reserva - Produto não disponível. Motivo: ' . $motivo,
+                'user_id' => auth()->id(),
+                'company_id' => $stock->company_id,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return $stock->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Dar saída do produto (baixar do estoque total e liberar da reserva)
+     */
+    public function darSaida(Stock $stock, float $quantity, ?string $observation = null): Stock
+    {
+        $validator = Validator::make(['quantity' => $quantity], [
+            'quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stock->quantity_reserved < $quantity) {
+            throw new \Exception('Quantidade reservada insuficiente.');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $reservedBefore = $stock->quantity_reserved;
+            $reservedAfter = $stock->quantity_reserved - $quantity;
+            $totalBefore = $stock->quantity_total;
+            $totalAfter = $stock->quantity_total - $quantity;
+
+            $stock->update([
+                'quantity_reserved' => $reservedAfter,
+                'quantity_total' => $totalAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // Criar movimentação de saída
+            StockMovement::create([
+                'stock_id' => $stock->id,
+                'stock_product_id' => $stock->stock_product_id,
+                'stock_location_id' => $stock->stock_location_id,
+                'movement_type' => 'saida',
+                'quantity' => -$quantity,
+                'quantity_before' => $totalBefore,
+                'quantity_after' => $totalAfter,
+                'reference_type' => 'ajuste_manual',
+                'observation' => $observation ?? 'Saída de produto reservado',
+                'user_id' => auth()->id(),
+                'company_id' => $stock->company_id,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return $stock->fresh();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Transferir produto para outro local e dar saída
+     */
+    public function transferirESair(
+        Stock $stockOrigem,
+        int $locationDestinoId,
+        float $quantity,
+        ?string $observation = null
+    ): array {
+        $validator = Validator::make([
+            'quantity' => $quantity,
+            'location_id' => $locationDestinoId,
+        ], [
+            'quantity' => 'required|numeric|min:0.0001',
+            'location_id' => 'required|exists:stock_locations,id',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stockOrigem->quantity_reserved < $quantity) {
+            throw new \Exception('Quantidade reservada insuficiente.');
+        }
+
+        if ($stockOrigem->stock_location_id == $locationDestinoId) {
+            throw new \Exception('O local de origem e destino devem ser diferentes.');
+        }
+
+        $companyId = $stockOrigem->company_id;
+
+        DB::beginTransaction();
+
+        try {
+            // 1. Liberar da reserva na origem
+            $reservedAfter = $stockOrigem->quantity_reserved - $quantity;
+
+            $stockOrigem->update([
+                'quantity_reserved' => $reservedAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // 2. Baixar do total na origem
+            $totalBefore = $stockOrigem->quantity_total;
+            $totalAfter = $stockOrigem->quantity_total - $quantity;
+
+            $stockOrigem->update([
+                'quantity_total' => $totalAfter,
+            ]);
+
+            // 3. Criar movimentação de saída na origem
+            $movementFrom = StockMovement::create([
+                'stock_id' => $stockOrigem->id,
+                'stock_product_id' => $stockOrigem->stock_product_id,
+                'stock_location_id' => $stockOrigem->stock_location_id,
+                'movement_type' => 'saida',
+                'quantity' => -$quantity,
+                'quantity_before' => $totalBefore,
+                'quantity_after' => $totalAfter,
+                'reference_type' => 'transferencia',
+                'observation' => ($observation ?? 'Transferência e saída') . ' (Origem)',
+                'user_id' => auth()->id(),
+                'company_id' => $companyId,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            // 4. Buscar ou criar estoque no destino
+            $stockDestino = Stock::firstOrCreate(
+                [
+                    'stock_product_id' => $stockOrigem->stock_product_id,
+                    'stock_location_id' => $locationDestinoId,
+                    'company_id' => $companyId,
+                ],
+                [
+                    'quantity_available' => 0,
+                    'quantity_reserved' => 0,
+                    'quantity_total' => 0,
+                ]
+            );
+
+            // 5. Adicionar ao estoque RESERVADO no destino (mantém o status de reservado)
+            $reservedDestinoBefore = $stockDestino->quantity_reserved;
+            $totalDestinoBefore = $stockDestino->quantity_total;
+            $reservedDestinoAfter = $stockDestino->quantity_reserved + $quantity;
+            $totalDestinoAfter = $stockDestino->quantity_total + $quantity;
+
+            $stockDestino->update([
+                'quantity_reserved' => $reservedDestinoAfter,
+                'quantity_total' => $totalDestinoAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // 6. Criar movimentação de entrada no destino (como reservado)
+            $movementTo = StockMovement::create([
+                'stock_id' => $stockDestino->id,
+                'stock_product_id' => $stockOrigem->stock_product_id,
+                'stock_location_id' => $locationDestinoId,
+                'movement_type' => 'entrada',
+                'quantity' => $quantity,
+                'quantity_before' => $totalDestinoBefore,
+                'quantity_after' => $totalDestinoAfter,
+                'reference_type' => 'transferencia',
+                'observation' => ($observation ?? 'Transferência de produto reservado') . ' (Destino - Entrada como RESERVADO)',
+                'user_id' => auth()->id(),
+                'company_id' => $companyId,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            DB::commit();
+
+            return [
+                'stock_origem' => $stockOrigem->fresh(['product', 'location']),
+                'stock_destino' => $stockDestino->fresh(['product', 'location']),
+                'movement_from' => $movementFrom,
+                'movement_to' => $movementTo,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Dar saída do produto e criar ativo automaticamente
+     */
+    public function darSaidaECriarAtivo(
+        Stock $stock,
+        float $quantity,
+        array $assetData,
+        ?string $observation = null
+    ): array {
+        $validator = Validator::make(['quantity' => $quantity], [
+            'quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        if ($stock->quantity_reserved < $quantity) {
+            throw new \Exception('Quantidade reservada insuficiente.');
+        }
+
+        $companyId = $stock->company_id;
+
+        DB::beginTransaction();
+
+        try {
+            // 1. Dar saída do estoque
+            $reservedAfter = $stock->quantity_reserved - $quantity;
+            $totalBefore = $stock->quantity_total;
+            $totalAfter = $stock->quantity_total - $quantity;
+
+            $stock->update([
+                'quantity_reserved' => $reservedAfter,
+                'quantity_total' => $totalAfter,
+                'last_movement_at' => Carbon::now(),
+            ]);
+
+            // 2. Criar movimentação de saída
+            $movement = StockMovement::create([
+                'stock_id' => $stock->id,
+                'stock_product_id' => $stock->stock_product_id,
+                'stock_location_id' => $stock->stock_location_id,
+                'movement_type' => 'saida',
+                'quantity' => -$quantity,
+                'quantity_before' => $totalBefore,
+                'quantity_after' => $totalAfter,
+                'reference_type' => 'ajuste_manual',
+                'observation' => ($observation ?? 'Saída e criação de ativo') . ' - Produto: ' . ($stock->product->description ?? ''),
+                'user_id' => auth()->id(),
+                'company_id' => $companyId,
+                'movement_date' => Carbon::now()->toDateString(),
+            ]);
+
+            // 3. Buscar valor da nota fiscal (se houver movimentação de entrada associada)
+            $invoiceItemValue = $this->buscarValorNotaFiscal($stock, $quantity);
+            
+            // 4. Preparar dados do ativo
+            $assetData['description'] = $assetData['description'] ?? $stock->product->description;
+            $assetData['acquisition_date'] = $assetData['acquisition_date'] ?? Carbon::now()->toDateString();
+            // Usar valor da nota fiscal se disponível, senão usar valor informado pelo usuário
+            $assetData['value_brl'] = $invoiceItemValue ?? ($assetData['value_brl'] ?? 0);
+            $assetData['status'] = 'incluido';
+            $assetData['item_quantity'] = $quantity;
+            $assetData['purchase_reference_type'] = 'estoque';
+            $assetData['purchase_reference_id'] = $stock->id;
+            $assetData['purchase_reference_number'] = 'ESTOQUE-' . $stock->id;
+            
+            // Se encontrou nota fiscal, adicionar referência
+            if ($invoiceItemValue !== null) {
+                $invoiceItem = StockMovement::where('stock_id', $stock->id)
+                    ->where('movement_type', 'entrada')
+                    ->whereNotNull('purchase_invoice_item_id')
+                    ->where('purchase_invoice_item_id', '>', 0)
+                    ->orderByDesc('created_at')
+                    ->first();
+                
+                if ($invoiceItem && $invoiceItem->purchaseInvoiceItem) {
+                    $invoice = $invoiceItem->purchaseInvoiceItem->invoice;
+                    $assetData['purchase_reference_type'] = 'nota_fiscal';
+                    $assetData['purchase_reference_id'] = $invoice->id;
+                    $assetData['purchase_reference_number'] = $invoice->invoice_number . ($invoice->invoice_series ? '/' . $invoice->invoice_series : '');
+                }
+            }
+            
+            // Remover cost_center_id se for string (código do Protheus)
+            // O campo cost_center_id espera um bigint (ID da tabela costcenter local)
+            // Se vier como string, significa que é código do Protheus e não pode ser salvo diretamente
+            if (isset($assetData['cost_center_id']) && is_string($assetData['cost_center_id'])) {
+                unset($assetData['cost_center_id']);
+            }
+            
+            // Remover cost_center_selected dos dados antes de criar o ativo (não é campo do banco)
+            unset($assetData['cost_center_selected']);
+
+            // 5. Criar ativo
+            $asset = $this->assetService->create($assetData, $companyId, auth()->id());
+
+            // 6. Criar movimentação inicial do ativo com informações do estoque
+            AssetMovement::create([
+                'asset_id' => $asset->id,
+                'movement_type' => 'cadastro',
+                'movement_date' => $asset->acquisition_date ?? Carbon::now()->toDateString(),
+                'to_branch_id' => $asset->branch_id,
+                'to_location_id' => $asset->location_id ?? $stock->stock_location_id,
+                'to_responsible_id' => $asset->responsible_id,
+                'to_cost_center_id' => $asset->cost_center_id,
+                'observation' => 'Criado a partir de baixa de estoque. Produto: ' . ($stock->product->code ?? '') . ' - ' . ($stock->product->description ?? ''),
+                'user_id' => auth()->id(),
+                'reference_type' => 'estoque',
+                'reference_id' => $stock->id,
+            ]);
+
+            DB::commit();
+
+            return [
+                'stock' => $stock->fresh(['product', 'location']),
+                'asset' => $asset,
+                'movement' => $movement,
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Buscar valor unitário da nota fiscal para o estoque
+     * Usa FIFO (First In, First Out) - busca a entrada mais antiga com nota fiscal
+     */
+    protected function buscarValorNotaFiscal(Stock $stock, float $quantity): ?float
+    {
+        // Buscar movimentações de entrada com nota fiscal associada
+        $entryMovements = StockMovement::where('stock_id', $stock->id)
+            ->where('movement_type', 'entrada')
+            ->whereNotNull('purchase_invoice_item_id')
+            ->where('purchase_invoice_item_id', '>', 0)
+            ->orderBy('created_at', 'asc') // FIFO - mais antiga primeiro
+            ->with('purchaseInvoiceItem')
+            ->get();
+
+        if ($entryMovements->isEmpty()) {
+            return null;
+        }
+
+        // Calcular quantidade acumulada até encontrar a quantidade necessária
+        $accumulatedQuantity = 0;
+        $lastMovement = null;
+
+        foreach ($entryMovements as $movement) {
+            $accumulatedQuantity += abs($movement->quantity);
+            $lastMovement = $movement;
+            
+            if ($accumulatedQuantity >= $quantity) {
+                break;
+            }
+        }
+
+        // Se encontrou movimento com nota fiscal, retornar o valor unitário
+        if ($lastMovement && $lastMovement->purchaseInvoiceItem) {
+            return (float) $lastMovement->purchaseInvoiceItem->unit_price;
+        }
+
+        return null;
+    }
+}
+
