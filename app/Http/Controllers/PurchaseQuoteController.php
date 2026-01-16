@@ -2085,6 +2085,7 @@ class PurchaseQuoteController extends Controller
     public function imprimir(Request $request, $id)
     {
         $companyId = $request->header('company-id');
+        $companyId = $companyId ? (int) $companyId : null;
         
         $quote = PurchaseQuote::with([
             'items',
@@ -2093,6 +2094,12 @@ class PurchaseQuoteController extends Controller
             'approvals.approver'
         ])->findOrFail($id);
         
+        // Se a cotação não tiver company_id e o header tiver, atualizar
+        if (!$quote->company_id && $companyId) {
+            $this->updateModelWithStringTimestamps($quote, ['company_id' => $companyId]);
+            $quote->refresh();
+        }
+        
         // Buscar empresa separadamente se necessário
         $company = null;
         if ($quote->company_id) {
@@ -2100,7 +2107,8 @@ class PurchaseQuoteController extends Controller
         }
 
         // Verificar se a cotação pertence à empresa
-        if ($quote->company_id != $companyId) {
+        // Se company_id for null, permitir acesso (cotação antiga sem company_id)
+        if ($quote->company_id !== null && (int) $quote->company_id !== $companyId) {
             return response()->json([
                 'message' => 'Cotação não encontrada ou não pertence à empresa.',
             ], Response::HTTP_FORBIDDEN);
@@ -2164,11 +2172,16 @@ class PurchaseQuoteController extends Controller
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isPhpEnabled', true);
         
-        $pdf = Pdf::loadView('cotacao-comparativa', $dados);
+        // Usar template específico para solicitação quando não há cotações
+        // Se houver cotações, usar o template comparativo
+        $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
+        $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
+        
+        $pdf = Pdf::loadView($viewTemplate, $dados);
         $pdf->getDomPDF()->setOptions($options);
         
-        // Configurar tamanho do papel (A4 landscape para o quadro comparativo)
-        $pdf->setPaper('A4', 'landscape');
+        // Configurar tamanho do papel
+        $pdf->setPaper('A4', $paperOrientation);
         
         return $pdf->stream('cotacao-' . $quote->quote_number . '.pdf');
     }
@@ -2315,29 +2328,13 @@ class PurchaseQuoteController extends Controller
             return false;
         }
 
-        // Se o status for "reprovado", pode ser editada
-        if ($quote->current_status_slug === 'reprovado') {
-            return true;
+        // Só pode editar se o status for "reprovado" ou "aguardando"
+        $statusPermitidos = ['reprovado', 'aguardando'];
+        if (!in_array($quote->current_status_slug, $statusPermitidos)) {
+            return false;
         }
 
-        // Se não há buyer_id na cotação, qualquer um pode editar (ainda não foi atribuída)
-        if (!$quote->buyer_id) {
-            return true;
-        }
-
-        // Verificar se o usuário é comprador
-        $approvalService = app(PurchaseQuoteApprovalService::class);
-        $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
-        
-        $isBuyer = in_array('COMPRADOR', $userLevels);
-        
-        // Se é comprador, só pode editar se for o buyer_id da cotação
-        if ($isBuyer) {
-            return $quote->buyer_id === $user->id;
-        }
-
-        // Outros perfis não podem editar (apenas visualizar)
-        return false;
+        return true;
     }
 
     /**
@@ -2551,5 +2548,56 @@ class PurchaseQuoteController extends Controller
         return response()->json([
             'data' => $data->values()->all(), // Garantir array indexado
         ], Response::HTTP_OK);
+    }
+
+    public function destroy(PurchaseQuote $quote)
+    {
+        // Verificar se o usuário tem permissão para deletar
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_delete')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para deletar solicitações.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Verificar se a cotação pode ser deletada (apenas em status iniciais)
+        $statusPermitidos = ['aguardando', 'reprovado'];
+        if (!in_array($quote->current_status_slug, $statusPermitidos)) {
+            return response()->json([
+                'message' => 'Apenas solicitações com status "Aguardando" ou "Reprovado" podem ser deletadas.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Deletar relacionamentos em cascata
+            $quote->items()->delete();
+            $quote->suppliers()->delete();
+            $quote->messages()->delete();
+            $quote->approvals()->delete();
+            $quote->statusHistory()->delete();
+            
+            // Deletar a cotação
+            $quote->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Solicitação deletada com sucesso.',
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            
+            Log::error('Falha ao deletar solicitação', [
+                'quote_id' => $quote->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Não foi possível deletar a solicitação.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 }
