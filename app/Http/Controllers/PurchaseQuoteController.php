@@ -341,7 +341,7 @@ class PurchaseQuoteController extends Controller
         ], Response::HTTP_OK);
     }
 
-    public function show(PurchaseQuote $quote)
+    public function show(Request $request, PurchaseQuote $quote)
     {
         $quote->load([
             'items.selectedSupplier',
@@ -353,6 +353,7 @@ class PurchaseQuoteController extends Controller
                 $query->orderByDesc('acted_at');
             },
             'statusHistory.status',
+            'company',
         ]);
 
         $itemsCollection = $quote->items;
@@ -429,16 +430,69 @@ class PurchaseQuoteController extends Controller
             'label' => $user->nome_completo ?? $user->login,
         ]);
 
+        // Buscar razão social da empresa
+        $empresaNome = $quote->company_name;
+        
+        // Tentar buscar a empresa de diferentes formas
+        $company = null;
+        $companyId = $quote->company_id;
+        
+        // Se não tem company_id na cotação, tentar pegar do header da requisição
+        if (!$companyId) {
+            $companyId = $request->header('company-id');
+        }
+        
+        if ($companyId) {
+            // Primeiro tenta pelo relacionamento
+            if ($quote->relationLoaded('company') && $quote->company && $quote->company->id == $companyId) {
+                $company = $quote->company;
+            } else {
+                // Se não estiver carregado ou não corresponde, tenta carregar
+                try {
+                    if ($quote->company_id == $companyId) {
+                        $quote->load('company');
+                        if ($quote->company) {
+                            $company = $quote->company;
+                        }
+                    } else {
+                        // Buscar diretamente se o ID não corresponder
+                        $company = \App\Models\Company::find($companyId);
+                    }
+                } catch (\Exception $e) {
+                    // Se falhar, tenta buscar diretamente
+                    try {
+                        $company = \App\Models\Company::find($companyId);
+                    } catch (\Exception $e2) {
+                        // Ignora erro
+                    }
+                }
+            }
+        }
+        
+        // Se encontrou a empresa, usar razão social ou nome
+        if ($company) {
+            if (!empty($company->razao_social)) {
+                $empresaNome = $company->razao_social;
+            } elseif (!empty($company->company)) {
+                $empresaNome = $company->company;
+            }
+            // Se ainda não tem nada, mantém o company_name que já estava
+        }
+        
+        // Se ainda está vazio e tem company_name na cotação, usar ele
+        if (empty($empresaNome) && !empty($quote->company_name)) {
+            $empresaNome = $quote->company_name;
+        }
+
         return response()->json([
             'data' => [
                 'id' => $quote->id,
                 'numero' => $quote->quote_number,
                 'data' => optional($quote->requested_at)->format('d/m/Y'),
                 'solicitante' => $quote->requester_name,
-                'empresa' => $quote->company_name,
+                'empresa' => $empresaNome,
                 'company_id' => $quote->company_id,
                 'local' => $quote->location,
-                'frente_obra' => $quote->work_front,
                 'observacao' => $quote->observation,
                 'requires_response' => (bool) $quote->requires_response,
                 'centro_custo' => [

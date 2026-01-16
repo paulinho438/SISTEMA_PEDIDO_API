@@ -179,6 +179,11 @@ class PurchaseQuote extends Model
         return $this->belongsTo(User::class, 'buyer_id')->withDefault();
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'company_id')->withDefault();
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(PurchaseOrder::class, 'purchase_quote_id');
