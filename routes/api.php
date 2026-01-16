@@ -280,6 +280,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/protheus/tes', [ProtheusDataController::class, 'tes']);
     Route::get('/cotacoes', [PurchaseQuoteController::class, 'index']);
     Route::post('/cotacoes', [PurchaseQuoteController::class, 'store']);
+    Route::put('/cotacoes/{quote}', [PurchaseQuoteController::class, 'update']);
     Route::get('/cotacoes/acompanhamento', [PurchaseQuoteController::class, 'acompanhamento']);
     Route::get('/cotacoes/{quote}', [PurchaseQuoteController::class, 'show']);
     Route::post('/cotacoes/{quote}/detalhes', [PurchaseQuoteController::class, 'saveDetails']);

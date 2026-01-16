@@ -477,8 +477,11 @@ class PurchaseQuoteController extends Controller
                     'aplicacao' => $item->application,
                     'prioridade' => $item->priority_days,
                     'tag' => $item->tag,
-                    'centro_custo' => $item->cost_center_code,
-                    'centro_custo_descricao' => $item->cost_center_description,
+                    'centro_custo' => ($item->cost_center_code || $item->cost_center_description) ? [
+                        'codigo' => $item->cost_center_code,
+                        'descricao' => $item->cost_center_description,
+                        'classe' => null, // O campo classe não está armazenado no banco, mas mantemos para compatibilidade
+                    ] : null,
                 ]),
                 'historico' => $quote->statusHistory->map(fn (PurchaseQuoteStatusHistory $history) => [
                     'status' => $history->status_label,
@@ -763,6 +766,195 @@ class PurchaseQuoteController extends Controller
             return response()->json([
                 'message' => 'Não foi possível salvar a cotação.',
                 'error' => $errorMessage,
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function update(Request $request, PurchaseQuote $quote)
+    {
+        // Verificar se o usuário pode editar esta cotação
+        if (!$this->canUserEditQuote($quote, auth()->user())) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar esta solicitação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Se a solicitação estiver reprovada, voltar para "aguardando" ao salvar
+        $statusNovo = null;
+        if ($quote->current_status_slug === 'reprovado') {
+            $statusAguardando = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
+            if (!$statusAguardando) {
+                return response()->json([
+                    'message' => 'Status "aguardando" não configurado. Execute as migrations novamente.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+            $statusNovo = $statusAguardando;
+        }
+
+        $validated = $request->validate([
+            'numero' => 'nullable|string|max:30|unique:purchase_quotes,quote_number,' . $quote->id,
+            'data_solicitacao' => 'nullable|date',
+            'solicitante.id' => 'nullable|integer|exists:users,id',
+            'solicitante.label' => 'nullable|string|max:191',
+            'empresa.id' => 'nullable|integer|exists:companies,id',
+            'empresa.label' => 'nullable|string|max:191',
+            'local' => 'nullable|string|max:191',
+            'work_front' => 'nullable|string|max:191',
+            'observacao' => 'nullable|string',
+            'itens' => 'required|array|min:1',
+            'itens.*.id' => 'nullable|integer|exists:purchase_quote_items,id',
+            'itens.*.codigo' => 'nullable|string|max:100',
+            'itens.*.referencia' => 'nullable|string|max:100',
+            'itens.*.mercadoria' => 'required|string|max:255',
+            'itens.*.quantidade' => 'nullable|numeric|min:0',
+            'itens.*.unidade' => 'nullable|string|max:20',
+            'itens.*.aplicacao' => 'nullable|string',
+            'itens.*.prioridade' => 'nullable|integer|min:0',
+            'itens.*.tag' => 'nullable|string|max:100',
+            'itens.*.centro_custo.codigo' => 'nullable|string|max:50',
+            'itens.*.centro_custo.descricao' => 'nullable|string',
+            'itens.*.centro_custo.classe' => 'nullable|string|max:20',
+        ]);
+
+        // Garantir que requested_at seja uma string no formato Y-m-d
+        $requestedAt = null;
+        if (!empty($validated['data_solicitacao'])) {
+            try {
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $validated['data_solicitacao'])) {
+                    $parsed = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['data_solicitacao']);
+                    $requestedAt = $parsed->format('Y-m-d');
+                } else {
+                    $parsed = \Carbon\Carbon::parse($validated['data_solicitacao']);
+                    $requestedAt = $parsed->format('Y-m-d');
+                }
+            } catch (\Exception $e) {
+                $requestedAt = $quote->requested_at ? (\Carbon\Carbon::parse($quote->requested_at)->format('Y-m-d')) : now()->format('Y-m-d');
+            }
+        } else {
+            $requestedAt = $quote->requested_at ? (\Carbon\Carbon::parse($quote->requested_at)->format('Y-m-d')) : now()->format('Y-m-d');
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Atualizar dados principais da cotação
+            $updateData = [
+                'requester_id' => data_get($validated, 'solicitante.id'),
+                'requester_name' => data_get($validated, 'solicitante.label'),
+                'company_id' => data_get($validated, 'empresa.id'),
+                'company_name' => data_get($validated, 'empresa.label'),
+                'location' => $validated['local'] ?? null,
+                'work_front' => $validated['work_front'] ?? null,
+                'observation' => $validated['observacao'] ?? null,
+                'updated_by' => auth()->id(),
+            ];
+
+            if (!empty($validated['numero'])) {
+                $updateData['quote_number'] = $validated['numero'];
+            }
+
+            $this->updateModelWithStringTimestamps($quote, $updateData);
+
+            // Atualizar requested_at separadamente
+            if ($requestedAt) {
+                DB::statement("UPDATE [purchase_quotes] SET [requested_at] = CAST(? AS DATE) WHERE [id] = ?", [$requestedAt, $quote->id]);
+                $quote->refresh();
+            }
+
+            // Atualizar itens: remover os que não estão mais na lista
+            $itemIdsFromRequest = array_filter(array_map(fn($item) => $item['id'] ?? null, $validated['itens']));
+            $quote->items()->whereNotIn('id', $itemIdsFromRequest)->delete();
+
+            $mainCostCenterCode = null;
+            $mainCostCenterDescription = null;
+            $itemCreatedAt = now()->format('Y-m-d H:i:s');
+            $itemUpdatedAt = now()->format('Y-m-d H:i:s');
+
+            // Atualizar ou criar itens
+            foreach ($validated['itens'] as $itemData) {
+                $centro = $itemData['centro_custo'] ?? null;
+                $costCenterCode = $centro['codigo'] ?? null;
+                $costCenterDescription = $centro['descricao'] ?? null;
+
+                if (!empty($itemData['id'])) {
+                    // Atualizar item existente
+                    $item = $quote->items()->find($itemData['id']);
+                    if ($item) {
+                        $itemUpdateData = [
+                            'product_code' => $itemData['codigo'] ?? null,
+                            'reference' => $itemData['referencia'] ?? null,
+                            'description' => $itemData['mercadoria'],
+                            'quantity' => $itemData['quantidade'] ?? 0,
+                            'unit' => $itemData['unidade'] ?? null,
+                            'application' => $itemData['aplicacao'] ?? null,
+                            'priority_days' => $itemData['prioridade'] ?? null,
+                            'tag' => $itemData['tag'] ?? null,
+                            'cost_center_code' => $costCenterCode,
+                            'cost_center_description' => $costCenterDescription,
+                        ];
+
+                        $this->updateModelWithStringTimestamps($item, $itemUpdateData);
+                    }
+                } else {
+                    // Criar novo item
+                    $newItemData = [
+                        'purchase_quote_id' => $quote->id,
+                        'product_code' => $itemData['codigo'] ?? null,
+                        'reference' => $itemData['referencia'] ?? null,
+                        'description' => $itemData['mercadoria'],
+                        'quantity' => $itemData['quantidade'] ?? 0,
+                        'unit' => $itemData['unidade'] ?? null,
+                        'application' => $itemData['aplicacao'] ?? null,
+                        'priority_days' => $itemData['prioridade'] ?? null,
+                        'tag' => $itemData['tag'] ?? null,
+                        'cost_center_code' => $costCenterCode,
+                        'cost_center_description' => $costCenterDescription,
+                    ];
+
+                    $this->insertWithStringTimestamps('purchase_quote_items', $newItemData);
+                }
+
+                if (!$mainCostCenterCode && $costCenterCode) {
+                    $mainCostCenterCode = $costCenterCode;
+                    $mainCostCenterDescription = $costCenterDescription;
+                }
+            }
+
+            // Atualizar centro de custo principal
+            if ($mainCostCenterCode) {
+                $this->updateModelWithStringTimestamps($quote, [
+                    'main_cost_center_code' => $mainCostCenterCode,
+                    'main_cost_center_description' => $mainCostCenterDescription,
+                ]);
+            }
+
+            // Se estava reprovada, mudar para "aguardando"
+            if ($statusNovo) {
+                $this->transitionStatus($quote, $statusNovo, 'Solicitação editada e retornada para aguardando autorização.');
+            }
+
+            DB::commit();
+
+            $quote->refresh();
+            $quote->load(['items', 'status']);
+
+            return response()->json([
+                'message' => 'Solicitação atualizada com sucesso.',
+                'data' => [
+                    'id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            Log::error('Falha ao atualizar solicitação', [
+                'quote_id' => $quote->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Não foi possível atualizar a solicitação.',
+                'error' => $exception->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -1247,6 +1439,13 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
+        // Validar que a mensagem foi fornecida
+        if ($normalizedMessage === '') {
+            return response()->json([
+                'message' => 'Informe o motivo da reprovação.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
         $status = PurchaseQuoteStatus::where('slug', 'reprovado')->first();
 
         if (!$status) {
@@ -1258,7 +1457,15 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
-            $this->transitionStatus($quote, $status, $validated['observacao'] ?? 'Solicitação reprovada.');
+            // Criar mensagem de reprovação para o solicitante ver ao editar
+            $this->insertWithStringTimestamps('purchase_quote_messages', [
+                'purchase_quote_id' => $quote->id,
+                'user_id' => auth()->id(),
+                'type' => 'reprova',
+                'message' => $normalizedMessage,
+            ]);
+
+            $this->transitionStatus($quote, $status, $normalizedMessage);
             DB::commit();
 
             return response()->json([
