@@ -182,8 +182,37 @@ class StockProductService
         }
 
         $data['company_id'] = $companyId;
+        $data['active'] = $data['active'] ?? true;
         
-        return StockProduct::create($data);
+        // Usar DB::statement() com CAST para garantir compatibilidade com SQL Server
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+        
+        $columns = array_keys($data);
+        $placeholders = array_fill(0, count($data), '?');
+        $values = array_values($data);
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stock_products] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        
+        DB::statement($sql, $values);
+        
+        // Buscar o ID do último registro inserido
+        $productId = DB::getPdo()->lastInsertId();
+        
+        // Carregar e retornar o modelo usando o ID retornado
+        return StockProduct::findOrFail($productId);
     }
 
     /**
