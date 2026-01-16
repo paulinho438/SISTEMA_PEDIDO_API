@@ -183,10 +183,10 @@ class UsuarioController extends Controller
                 $validator = Validator::make($request->all(), [
             'login' => 'required|unique:users,login',
             'nome_completo' => 'required',
-            'cpf' => 'required',
-            'rg' => 'required',
-            'data_nascimento' => 'required',
-            'sexo' => 'required',
+            'cpf' => 'nullable|string',
+            'rg' => 'nullable|string',
+            'data_nascimento' => 'nullable|string',
+            'sexo' => 'nullable|string',
             'email' => 'required',
             'telefone_celular' => 'required',
             'signature' => 'nullable|image|mimes:png|max:2048',
@@ -203,10 +203,34 @@ class UsuarioController extends Controller
                 $dados['permissao'] = json_decode($dados['permissao'], true);
             }
 
-            $cpf = preg_replace('/[^0-9]/', '', $dados['cpf']);
+            // Processar CPF apenas se fornecido
+            if (!empty($dados['cpf'])) {
+                $cpf = preg_replace('/[^0-9]/', '', $dados['cpf']);
+                $dados['cpf'] = $cpf;
+            } else {
+                $dados['cpf'] = null;
+            }
 
-            $dados['data_nascimento'] = (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d');
-            $dados['cpf'] = $cpf;
+            // Processar data_nascimento apenas se fornecido
+            if (!empty($dados['data_nascimento'])) {
+                try {
+                    $dados['data_nascimento'] = (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d');
+                } catch (\Exception $e) {
+                    // Se falhar ao parsear, manter como está ou definir como null
+                    $dados['data_nascimento'] = null;
+                }
+            } else {
+                $dados['data_nascimento'] = null;
+            }
+
+            // Garantir que campos opcionais sejam null se não fornecidos
+            if (!isset($dados['rg']) || empty($dados['rg'])) {
+                $dados['rg'] = null;
+            }
+            if (!isset($dados['sexo']) || empty($dados['sexo'])) {
+                $dados['sexo'] = null;
+            }
+
             $dados['password'] = password_hash($dados['password'], PASSWORD_DEFAULT);
 
             // Processar upload de assinatura se houver
@@ -424,10 +448,10 @@ class UsuarioController extends Controller
             // Validar os campos
             $validationRules = [
                 'nome_completo' => 'required|string',
-                'cpf' => 'required|string',
-                'rg' => 'required|string',
-                'data_nascimento' => 'required|string',
-                'sexo' => 'required|string',
+                'cpf' => 'nullable|string',
+                'rg' => 'nullable|string',
+                'data_nascimento' => 'nullable|string',
+                'sexo' => 'nullable|string',
                 'telefone_celular' => 'required|string',
                 'email' => 'required|email',
             ];
@@ -453,7 +477,11 @@ class UsuarioController extends Controller
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            $cpf = preg_replace('/[^0-9]/', '', $dados['cpf']);
+            // Processar CPF apenas se fornecido
+            $cpf = null;
+            if (!empty($dados['cpf'])) {
+                $cpf = preg_replace('/[^0-9]/', '', $dados['cpf']);
+            }
 
             $EditUser = User::find($id);
 
@@ -463,13 +491,24 @@ class UsuarioController extends Controller
                 $dados['password'] = $EditUser->password;
             }
 
+            // Processar data_nascimento apenas se fornecido
+            $dataNascimento = null;
+            if (!empty($dados['data_nascimento'])) {
+                try {
+                    $dataNascimento = (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d');
+                } catch (\Exception $e) {
+                    // Se falhar ao parsear, manter como null
+                    $dataNascimento = null;
+                }
+            }
+
             // Preparar dados para atualização
             $updateData = [
                 'nome_completo' => $dados['nome_completo'],
                 'cpf' => $cpf,
-                'rg' => $dados['rg'],
-                'data_nascimento' => (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d'),
-                'sexo' => $dados['sexo'],
+                'rg' => $dados['rg'] ?? null,
+                'data_nascimento' => $dataNascimento,
+                'sexo' => $dados['sexo'] ?? null,
                 'telefone_celular' => $dados['telefone_celular'],
                 'email' => $dados['email'],
                 'password' => $dados['password'],
