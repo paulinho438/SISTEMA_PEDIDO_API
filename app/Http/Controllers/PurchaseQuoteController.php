@@ -1405,6 +1405,17 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
+            // Garantir que a cotação tenha company_id (pegar do header se não tiver)
+            if (!$quote->company_id) {
+                $companyId = (int) $request->header('company-id');
+                if ($companyId) {
+                    $this->updateModelWithStringTimestamps($quote, [
+                        'company_id' => $companyId,
+                    ]);
+                    $quote->refresh();
+                }
+            }
+
             $this->updateModelWithStringTimestamps($quote, [
                 'updated_by' => auth()->id(),
             ]);
@@ -1419,8 +1430,28 @@ class PurchaseQuoteController extends Controller
             $user = auth()->user();
             $approvalService = app(PurchaseQuoteApprovalService::class);
             
-            // Se o status mudou para 'analisada', pode ser que o Engenheiro tenha analisado
-            if ($status->slug === 'analisada') {
+            // Se o status atual é 'finalizada' e está mudando para 'analisada', verificar qual perfil está analisando
+            // Isso garante que quando o Gerente Local ou Engenheiro analisam uma cotação finalizada, suas aprovações sejam registradas
+            if ($currentStatus === 'finalizada' && $status->slug === 'analisada') {
+                // Verificar se há aprovação pendente para GERENTE_LOCAL e o usuário pode aprovar
+                $localManagerApproval = $quote->approvals()
+                    ->byLevel('GERENTE_LOCAL')
+                    ->required()
+                    ->where('approved', false)
+                    ->first();
+
+                // Verificar se pode aprovar (após garantir company_id)
+                $canApprove = $approvalService->canApproveLevel($quote, 'GERENTE_LOCAL', $user);
+                
+                if ($localManagerApproval && $canApprove) {
+                    // Aprovar o nível GERENTE_LOCAL
+                    $approvalService->approveLevel($quote, 'GERENTE_LOCAL', $user, $validated['observacao'] ?? null);
+                    
+                    // Recarregar a cotação com os relacionamentos atualizados para garantir que a assinatura apareça
+                    $quote->refresh();
+                    $quote->load(['approvals.approver']);
+                }
+                
                 // Verificar se há aprovação pendente para ENGENHEIRO e o usuário pode aprovar
                 $engineerApproval = $quote->approvals()
                     ->byLevel('ENGENHEIRO')
@@ -1437,13 +1468,13 @@ class PurchaseQuoteController extends Controller
                     $quote->load(['approvals.approver']);
                     
                     // Verificar se há GERENTE_LOCAL pendente e avançar para ele
-                    $localManagerApproval = $quote->approvals()
+                    $localManagerApprovalAfterEngineer = $quote->approvals()
                         ->byLevel('GERENTE_LOCAL')
                         ->required()
                         ->where('approved', false)
                         ->first();
                     
-                    if ($localManagerApproval) {
+                    if ($localManagerApprovalAfterEngineer) {
                         // Avançar para análise de gerência (onde o Gerente Local vai aprovar)
                         $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
                         if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
@@ -1452,15 +1483,40 @@ class PurchaseQuoteController extends Controller
                     }
                 }
             } elseif ($status->slug === 'analise_gerencia') {
-                // Verificar se há aprovação pendente para GERENTE_LOCAL
-                $localManagerApproval = $quote->approvals()
-                    ->byLevel('GERENTE_LOCAL')
-                    ->required()
-                    ->where('approved', false)
-                    ->first();
-                
-                if ($localManagerApproval && $approvalService->canApproveLevel($quote, 'GERENTE_LOCAL', $user)) {
-                    $approvalService->approveLevel($quote, 'GERENTE_LOCAL', $user, $validated['observacao'] ?? null);
+                // Quando o status atual é 'analisada' ou 'analisada_aguardando' e muda para 'analise_gerencia',
+                // pode ser GERENTE_LOCAL ou GERENTE_GERAL que está encaminhando, então deve aprovar automaticamente
+                if (in_array($currentStatus, ['analisada', 'analisada_aguardando'])) {
+                    // Verificar se há aprovação pendente para GERENTE_LOCAL e o usuário pode aprovar
+                    $localManagerApproval = $quote->approvals()
+                        ->byLevel('GERENTE_LOCAL')
+                        ->required()
+                        ->where('approved', false)
+                        ->first();
+                    
+                    if ($localManagerApproval && $approvalService->canApproveLevel($quote, 'GERENTE_LOCAL', $user)) {
+                        // Aprovar o nível GERENTE_LOCAL quando encaminha para análise de gerência
+                        $approvalService->approveLevel($quote, 'GERENTE_LOCAL', $user, $validated['observacao'] ?? null);
+                        
+                        // Recarregar a cotação com os relacionamentos atualizados para garantir que a assinatura apareça
+                        $quote->refresh();
+                        $quote->load(['approvals.approver']);
+                    }
+                    
+                    // Verificar se há aprovação pendente para GERENTE_GERAL e o usuário pode aprovar
+                    $generalManagerApproval = $quote->approvals()
+                        ->byLevel('GERENTE_GERAL')
+                        ->required()
+                        ->where('approved', false)
+                        ->first();
+                    
+                    if ($generalManagerApproval && $approvalService->canApproveLevel($quote, 'GERENTE_GERAL', $user)) {
+                        // Aprovar o nível GERENTE_GERAL quando encaminha para análise de gerência
+                        $approvalService->approveLevel($quote, 'GERENTE_GERAL', $user, $validated['observacao'] ?? null);
+                        
+                        // Recarregar a cotação com os relacionamentos atualizados para garantir que a assinatura apareça
+                        $quote->refresh();
+                        $quote->load(['approvals.approver']);
+                    }
                 }
             } elseif ($status->slug === 'aprovado') {
                 // Verificar se há aprovação pendente para GERENTE_GERAL ou DIRETOR

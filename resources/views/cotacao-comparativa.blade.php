@@ -252,34 +252,59 @@
     <table class="quote-table">
         <thead>
             <tr>
-                <th style="width: 3%;">Item</th>
-                <th style="width: 5%;">Qtd</th>
-                <th style="width: 5%;">Medida</th>
-                <th style="width: 20%;">DESCRIÇÃO DE PRODUTO</th>
-                <th style="width: 15%;">FINALIDADE</th>
-                <th style="width: 8%;">FILIAL</th>
-                <th style="width: 8%;">N° RM</th>
+                <th rowspan="2" style="width: 3%;">Item</th>
+                <th rowspan="2" style="width: 5%;">Qtd</th>
+                <th rowspan="2" style="width: 5%;">Medida</th>
+                <th rowspan="2" style="width: 20%;">DESCRIÇÃO DE PRODUTO</th>
+                <th rowspan="2" style="width: 15%;">FINALIDADE</th>
+                <th rowspan="2" style="width: 8%;">FILIAL</th>
+                <th rowspan="2" style="width: 8%;">N° RM</th>
                 @if($totalSuppliers > 0)
                     @for($i = 0; $i < min(1, $totalSuppliers); $i++)
-                        <th colspan="7" style="width: 50%;" class="supplier-header">
-                            COTAÇÃO {{ $i + 1 }}
-                        </th>
+                        @if(isset($suppliers[$i]))
+                            @php
+                                $supplier = $suppliers[$i];
+                            @endphp
+                            <th colspan="7" style="width: 50%;" class="supplier-header">
+                                <div style="font-weight: bold; margin-bottom: 5px;">COTAÇÃO {{ $i + 1 }}</div>
+                                <div style="font-size: 6pt; text-align: left;">
+                                    <div><strong>FORNECEDOR:</strong> {{ strtoupper($supplier->supplier_name ?? '') }}</div>
+                                    <div><strong>VENDEDOR:</strong> {{ strtoupper($supplier->vendor_name ?? '') }}</div>
+                                    <div><strong>TELEFONE:</strong> {{ $supplier->vendor_phone ?? '' }}</div>
+                                    <div><strong>EMAIL:</strong> {{ $supplier->vendor_email ?? '' }}</div>
+                                    <div><strong>N° PROPOSTA:</strong> {{ $supplier->proposal_number ?? '' }}</div>
+                                </div>
+                            </th>
+                        @else
+                            <th colspan="7" style="width: 50%;" class="supplier-header">
+                                COTAÇÃO {{ $i + 1 }}
+                            </th>
+                        @endif
+                    @endfor
+                @endif
+            </tr>
+            <tr>
+                @if($totalSuppliers > 0)
+                    @for($i = 0; $i < min(1, $totalSuppliers); $i++)
+                        <th>Custo Unit. S/IPI</th>
+                        <th>IPI %</th>
+                        <th>Valor Total S/Difal C/IPI</th>
+                        <th>ICMS %</th>
+                        <th>ICMS Custo Total</th>
+                        <th>Custo Total C/DIFAL C/IPI</th>
+                        <th>Marca</th>
                     @endfor
                 @endif
             </tr>
         </thead>
         <tbody>
-            @php
-                // Pegar apenas o primeiro item para a primeira página
-                $firstItem = $items->first();
-            @endphp
-            @if($firstItem)
+            @foreach($items as $itemIndex => $item)
             <tr>
-                <td class="center">1</td>
-                <td class="center">{{ number_format($firstItem->quantity, 0, ',', '.') }}</td>
-                <td class="center">{{ strtoupper($firstItem->unit ?? 'UND') }}</td>
-                <td>{{ strtoupper($firstItem->description ?? '') }}</td>
-                <td>{{ strtoupper($firstItem->application ?? '') }}</td>
+                <td class="center">{{ $itemIndex + 1 }}</td>
+                <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
+                <td class="center">{{ strtoupper($item->unit ?? 'UND') }}</td>
+                <td>{{ strtoupper($item->description ?? '') }}</td>
+                <td>{{ strtoupper($item->application ?? '') }}</td>
                 <td>{{ strtoupper($quote->location ?? '') }}</td>
                 <td></td>
                 
@@ -287,135 +312,114 @@
                     @if(isset($suppliers[$i]))
                         @php
                             $supplier = $suppliers[$i];
-                            $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $firstItem->id);
+                            $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $item->id);
                             $unitCost = $supplierItem ? ($supplierItem->unit_cost ?? 0) : 0;
                             $ipiPercent = $supplierItem ? ($supplierItem->ipi ?? 0) : 0;
-                            $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $firstItem->quantity) : 0;
+                            $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                             $icmsPercent = $supplierItem ? ($supplierItem->icms ?? 0) : 0;
                             $icmsTotal = $supplierItem ? ($supplierItem->icms_total ?? 0) : 0;
-                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $firstItem->quantity) : 0;
+                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                             
                             // Verificar se deve destacar (menor preço ou selecionado)
                             $highlight = false;
                             $highlightClass = '';
-                            if ($itemHighlights[$firstItem->id]['selected_supplier_id'] == $supplier->id) {
+                            if (isset($itemHighlights[$item->id]) && $itemHighlights[$item->id]['selected_supplier_id'] == $supplier->id) {
                                 $highlight = true;
                                 $highlightClass = 'highlight-yellow';
-                            } elseif ($itemHighlights[$firstItem->id]['menor_preco_com_difal_supplier_id'] == $supplier->id) {
+                            } elseif (isset($itemHighlights[$item->id]) && $itemHighlights[$item->id]['menor_preco_com_difal_supplier_id'] == $supplier->id) {
                                 $highlight = true;
                                 $highlightClass = 'highlight-yellow';
                             }
                         @endphp
-                        <td colspan="7" style="padding: 0; vertical-align: top;">
-                            <!-- Informações do Fornecedor -->
-                            <div class="supplier-info">
-                                <table>
-                                    <tr>
-                                        <td>FORNECEDOR:</td>
-                                        <td style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ strtoupper($supplier->supplier_name ?? '') }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>VENDEDOR:</td>
-                                        <td>{{ strtoupper($supplier->vendor_name ?? '') }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>TELEFONE:</td>
-                                        <td>{{ $supplier->vendor_phone ?? '' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>EMAIL:</td>
-                                        <td>{{ $supplier->vendor_email ?? '' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>N° PROPOSTA:</td>
-                                        <td>{{ $supplier->proposal_number ?? '' }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            
-                            <!-- Tabela de Custos -->
-                            <table class="cost-table">
-                                <thead>
-                                    <tr>
-                                        <th>Custo Unit. S/IPI</th>
-                                        <th>IPI %</th>
-                                        <th>Valor Total S/Difal C/IPI</th>
-                                        <th>ICMS %</th>
-                                        <th>ICMS Custo Total</th>
-                                        <th>Custo Total C/DIFAL C/IPI</th>
-                                        <th>Marca</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($unitCost, 2, ',', '.') }}</td>
-                                        <td style="text-align: right;">{{ $ipiPercent > 0 ? number_format($ipiPercent, 2, ',', '.') . '%' : '' }}</td>
-                                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithIpi, 2, ',', '.') }}</td>
-                                        <td style="text-align: right;">{{ $icmsPercent > 0 ? number_format($icmsPercent, 2, ',', '.') . '%' : '' }}</td>
-                                        <td style="text-align: right;">R$ {{ number_format($icmsTotal, 2, ',', '.') }}</td>
-                                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithDifal, 2, ',', '.') }}</td>
-                                        <td class="center">{{ strtoupper($firstItem->tag ?? '') }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                            
-                            <!-- Informações de Frete e Entrega -->
-                            <div class="supplier-info">
-                                <table>
-                                    <tr>
-                                        <td>Tipo de frete:</td>
-                                        <td>{{ $supplier->freight_type == 'F' ? 'FOB' : ($supplier->freight_type == 'C' ? 'CIF' : '') }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Valor do Frete:</td>
-                                        <td style="text-align: right;">0,00</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Total Comprado S/ Difal C/IPI + Frete:</td>
-                                        <td style="text-align: right;">
-                                            @php
-                                                $totalSemDifal = 0;
-                                                foreach ($items as $it) {
-                                                    $si = $supplier->items->firstWhere('purchase_quote_item_id', $it->id);
-                                                    if ($si) {
-                                                        $totalSemDifal += ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $it->quantity;
-                                                    }
-                                                }
-                                            @endphp
-                                            {{ number_format($totalSemDifal, 2, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Total Comprado C/ Difal C/IPI + Frete:</td>
-                                        <td style="text-align: right;">
-                                            @php
-                                                $totalComDifal = 0;
-                                                foreach ($items as $it) {
-                                                    $si = $supplier->items->firstWhere('purchase_quote_item_id', $it->id);
-                                                    if ($si) {
-                                                        $totalComDifal += $si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $it->quantity;
-                                                    }
-                                                }
-                                            @endphp
-                                            {{ number_format($totalComDifal, 2, ',', '.') }}
-                                        </td>
-                                    </tr>
-                                    <tr>
-                                        <td>Condição de Pgto:</td>
-                                        <td>{{ $supplier->payment_condition_description ?? '' }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td>Prazo de Entrega:</td>
-                                        <td>{{ $supplier->payment_condition_description ?? '' }}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                        </td>
+                        <!-- Células diretas de custo (sem tabela aninhada) -->
+                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($unitCost, 2, ',', '.') }}</td>
+                        <td style="text-align: right;">{{ $ipiPercent > 0 ? number_format($ipiPercent, 2, ',', '.') . '%' : '' }}</td>
+                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithIpi, 2, ',', '.') }}</td>
+                        <td style="text-align: right;">{{ $icmsPercent > 0 ? number_format($icmsPercent, 2, ',', '.') . '%' : '' }}</td>
+                        <td style="text-align: right;">R$ {{ number_format($icmsTotal, 2, ',', '.') }}</td>
+                        <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithDifal, 2, ',', '.') }}</td>
+                        <td class="center">{{ strtoupper($item->tag ?? '') }}</td>
                     @else
-                        <td colspan="7"></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
                     @endif
                 @endfor
             </tr>
+            @endforeach
+            
+            @if($totalSuppliers > 0)
+                @for($i = 0; $i < min(1, $totalSuppliers); $i++)
+                    @if(isset($suppliers[$i]))
+                        @php
+                            $supplier = $suppliers[$i];
+                        @endphp
+                        <!-- Linha final com informações de frete -->
+                        <tr>
+                            <td colspan="7"></td>
+                            <td colspan="7" style="padding: 5px; font-size: 7pt;">
+                                <div class="supplier-info">
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 7pt;">
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold; width: 40%;">Tipo de frete:</td>
+                                            <td style="padding: 2px;">{{ $supplier->freight_type == 'F' ? 'FOB' : ($supplier->freight_type == 'C' ? 'CIF' : '') }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold;">Valor do Frete:</td>
+                                            <td style="padding: 2px; text-align: right;">0,00</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold;">Total Comprado S/ Difal C/IPI + Frete:</td>
+                                            <td style="padding: 2px; text-align: right;">
+                                                @php
+                                                    $totalSemDifal = 0;
+                                                    foreach ($items as $it) {
+                                                        $si = $supplier->items->firstWhere('purchase_quote_item_id', $it->id);
+                                                        if ($si) {
+                                                            $totalSemDifal += ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $it->quantity;
+                                                        }
+                                                    }
+                                                @endphp
+                                                {{ number_format($totalSemDifal, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold;">Total Comprado C/ Difal C/IPI + Frete:</td>
+                                            <td style="padding: 2px; text-align: right;">
+                                                @php
+                                                    $totalComDifal = 0;
+                                                    foreach ($items as $it) {
+                                                        $si = $supplier->items->firstWhere('purchase_quote_item_id', $it->id);
+                                                        if ($si) {
+                                                            $totalComDifal += $si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $it->quantity;
+                                                        }
+                                                    }
+                                                @endphp
+                                                {{ number_format($totalComDifal, 2, ',', '.') }}
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold;">Condição de Pgto:</td>
+                                            <td style="padding: 2px;">{{ $supplier->payment_condition_description ?? '' }}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding: 2px; font-weight: bold;">Prazo de Entrega:</td>
+                                            <td style="padding: 2px;">{{ $supplier->payment_condition_description ?? '' }}</td>
+                                        </tr>
+                                    </table>
+                                </div>
+                            </td>
+                        </tr>
+                    @else
+                        <tr>
+                            <td colspan="14"></td>
+                        </tr>
+                    @endif
+                @endfor
             @endif
         </tbody>
     </table>
@@ -497,9 +501,6 @@
                             </div>
 
                             <!-- Tabela com Item, Qtd, Medida, Descrição e Custos na mesma linha -->
-                            @php
-                                $firstItem = $items->first();
-                            @endphp
                             <table class="quote-table" style="font-size: 7pt;">
                                 <thead>
                                     <tr>
@@ -517,42 +518,42 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @if($firstItem)
+                                    @foreach($items as $itemIndex => $item)
                                         @php
-                                            $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $firstItem->id);
+                                            $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $item->id);
                                             $unitCost = $supplierItem ? ($supplierItem->unit_cost ?? 0) : 0;
                                             $ipiPercent = $supplierItem ? ($supplierItem->ipi ?? 0) : 0;
-                                            $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $firstItem->quantity) : 0;
+                                            $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                                             $icmsPercent = $supplierItem ? ($supplierItem->icms ?? 0) : 0;
                                             $icmsTotal = $supplierItem ? ($supplierItem->icms_total ?? 0) : 0;
-                                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $firstItem->quantity) : 0;
+                                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                                             
                                             $highlight = false;
                                             $highlightClass = '';
-                                            if ($firstItem && isset($itemHighlights[$firstItem->id])) {
-                                                if ($itemHighlights[$firstItem->id]['selected_supplier_id'] == $supplier->id) {
+                                            if (isset($itemHighlights[$item->id])) {
+                                                if ($itemHighlights[$item->id]['selected_supplier_id'] == $supplier->id) {
                                                     $highlight = true;
                                                     $highlightClass = 'highlight-yellow';
-                                                } elseif ($itemHighlights[$firstItem->id]['menor_preco_com_difal_supplier_id'] == $supplier->id) {
+                                                } elseif ($itemHighlights[$item->id]['menor_preco_com_difal_supplier_id'] == $supplier->id) {
                                                     $highlight = true;
                                                     $highlightClass = 'highlight-yellow';
                                                 }
                                             }
                                         @endphp
                                         <tr>
-                                            <td class="center">1</td>
-                                            <td class="center">{{ number_format($firstItem->quantity, 0, ',', '.') }}</td>
-                                            <td class="center">{{ strtoupper($firstItem->unit ?? 'UND') }}</td>
-                                            <td>{{ strtoupper($firstItem->description ?? '') }}</td>
+                                            <td class="center">{{ $itemIndex + 1 }}</td>
+                                            <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
+                                            <td class="center">{{ strtoupper($item->unit ?? 'UND') }}</td>
+                                            <td>{{ strtoupper($item->description ?? '') }}</td>
                                             <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($unitCost, 2, ',', '.') }}</td>
                                             <td style="text-align: right;">{{ $ipiPercent > 0 ? number_format($ipiPercent, 2, ',', '.') . '%' : '' }}</td>
                                             <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithIpi, 2, ',', '.') }}</td>
                                             <td style="text-align: right;">{{ $icmsPercent > 0 ? number_format($icmsPercent, 2, ',', '.') . '%' : '' }}</td>
                                             <td style="text-align: right;">R$ {{ number_format($icmsTotal, 2, ',', '.') }}</td>
                                             <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithDifal, 2, ',', '.') }}</td>
-                                            <td class="center">{{ strtoupper($firstItem->tag ?? '') }}</td>
+                                            <td class="center">{{ strtoupper($item->tag ?? '') }}</td>
                                         </tr>
-                                    @endif
+                                    @endforeach
                                 </tbody>
                             </table>
 
