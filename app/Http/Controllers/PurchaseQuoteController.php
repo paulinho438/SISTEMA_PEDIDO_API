@@ -1247,11 +1247,11 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        $status = PurchaseQuoteStatus::where('slug', 'analisada')->first();
+        $status = PurchaseQuoteStatus::where('slug', 'reprovado')->first();
 
         if (!$status) {
             return response()->json([
-                'message' => 'Status "analisada" não configurado.',
+                'message' => 'Status "reprovado" não configurado. Execute as migrations novamente.',
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -2106,6 +2106,11 @@ class PurchaseQuoteController extends Controller
     {
         if (!$user) {
             return false;
+        }
+
+        // Se o status for "reprovado", pode ser editada
+        if ($quote->current_status_slug === 'reprovado') {
+            return true;
         }
 
         // Se não há buyer_id na cotação, qualquer um pode editar (ainda não foi atribuída)
