@@ -28,6 +28,8 @@ class PurchaseQuoteSupplier extends Model
         'payment_condition_code',
         'payment_condition_description',
         'freight_type',
+        'freight_value',
+        'discount',
     ];
 
     protected $casts = [

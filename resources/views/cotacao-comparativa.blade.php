@@ -636,16 +636,18 @@
                 <th style="width: 3%;">Item</th>
                 <th style="width: 5%;">Qtd</th>
                 <th style="width: 5%;">Medida</th>
-                <th style="width: 30%;">Descrição do Produto</th>
-                <th style="width: 20%;">Finalidade</th>
-                <th style="width: 10%;">FILIAL</th>
-                <th style="width: 10%;">N° RM</th>
+                <th style="width: 25%;">Descrição do Produto</th>
+                <th style="width: 8%;">Marca</th>
+                <th style="width: 15%;">Finalidade</th>
+                <th style="width: 8%;">FILIAL</th>
+                <th style="width: 8%;">N° RM</th>
                 <th colspan="3" style="width: 17%;">FORNECEDOR MENOR PREÇO S/DIFAL</th>
                 <th colspan="3" style="width: 17%;">FORNECEDOR MENOR PREÇO C/DIFAL</th>
                 <th colspan="3" style="width: 17%;">FORNECEDOR DECISÃO COMPRA</th>
                 <th style="width: 10%;">JUSTIFICATIVA</th>
             </tr>
             <tr>
+                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -717,12 +719,20 @@
                     $totalSemDifal += ($menorPrecoSemDifal ?? 0) * $item->quantity;
                     $totalComDifal += $menorPrecoComDifal ?? 0;
                     $totalDecisao += $decisaoCompra ?? 0;
+                    
+                    // Buscar marca do fornecedor selecionado
+                    $marca = '';
+                    if ($decisaoCompraSupplier) {
+                        $supplierItemSelecionado = $decisaoCompraSupplier->items->firstWhere('purchase_quote_item_id', $item->id);
+                        $marca = $supplierItemSelecionado->brand ?? '';
+                    }
                 @endphp
             <tr>
                 <td class="center">{{ $itemIndex + 1 }}</td>
                 <td class="center">{{ number_format($item->quantity, 0, ',', '.') }}</td>
                 <td class="center">{{ strtoupper($item->unit ?? 'UND') }}</td>
                 <td>{{ strtoupper($item->description ?? '') }}</td>
+                <td>{{ strtoupper($marca) }}</td>
                 <td>{{ strtoupper($item->application ?? '') }}</td>
                 <td>{{ strtoupper($quote->location ?? '') }}</td>
                 <td></td>
@@ -732,18 +742,18 @@
                 <td class="number">{{ $menorPrecoSemDifal ? number_format($menorPrecoSemDifal * $item->quantity, 2, ',', '.') : '0,00' }}</td>
                 <!-- Menor Preço C/DIFAL -->
                 <td>{{ $menorPrecoComDifalSupplier ? strtoupper($menorPrecoComDifalSupplier->supplier_name ?? '') : '' }}</td>
-                <td class="number">{{ $menorPrecoComDifal ? number_format($menorPrecoComDifal / $item->quantity, 2, ',', '.') : '0,00' }}</td>
+                <td class="number">{{ ($menorPrecoComDifal && $item->quantity > 0) ? number_format($menorPrecoComDifal / $item->quantity, 2, ',', '.') : '0,00' }}</td>
                 <td class="number">{{ $menorPrecoComDifal ? number_format($menorPrecoComDifal, 2, ',', '.') : '0,00' }}</td>
                 <!-- Decisão Compra -->
                 <td>{{ $decisaoCompraSupplier ? strtoupper($decisaoCompraSupplier->supplier_name ?? '') : '' }}</td>
-                <td class="number">{{ $decisaoCompra ? number_format($decisaoCompra / $item->quantity, 2, ',', '.') : '0,00' }}</td>
+                <td class="number">{{ ($decisaoCompra && $item->quantity > 0) ? number_format($decisaoCompra / $item->quantity, 2, ',', '.') : '0,00' }}</td>
                 <td class="number">{{ $decisaoCompra ? number_format($decisaoCompra, 2, ',', '.') : '0,00' }}</td>
                 <td>{{ strtoupper($item->selection_reason ?? '') }}</td>
             </tr>
             @endforeach
             <!-- Totais -->
             <tr style="font-weight: bold;">
-                <td colspan="8" style="text-align: right;">TOTAL:</td>
+                <td colspan="9" style="text-align: right;">TOTAL:</td>
                 <td class="number">{{ number_format($totalSemDifal, 2, ',', '.') }}</td>
                 <td></td>
                 <td class="number">{{ number_format($totalComDifal, 2, ',', '.') }}</td>

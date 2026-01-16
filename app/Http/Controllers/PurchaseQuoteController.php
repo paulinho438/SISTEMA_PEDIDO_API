@@ -389,6 +389,8 @@ class PurchaseQuoteController extends Controller
                     'descricao' => $supplier->payment_condition_description,
                 ] : null,
                 'tipo_frete' => $supplier->freight_type,
+                'valor_frete' => $supplier->freight_value,
+                'desconto' => $supplier->discount,
                 'itens' => $itemQuotes,
             ];
         });
@@ -1028,6 +1030,8 @@ class PurchaseQuoteController extends Controller
             'fornecedores.*.condicao_pagamento.codigo' => 'nullable|string|max:20',
             'fornecedores.*.condicao_pagamento.descricao' => 'nullable|string|max:191',
             'fornecedores.*.tipo_frete' => 'nullable|string|max:10',
+            'fornecedores.*.valor_frete' => 'nullable|numeric',
+            'fornecedores.*.desconto' => 'nullable|numeric',
             'fornecedores.*.itens' => 'required|array',
             'fornecedores.*.itens.*.item_id' => 'required|integer|exists:purchase_quote_items,id',
             'fornecedores.*.itens.*.custo_unit' => 'nullable|numeric',
@@ -1093,6 +1097,8 @@ class PurchaseQuoteController extends Controller
                     'payment_condition_code' => data_get($supplierPayload, 'condicao_pagamento.codigo'),
                     'payment_condition_description' => data_get($supplierPayload, 'condicao_pagamento.descricao'),
                     'freight_type' => $supplierPayload['tipo_frete'] ?? null,
+                    'freight_value' => $normalizeNumber($supplierPayload['valor_frete'] ?? null),
+                    'discount' => $normalizeNumber($supplierPayload['desconto'] ?? null),
                 ];
 
                 if ($isNewSupplier) {
