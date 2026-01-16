@@ -19,7 +19,31 @@ class PermItemsSeeder extends Seeder
             [
                 "name"             => "Criar Empresas",
                 "slug"             => "criar_empresas",
-                "group"            => "empresa"
+                "group"            => "empresas"
+            ]
+        );
+        
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Empresas",
+                "slug"             => "view_empresas",
+                "group"            => "empresas"
+            ]
+        );
+        
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Empresas",
+                "slug"             => "edit_empresas",
+                "group"            => "empresas"
+            ]
+        );
+        
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Excluir Empresas",
+                "slug"             => "delete_empresas",
+                "group"            => "empresas"
             ]
         );
 

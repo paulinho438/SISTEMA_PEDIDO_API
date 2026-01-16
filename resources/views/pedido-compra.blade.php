@@ -327,7 +327,7 @@
             <div class="info-block info-block-right">
                 <div class="info-block-title">FATURAR A</div>
                 <div class="info-block-content">
-                    <div class="text-bold">{{ strtoupper($company->company ?? '') }}</div>
+                    <div class="text-bold">{{ strtoupper($order->quote && $order->quote->location ? $order->quote->location : ($company->company ?? '')) }}</div>
                 </div>
             </div>
         </div>

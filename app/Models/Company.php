@@ -15,6 +15,20 @@ class Company extends Model
 
     protected $fillable = [
         'company',
+        'fantasia',
+        'razao_social',
+        'endereco',
+        'endereco_numero',
+        'bairro',
+        'cidade',
+        'uf',
+        'cep',
+        'cnpj',
+        'inscricao_estadual',
+        'inscricao_estadual_subst_tributario',
+        'inscricao_municipal',
+        'regime_tributario',
+        'credito_simples_nacional',
         'juros',
         'caixa',
         'caixa_pix',
@@ -24,11 +38,11 @@ class Company extends Model
         'plano_id',
         'login',
         'numero_contato',
+        'whatsapp',
         'envio_automatico_renovacao',
         'mensagem_audio',
         'token_api_wtz',
         'instance_id'
-
     ];
 
     use HasFactory;

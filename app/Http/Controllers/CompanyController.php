@@ -563,22 +563,30 @@ class CompanyController extends Controller
 
             $EditCompany = Company::find($id);
 
-            $EditCompany->ativo = $dados['ativo'];
-            $EditCompany->motivo_inativo = $dados['motivo_inativo'] ?? null;
-            $EditCompany->whatsapp = $dados['whatsapp'] ?? null;
-            $EditCompany->plano_id = $dados['plano_id'] ?? null;
-            $EditCompany->juros = $dados['juros'] ?? null;
-            $EditCompany->caixa = $dados['caixa'] ?? null;
-            $EditCompany->numero_contato = $dados['numero_contato'] ?? null;
-            $EditCompany->company = $dados['company'] ?? null;
+            if (!$EditCompany) {
+                return response()->json([
+                    "message" => "Empresa não encontrada.",
+                    "error" => "Company not found"
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            // Atualizar apenas os campos permitidos no fillable
+            $EditCompany->fill($dados);
+            
+            // Garantir que campos específicos sejam atualizados corretamente
+            if (isset($dados['ativo'])) {
+                $EditCompany->ativo = $dados['ativo'];
+            }
+            
             $EditCompany->save();
 
+            $array['data'] = $EditCompany;
 
             return $array;
         } catch (\Exception $e) {
 
             return response()->json([
-                "message" => "Erro ao editar Usere.",
+                "message" => "Erro ao editar empresa.",
                 "error" => $e->getMessage()
             ], Response::HTTP_FORBIDDEN);
         }
