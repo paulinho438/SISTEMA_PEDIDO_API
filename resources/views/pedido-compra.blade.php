@@ -164,14 +164,20 @@
             border: 1px solid #000;
             padding: 3px;
             text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: break-word;
         }
         
         .items-table td.number {
             text-align: right;
+            white-space: nowrap;
         }
         
         .items-table td.center {
             text-align: center;
+            white-space: nowrap;
         }
         
         /* Totals Section Styles */
@@ -371,39 +377,18 @@
                         if ($quoteItem && $quoteItem->tag) {
                             $brand = $quoteItem->tag;
                         }
-                        $lines = max(
-                            ceil(mb_strlen($description) / 30),
-                            ceil(mb_strlen($application) / 18),
-                            ceil(mb_strlen($brand) / 12),
-                            1
-                        );
                     @endphp
-                    
-                    @for($i = 0; $i < $lines; $i++)
                     <tr>
-                        @if($i == 0)
-                            <td class="center">{{ str_pad($index + 1, 4, '0', STR_PAD_LEFT) }}</td>
-                            <td>{{ substr($item->product_code ?? '', 0, 12) }}</td>
-                            <td>{{ mb_substr($description, $i * 30, 30) }}</td>
-                            <td>{{ mb_substr($application, $i * 18, 18) }}</td>
-                            <td>{{ mb_substr($brand, $i * 12, 12) }}</td>
-                            <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
-                            <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
-                            <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                            <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
-                        @else
-                            <td></td>
-                            <td></td>
-                            <td>{{ mb_substr($description, $i * 30, 30) }}</td>
-                            <td>{{ mb_substr($application, $i * 18, 18) }}</td>
-                            <td>{{ mb_substr($brand, $i * 12, 12) }}</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        @endif
+                        <td class="center">{{ str_pad($index + 1, 4, '0', STR_PAD_LEFT) }}</td>
+                        <td>{{ $item->product_code ?? '' }}</td>
+                        <td>{{ strtoupper($description) }}</td>
+                        <td>{{ strtoupper($application) }}</td>
+                        <td>{{ strtoupper($brand) }}</td>
+                        <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
+                        <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
+                        <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
+                        <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
                     </tr>
-                    @endfor
                 @endforeach
             </tbody>
         </table>

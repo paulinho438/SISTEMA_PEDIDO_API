@@ -144,7 +144,7 @@ class PurchaseQuoteController extends Controller
         $perPage = (int) $request->get('per_page', 10);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 10;
 
-        $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('created_at');
+        $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
         if ($request->filled('status')) {
             $query->where('current_status_slug', $request->get('status'));

@@ -638,5 +638,223 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
+        // Permissões de Ativos - Grupo: ativos (Visualização e Listagem)
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Ativos",
+                "slug"             => "view_ativos",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Controle de Ativos",
+                "slug"             => "view_ativos_controle",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Ativo",
+                "slug"             => "view_ativos_create",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Ativo",
+                "slug"             => "view_ativos_edit",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Excluir Ativo",
+                "slug"             => "view_ativos_delete",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Consulta de Ativo",
+                "slug"             => "view_ativos_consulta",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Filiais",
+                "slug"             => "view_ativos_filiais",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Filial",
+                "slug"             => "view_ativos_filiais_create",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Filial",
+                "slug"             => "view_ativos_filiais_edit",
+                "group"            => "ativos"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Excluir Filial",
+                "slug"             => "view_ativos_filiais_delete",
+                "group"            => "ativos"
+            ]
+        );
+
+        // Permissões de Estoque - Grupo: estoque (Visualização e Listagem)
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Estoque",
+                "slug"             => "view_estoque",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Produtos",
+                "slug"             => "view_estoque_produtos",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Produto",
+                "slug"             => "view_estoque_produtos_create",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Produto",
+                "slug"             => "view_estoque_produtos_edit",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Excluir Produto",
+                "slug"             => "view_estoque_produtos_delete",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Locais",
+                "slug"             => "view_estoque_locais",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Local",
+                "slug"             => "view_estoque_locais_create",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Local",
+                "slug"             => "view_estoque_locais_edit",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Excluir Local",
+                "slug"             => "view_estoque_locais_delete",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Consulta de Estoque",
+                "slug"             => "view_estoque_consulta",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Movimentações",
+                "slug"             => "view_estoque_movimentacoes",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Movimentação",
+                "slug"             => "view_estoque_movimentacoes_create",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Gerenciar Almoxarifes",
+                "slug"             => "view_estoque_almoxarifes",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Análise de Reservas",
+                "slug"             => "view_estoque_reservas",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Nota Fiscal e Entrada",
+                "slug"             => "view_estoque_nota_fiscal",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Criar Nota Fiscal",
+                "slug"             => "view_estoque_nota_fiscal_create",
+                "group"            => "estoque"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Nota Fiscal",
+                "slug"             => "view_estoque_nota_fiscal_edit",
+                "group"            => "estoque"
+            ]
+        );
+
     }
 }

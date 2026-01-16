@@ -151,7 +151,7 @@ class PurchaseOrderService
                     'proposal_number' => $supplier->proposal_number,
                     'total_amount' => 0, // Será calculado
                     'status' => 'pendente',
-                    'observation' => "Pedido gerado automaticamente da cotação #{$quote->quote_number}",
+                    'observation' => $quote->observation, // Observação da cotação (que vem da solicitação)
                     'company_id' => $companyId,
                     'created_by' => $userId,
                     'updated_by' => $userId,
