@@ -20,17 +20,22 @@ return new class extends Migration
             ->exists();
 
         if (!$exists) {
-            // Inserir novo status "reprovado"
-            DB::table('purchase_quote_statuses')->insert([
-                [
-                    'slug' => 'reprovado',
-                    'label' => 'Reprovado',
-                    'description' => 'Solicitação reprovada e pode ser alterada.',
-                    'required_profile' => null,
-                    'order' => 99, // Ordem alta para não interferir no fluxo normal
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]
+            // Preparar timestamps como strings para SQL Server
+            $now = now()->format('Y-m-d H:i:s');
+            
+            // Inserir novo status "reprovado" usando DB::statement para garantir compatibilidade com SQL Server
+            DB::statement("
+                INSERT INTO [purchase_quote_statuses] 
+                ([slug], [label], [description], [required_profile], [order], [created_at], [updated_at]) 
+                VALUES (?, ?, ?, ?, ?, CAST(? AS DATETIME2), CAST(? AS DATETIME2))
+            ", [
+                'reprovado',
+                'Reprovado',
+                'Solicitação reprovada e pode ser alterada.',
+                null,
+                99,
+                $now,
+                $now
             ]);
         }
     }
