@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Services\PurchaseOrderService;
+use App\Services\PurchaseOrderStatusService;
 use App\Models\PurchaseQuote;
 use App\Models\PurchaseOrder;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
@@ -403,5 +405,211 @@ class PurchaseOrderController extends Controller
         });
         
         return $signatures;
+    }
+
+    /**
+     * Atualizar status do pedido de compra
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        // Carregar o pedido explicitamente para garantir que tem ID válido
+        $order = PurchaseOrder::find($id);
+        
+        if (!$order) {
+            Log::error('Pedido não encontrado no updateStatus', [
+                'order_id' => $id,
+            ]);
+            return response()->json([
+                'message' => 'Pedido não encontrado.',
+                'error' => 'Pedido não encontrado',
+            ], Response::HTTP_NOT_FOUND);
+        }
+        
+        // Validar que o pedido tem um ID válido
+        if (!$order->id) {
+            Log::error('Pedido sem ID válido no updateStatus', [
+                'order_id_param' => $id,
+                'order_attributes' => $order->getAttributes(),
+                'order_exists' => $order->exists,
+            ]);
+            return response()->json([
+                'message' => 'Pedido não encontrado.',
+                'error' => 'Pedido sem ID válido',
+            ], Response::HTTP_NOT_FOUND);
+        }
+        
+        $validated = $request->validate([
+            'status' => 'required|string',
+            'justification' => 'nullable|string|max:1000',
+        ]);
+
+        $companyId = (int) $request->header('company-id');
+        
+        // Log inicial para debug
+        Log::info('Atualizando status do pedido', [
+            'order_id' => $order->id,
+            'order_company_id_before' => $order->company_id,
+            'request_company_id' => $companyId,
+        ]);
+        
+        // Se o pedido não tiver company_id, atualizar com o do header
+        if (!$order->company_id && $companyId) {
+            Log::info('Atualizando company_id do pedido', [
+                'order_id' => $order->id,
+                'new_company_id' => $companyId,
+            ]);
+            
+            try {
+                $this->service->updateModelWithStringTimestamps($order, [
+                    'company_id' => $companyId,
+                ]);
+                // O método updateModelWithStringTimestamps já faz refresh(), mas vamos garantir que o valor foi atualizado
+                // Verificar diretamente no banco se necessário
+                $order->refresh();
+                // Forçar reload do atributo company_id
+                $order->setAttribute('company_id', $companyId);
+                $order->syncOriginal();
+                
+                Log::info('Company_id atualizado com sucesso', [
+                    'order_id' => $order->id,
+                    'company_id_after' => $order->company_id,
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Erro ao atualizar company_id do pedido', [
+                    'order_id' => $order->id,
+                    'error' => $e->getMessage(),
+                ]);
+                return response()->json([
+                    'message' => 'Erro ao atualizar pedido.',
+                    'error' => $e->getMessage(),
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+        
+        // Verificar se o pedido pertence à empresa
+        $orderCompanyId = $order->company_id ? (int) $order->company_id : null;
+        
+        Log::info('Validação de company_id', [
+            'order_id' => $order->id,
+            'order_company_id' => $orderCompanyId,
+            'request_company_id' => $companyId,
+            'match' => $orderCompanyId === $companyId,
+        ]);
+        
+        if ($orderCompanyId !== $companyId) {
+            // Log para debug
+            Log::warning('Tentativa de atualizar pedido de empresa diferente', [
+                'order_id' => $order->id,
+                'order_company_id' => $order->company_id,
+                'order_company_id_int' => $orderCompanyId,
+                'request_company_id' => $companyId,
+                'types' => [
+                    'order_company_id_type' => gettype($order->company_id),
+                    'order_company_id_int_type' => gettype($orderCompanyId),
+                    'request_company_id_type' => gettype($companyId),
+                ],
+            ]);
+            
+            return response()->json([
+                'message' => 'Pedido não encontrado ou não pertence à empresa.',
+                'debug' => [
+                    'order_company_id' => $order->company_id,
+                    'request_company_id' => $companyId,
+                ],
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Verificar se o usuário é comprador
+        $user = auth()->user();
+        if (!$this->isBuyer($user, $companyId)) {
+            return response()->json([
+                'message' => 'Apenas compradores podem alterar o status do pedido.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Normalizar status do pedido: tratar vazio/null como 'pendente'
+        $currentStatus = trim($order->status ?? '') ?: PurchaseOrder::STATUS_PENDENTE;
+        
+        // Se o status estava vazio, atualizar para 'pendente' antes de validar
+        if (empty(trim($order->status ?? ''))) {
+            Log::info('Status do pedido estava vazio, atualizando para pendente', [
+                'order_id' => $order->id,
+            ]);
+            $this->service->updateModelWithStringTimestamps($order, [
+                'status' => PurchaseOrder::STATUS_PENDENTE,
+            ]);
+            $order->refresh();
+            $order->setAttribute('status', PurchaseOrder::STATUS_PENDENTE);
+            $order->syncOriginal();
+            $currentStatus = PurchaseOrder::STATUS_PENDENTE;
+        }
+        
+        // Validar transição de status
+        if (!$order->canTransitionTo($validated['status'])) {
+            return response()->json([
+                'message' => "Transição de status inválida: {$currentStatus} → {$validated['status']}",
+                'debug' => [
+                    'current_status' => $currentStatus,
+                    'order_status_raw' => $order->status,
+                    'new_status' => $validated['status'],
+                    'valid_next_statuses' => $order->getValidNextStatuses(),
+                ],
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Validar justificativa obrigatória para link_reprovado
+        if ($validated['status'] === PurchaseOrder::STATUS_LINK_REPROVADO && empty($validated['justification'])) {
+            return response()->json([
+                'message' => 'Justificativa é obrigatória quando o LINK é reprovado.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        try {
+            $statusService = app(PurchaseOrderStatusService::class);
+            $statusService->updateStatus(
+                $order,
+                $validated['status'],
+                $validated['justification'] ?? null,
+                $user->id
+            );
+
+            // Recarregar pedido com relacionamentos
+            $order->refresh();
+            $order->load(['statusHistory.changedBy', 'quote']);
+
+            return response()->json([
+                'message' => 'Status atualizado com sucesso.',
+                'data' => $order,
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            Log::error('Erro ao atualizar status do pedido', [
+                'order_id' => $order->id,
+                'new_status' => $validated['status'],
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Erro ao atualizar status do pedido.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Verifica se o usuário é comprador
+     */
+    private function isBuyer(User $user, ?int $companyId): bool
+    {
+        // Verificar se o usuário tem grupo/permissão de comprador
+        return $user->groups()
+            ->where(function ($query) use ($companyId) {
+                $query->where('name', 'LIKE', '%COMPRADOR%')
+                      ->orWhere('name', 'LIKE', '%Comprador%')
+                      ->orWhere('name', 'LIKE', '%comprador%');
+                if ($companyId) {
+                    $query->where('company_id', $companyId);
+                }
+            })
+            ->exists();
     }
 }

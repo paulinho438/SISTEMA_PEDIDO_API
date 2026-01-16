@@ -309,6 +309,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/cotacao/{quoteId}/gerar', [PurchaseOrderController::class, 'gerarPedidosCotacao']);
         Route::get('/{id}', [PurchaseOrderController::class, 'show']);
         Route::get('/{id}/imprimir', [PurchaseOrderController::class, 'imprimir']);
+        Route::put('/{id}/status', [PurchaseOrderController::class, 'updateStatus']);
     });
     
     Route::prefix('estoque')->group(function () {

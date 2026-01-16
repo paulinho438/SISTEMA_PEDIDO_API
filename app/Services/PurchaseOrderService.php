@@ -14,7 +14,7 @@ class PurchaseOrderService
     /**
      * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
      */
-    private function updateModelWithStringTimestamps($model, array $data)
+    public function updateModelWithStringTimestamps($model, array $data)
     {
         // Adicionar updated_at como string
         $data['updated_at'] = now()->format('Y-m-d H:i:s');
@@ -150,7 +150,7 @@ class PurchaseOrderService
                     'vendor_email' => $supplier->vendor_email,
                     'proposal_number' => $supplier->proposal_number,
                     'total_amount' => 0, // Será calculado
-                    'status' => 'pendente',
+                    'status' => 'pendente', // Comprador precisa encaminhar para PROTHEUS manualmente
                     'observation' => $quote->observation, // Observação da cotação (que vem da solicitação)
                     'company_id' => $companyId,
                     'created_by' => $userId,
@@ -221,7 +221,8 @@ class PurchaseOrderService
             'items.quoteSupplierItem',
             'company',
             'createdBy',
-            'updatedBy'
+            'updatedBy',
+            'statusHistory.changedBy'
         ])->findOrFail($id);
     }
 
