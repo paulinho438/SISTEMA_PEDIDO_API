@@ -142,8 +142,23 @@ class AssetService
      */
     private function updateModelWithStringTimestamps($model, array $data)
     {
+        // Remover campos que não devem ser atualizados
+        unset($data['id'], $data['created_at']);
+        
         // Adicionar updated_at como string
         $data['updated_at'] = now()->format('Y-m-d H:i:s');
+        
+        // Se não há dados para atualizar além do updated_at, apenas atualizar o timestamp
+        if (empty($data) || (count($data) === 1 && isset($data['updated_at']))) {
+            $table = $model->getTable();
+            $id = $model->getKey();
+            $idColumn = $model->getKeyName();
+            
+            $sql = "UPDATE [{$table}] SET [updated_at] = CAST(? AS DATETIME2) WHERE [{$idColumn}] = ?";
+            DB::statement($sql, [$data['updated_at'], $id]);
+            $model->refresh();
+            return $model;
+        }
         
         // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
         $table = $model->getTable();
@@ -156,7 +171,7 @@ class AssetService
         
         foreach ($columns as $column) {
             // Campos de data precisam de CAST
-            if (in_array($column, ['updated_at', 'created_at'])) {
+            if ($column === 'updated_at') {
                 $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
             } elseif (in_array($column, ['acquisition_date', 'document_issue_date'])) {
                 $placeholders[] = "[{$column}] = CAST(? AS DATE)";
