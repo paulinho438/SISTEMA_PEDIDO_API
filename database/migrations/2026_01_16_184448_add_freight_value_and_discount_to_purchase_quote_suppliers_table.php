@@ -14,8 +14,8 @@ return new class extends Migration
     public function up()
     {
         Schema::table('purchase_quote_suppliers', function (Blueprint $table) {
-            $table->decimal('freight_value', 15, 2)->nullable()->after('freight_type');
-            $table->decimal('discount', 15, 2)->nullable()->after('freight_value');
+            $table->decimal('freight_value', 15, 2)->nullable();
+            $table->decimal('discount', 15, 2)->nullable();
         });
     }
 
