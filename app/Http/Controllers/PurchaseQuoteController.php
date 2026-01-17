@@ -1417,45 +1417,42 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
         
-        // Verificar permissão genérica de aprovar
-        $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+        $currentStatus = $quote->current_status_slug;
         
-        $approvalService = app(PurchaseQuoteApprovalService::class);
-        
-        // Verificar se o usuário pode aprovar algum nível pendente
-        $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
-        
-        // Se tem permissão genérica, verificar se tem algum nível de aprovação
-        if ($hasGenericPermission && $nextLevel === null) {
-            // Obter company_id da cotação
-            $companyId = $quote->company_id;
-            
-            // Verificar se o usuário tem algum nível de aprovação
-            $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
-            
-            if (empty($userLevels)) {
+        // Verificar permissão baseada no status atual
+        if ($currentStatus === 'aguardando') {
+            // Para autorizar, verificar permissão específica
+            if (!$user->hasPermission('cotacoes_autorizar')) {
                 return response()->json([
-                    'message' => 'Você tem permissão para aprovar, mas não possui um perfil de aprovação válido (Engenheiro, Gerente, Diretor, etc.).',
+                    'message' => 'Você não tem permissão para autorizar solicitações de cotação.',
                 ], Response::HTTP_FORBIDDEN);
             }
-        }
-        
-        // Se não tem permissão genérica e não tem nível pendente, negar acesso
-        if (!$hasGenericPermission && $nextLevel === null) {
-            return response()->json([
-                'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        $currentStatus = $quote->current_status_slug;
-
-        if ($currentStatus === 'aguardando') {
             $nextStatusSlug = 'autorizado';
             $defaultNote = 'Solicitação autorizada para cotação.';
         } elseif (in_array($currentStatus, ['analisada', 'analisada_aguardando'], true)) {
+            // Para aprovar análise, verificar permissão genérica ou nível de aprovação
+            $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+            $approvalService = app(PurchaseQuoteApprovalService::class);
+            $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
+            
+            if (!$hasGenericPermission && $nextLevel === null) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
+                ], Response::HTTP_FORBIDDEN);
+            }
             $nextStatusSlug = 'analise_gerencia';
             $defaultNote = 'Cotação encaminhada para análise da gerência.';
         } elseif ($currentStatus === 'analise_gerencia') {
+            // Para aprovar na gerência, verificar permissão genérica ou nível de aprovação
+            $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+            $approvalService = app(PurchaseQuoteApprovalService::class);
+            $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
+            
+            if (!$hasGenericPermission && $nextLevel === null) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
+                ], Response::HTTP_FORBIDDEN);
+            }
             $nextStatusSlug = 'aprovado';
             $defaultNote = 'Cotação aprovada pela gerência.';
         } else {
@@ -1552,10 +1549,14 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
         
-        // Verificar permissão para reprovar
-        if (!$user->hasPermission('cotacoes_reprovar')) {
+        // Verificar permissão para rejeitar/reprovar
+        // Verificar se tem permissão de rejeitar (cotacoes_rejeitar) ou reprovar (cotacoes_reprovar)
+        $hasRejectPermission = $user->hasPermission('cotacoes_rejeitar');
+        $hasReprovePermission = $user->hasPermission('cotacoes_reprovar');
+        
+        if (!$hasRejectPermission && !$hasReprovePermission) {
             return response()->json([
-                'message' => 'Você não tem permissão para reprovar solicitações.',
+                'message' => 'Você não tem permissão para rejeitar/reprovar solicitações.',
             ], Response::HTTP_FORBIDDEN);
         }
 
