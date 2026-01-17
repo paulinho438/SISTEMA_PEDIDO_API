@@ -1410,12 +1410,38 @@ class PurchaseQuoteController extends Controller
         ]);
 
         $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        // Verificar permissão genérica de aprovar
+        $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+        
         $approvalService = app(PurchaseQuoteApprovalService::class);
         
         // Verificar se o usuário pode aprovar algum nível pendente
         $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
         
-        if ($nextLevel === null) {
+        // Se tem permissão genérica, verificar se tem algum nível de aprovação
+        if ($hasGenericPermission && $nextLevel === null) {
+            // Obter company_id da cotação
+            $companyId = $quote->company_id;
+            
+            // Verificar se o usuário tem algum nível de aprovação
+            $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
+            
+            if (empty($userLevels)) {
+                return response()->json([
+                    'message' => 'Você tem permissão para aprovar, mas não possui um perfil de aprovação válido (Engenheiro, Gerente, Diretor, etc.).',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+        
+        // Se não tem permissão genérica e não tem nível pendente, negar acesso
+        if (!$hasGenericPermission && $nextLevel === null) {
             return response()->json([
                 'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
             ], Response::HTTP_FORBIDDEN);
@@ -1517,6 +1543,21 @@ class PurchaseQuoteController extends Controller
             'observacao' => 'nullable|string',
             'mensagem' => 'nullable|string',
         ]);
+
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        // Verificar permissão para reprovar
+        if (!$user->hasPermission('cotacoes_reprovar')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para reprovar solicitações.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
         $normalizedMessage = trim((string) ($validated['mensagem'] ?? $validated['observacao'] ?? ''));
 
@@ -2130,9 +2171,37 @@ class PurchaseQuoteController extends Controller
         }
 
         $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        // Mapear nível para permissão específica
+        $levelPermissionMap = [
+            'COMPRADOR' => 'cotacoes_aprovar_comprador',
+            'GERENTE_LOCAL' => 'cotacoes_aprovar_gerente_local',
+            'ENGENHEIRO' => 'cotacoes_aprovar_engenheiro',
+            'GERENTE_GERAL' => 'cotacoes_aprovar_gerente_geral',
+            'DIRETOR' => 'cotacoes_aprovar_diretor',
+            'PRESIDENTE' => 'cotacoes_aprovar_presidente',
+        ];
+        
+        $levelPermission = $levelPermissionMap[$level] ?? null;
+        $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+        $hasLevelPermission = $levelPermission && $user->hasPermission($levelPermission);
+        
+        // Verificar se tem permissão genérica ou específica do nível
+        if (!$hasGenericPermission && !$hasLevelPermission) {
+            return response()->json([
+                'message' => 'Você não tem permissão para aprovar este nível.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+        
         $approvalService = app(PurchaseQuoteApprovalService::class);
 
-        // Verificar se pode aprovar
+        // Verificar se pode aprovar (validação de níveis anteriores e perfil)
         if (!$approvalService->canApproveLevel($quote, $level, $user)) {
             return response()->json([
                 'message' => 'Você não tem permissão para aprovar este nível ou há aprovações pendentes anteriores.',
