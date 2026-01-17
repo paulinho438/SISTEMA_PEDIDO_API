@@ -2265,20 +2265,36 @@ class PurchaseQuoteController extends Controller
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isPhpEnabled', true);
         
-        // Usar template específico para solicitação quando o status ainda é de solicitação
-        // Status de solicitação: 'aguardando' e 'autorizado'
-        // A partir de 'cotacao' em diante, é considerado cotação
-        $isSolicitacao = in_array($quote->current_status_slug, ['aguardando', 'autorizado']);
+        // Verificar se há fornecedores com cotações preenchidas (com valores)
+        // Se não houver fornecedores com valores, usar template de solicitação
+        // Se houver fornecedores com valores, usar template comparativo
+        $hasSuppliersWithValues = false;
+        $suppliers = $quote->suppliers;
         
-        // Se for solicitação, sempre usar template de solicitação
-        // Se for cotação e houver fornecedores, usar template comparativo
-        // Se for cotação mas não houver fornecedores, usar template de solicitação
-        if ($isSolicitacao) {
+        if ($suppliers->count() > 0) {
+            foreach ($suppliers as $supplier) {
+                // Verificar se o fornecedor tem itens com valores preenchidos
+                $hasItemsWithValues = $supplier->items()->where(function($query) {
+                    $query->whereNotNull('unit_cost')
+                          ->orWhereNotNull('final_cost')
+                          ->orWhere('unit_cost', '>', 0)
+                          ->orWhere('final_cost', '>', 0);
+                })->exists();
+                
+                if ($hasItemsWithValues) {
+                    $hasSuppliersWithValues = true;
+                    break;
+                }
+            }
+        }
+        
+        // Usar template comparativo apenas se houver fornecedores com valores preenchidos
+        if ($hasSuppliersWithValues) {
+            $viewTemplate = 'cotacao-comparativa';
+            $paperOrientation = 'landscape';
+        } else {
             $viewTemplate = 'solicitacao';
             $paperOrientation = 'portrait';
-        } else {
-            $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
-            $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
         }
         
         $pdf = Pdf::loadView($viewTemplate, $dados);
