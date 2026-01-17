@@ -129,12 +129,53 @@ class AssetService
 
     public function update(Asset $asset, array $data, ?int $userId = null): Asset
     {
-        $asset->update([
-            ...$data,
-            'updated_by' => $userId ?? auth()->id(),
-        ]);
+        $data['updated_by'] = $userId ?? auth()->id();
+        
+        // Usar método auxiliar para garantir compatibilidade com SQL Server
+        $this->updateModelWithStringTimestamps($asset, $data);
 
         return $asset->fresh();
+    }
+
+    /**
+     * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
+     */
+    private function updateModelWithStringTimestamps($model, array $data)
+    {
+        // Adicionar updated_at como string
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+        
+        // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            // Campos de data precisam de CAST
+            if (in_array($column, ['updated_at', 'created_at'])) {
+                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+            } elseif (in_array($column, ['acquisition_date', 'document_issue_date'])) {
+                $placeholders[] = "[{$column}] = CAST(? AS DATE)";
+            } else {
+                $placeholders[] = "[{$column}] = ?";
+            }
+            $values[] = $data[$column];
+        }
+        
+        $values[] = $id; // Para o WHERE
+        
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $placeholders) . " WHERE [{$idColumn}] = ?";
+        
+        DB::statement($sql, $values);
+        
+        // Recarregar o modelo para ter os valores atualizados
+        $model->refresh();
+        
+        return $model;
     }
 
     public function baixar(Asset $asset, string $reason, ?string $observation = null, ?int $userId = null): Asset
