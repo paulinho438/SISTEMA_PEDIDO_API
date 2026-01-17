@@ -2265,10 +2265,21 @@ class PurchaseQuoteController extends Controller
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isPhpEnabled', true);
         
-        // Usar template específico para solicitação quando não há cotações
-        // Se houver cotações, usar o template comparativo
-        $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
-        $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
+        // Usar template específico para solicitação quando o status ainda é de solicitação
+        // Status de solicitação: 'aguardando' e 'autorizado'
+        // A partir de 'cotacao' em diante, é considerado cotação
+        $isSolicitacao = in_array($quote->current_status_slug, ['aguardando', 'autorizado']);
+        
+        // Se for solicitação, sempre usar template de solicitação
+        // Se for cotação e houver fornecedores, usar template comparativo
+        // Se for cotação mas não houver fornecedores, usar template de solicitação
+        if ($isSolicitacao) {
+            $viewTemplate = 'solicitacao';
+            $paperOrientation = 'portrait';
+        } else {
+            $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
+            $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
+        }
         
         $pdf = Pdf::loadView($viewTemplate, $dados);
         $pdf->getDomPDF()->setOptions($options);
