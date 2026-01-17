@@ -2265,36 +2265,47 @@ class PurchaseQuoteController extends Controller
         $options->set('isHtml5ParserEnabled', true);
         $options->set('isPhpEnabled', true);
         
-        // Verificar se há fornecedores com cotações preenchidas (com valores)
-        // Se não houver fornecedores com valores, usar template de solicitação
-        // Se houver fornecedores com valores, usar template comparativo
-        $hasSuppliersWithValues = false;
-        $suppliers = $quote->suppliers;
+        // Verificar o tipo solicitado via parâmetro da requisição
+        // Se vier da tela de solicitação, usar template de solicitação
+        // Se vier da tela de cotação, usar template comparativo (se houver fornecedores)
+        $tipo = $request->get('tipo', null);
         
-        if ($suppliers->count() > 0) {
-            foreach ($suppliers as $supplier) {
-                // Verificar se o fornecedor tem itens com valores preenchidos
-                $hasItemsWithValues = $supplier->items()->where(function($query) {
-                    $query->whereNotNull('unit_cost')
-                          ->orWhereNotNull('final_cost')
-                          ->orWhere('unit_cost', '>', 0)
-                          ->orWhere('final_cost', '>', 0);
-                })->exists();
-                
-                if ($hasItemsWithValues) {
-                    $hasSuppliersWithValues = true;
-                    break;
-                }
-            }
-        }
-        
-        // Usar template comparativo apenas se houver fornecedores com valores preenchidos
-        if ($hasSuppliersWithValues) {
-            $viewTemplate = 'cotacao-comparativa';
-            $paperOrientation = 'landscape';
-        } else {
+        if ($tipo === 'solicitacao') {
+            // Sempre usar template de solicitação quando vem da tela de solicitação
             $viewTemplate = 'solicitacao';
             $paperOrientation = 'portrait';
+        } elseif ($tipo === 'cotacao') {
+            // Quando vem da tela de cotação, usar template comparativo se houver fornecedores
+            $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
+            $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
+        } else {
+            // Fallback: verificar se há fornecedores com valores preenchidos
+            $hasSuppliersWithValues = false;
+            $suppliers = $quote->suppliers;
+            
+            if ($suppliers->count() > 0) {
+                foreach ($suppliers as $supplier) {
+                    $hasItemsWithValues = $supplier->items()->where(function($query) {
+                        $query->whereNotNull('unit_cost')
+                              ->orWhereNotNull('final_cost')
+                              ->orWhere('unit_cost', '>', 0)
+                              ->orWhere('final_cost', '>', 0);
+                    })->exists();
+                    
+                    if ($hasItemsWithValues) {
+                        $hasSuppliersWithValues = true;
+                        break;
+                    }
+                }
+            }
+            
+            if ($hasSuppliersWithValues) {
+                $viewTemplate = 'cotacao-comparativa';
+                $paperOrientation = 'landscape';
+            } else {
+                $viewTemplate = 'solicitacao';
+                $paperOrientation = 'portrait';
+            }
         }
         
         $pdf = Pdf::loadView($viewTemplate, $dados);
