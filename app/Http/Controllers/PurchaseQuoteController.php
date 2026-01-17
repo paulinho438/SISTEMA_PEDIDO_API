@@ -522,23 +522,34 @@ class PurchaseQuoteController extends Controller
                     ->values(),
                 'cotacoes' => $cotacoes,
                 'selecoes' => $selecoes,
-                'itens' => $quote->items->map(fn (PurchaseQuoteItem $item) => [
-                    'id' => $item->id,
-                    'numero' => $item->id,
-                    'codigo' => $item->product_code,
-                    'referencia' => $item->reference,
-                    'mercadoria' => $item->description,
-                    'quantidade' => $item->quantity,
-                    'unidade' => $item->unit,
-                    'aplicacao' => $item->application,
-                    'prioridade' => $item->priority_days,
-                    'tag' => $item->tag,
-                    'centro_custo' => ($item->cost_center_code || $item->cost_center_description) ? [
-                        'codigo' => $item->cost_center_code,
-                        'descricao' => $item->cost_center_description,
-                        'classe' => null, // O campo classe não está armazenado no banco, mas mantemos para compatibilidade
-                    ] : null,
-                ]),
+                'itens' => $quote->items->map(function (PurchaseQuoteItem $item) use ($quote) {
+                    // Buscar referência do produto do estoque se não houver no item
+                    $referencia = $item->reference;
+                    if (empty($referencia) && !empty($item->product_code) && !empty($quote->company_id)) {
+                        $produto = \App\Models\StockProduct::where('code', $item->product_code)
+                            ->where('company_id', $quote->company_id)
+                            ->first();
+                        $referencia = $produto->reference ?? null;
+                    }
+                    
+                    return [
+                        'id' => $item->id,
+                        'numero' => $item->id,
+                        'codigo' => $item->product_code,
+                        'referencia' => $referencia,
+                        'mercadoria' => $item->description,
+                        'quantidade' => $item->quantity,
+                        'unidade' => $item->unit,
+                        'aplicacao' => $item->application,
+                        'prioridade' => $item->priority_days,
+                        'tag' => $item->tag,
+                        'centro_custo' => ($item->cost_center_code || $item->cost_center_description) ? [
+                            'codigo' => $item->cost_center_code,
+                            'descricao' => $item->cost_center_description,
+                            'classe' => null, // O campo classe não está armazenado no banco, mas mantemos para compatibilidade
+                        ] : null,
+                    ];
+                }),
                 'historico' => $quote->statusHistory->map(fn (PurchaseQuoteStatusHistory $history) => [
                     'status' => $history->status_label,
                     'perfil' => optional($history->status)->required_profile,
@@ -582,7 +593,7 @@ class PurchaseQuoteController extends Controller
             'itens.*.codigo' => 'nullable|string|max:100',
             'itens.*.referencia' => 'nullable|string|max:100',
             'itens.*.mercadoria' => 'required|string|max:255',
-            'itens.*.quantidade' => 'nullable|numeric|min:0',
+            'itens.*.quantidade' => 'required|numeric|min:0.0001',
             'itens.*.unidade' => 'nullable|string|max:20',
             'itens.*.aplicacao' => 'nullable|string',
             'itens.*.prioridade' => 'nullable|integer|min:0',
@@ -862,7 +873,7 @@ class PurchaseQuoteController extends Controller
             'itens.*.codigo' => 'nullable|string|max:100',
             'itens.*.referencia' => 'nullable|string|max:100',
             'itens.*.mercadoria' => 'required|string|max:255',
-            'itens.*.quantidade' => 'nullable|numeric|min:0',
+            'itens.*.quantidade' => 'required|numeric|min:0.0001',
             'itens.*.unidade' => 'nullable|string|max:20',
             'itens.*.aplicacao' => 'nullable|string',
             'itens.*.prioridade' => 'nullable|integer|min:0',
@@ -2216,11 +2227,33 @@ class PurchaseQuoteController extends Controller
             }
         }
 
+        // Buscar referências dos produtos do estoque para itens que não têm referência
+        $itemsWithReference = $quote->items->map(function ($item) use ($quote) {
+            // Se o item já tem referência, não precisa buscar
+            if (!empty($item->reference)) {
+                return $item;
+            }
+            
+            // Buscar referência do produto do estoque se não houver no item
+            if (!empty($item->product_code) && !empty($quote->company_id)) {
+                $produto = \App\Models\StockProduct::where('code', $item->product_code)
+                    ->where('company_id', $quote->company_id)
+                    ->first();
+                
+                if ($produto && !empty($produto->reference)) {
+                    // Criar uma cópia do item com a referência do produto
+                    $item->reference = $produto->reference;
+                }
+            }
+            
+            return $item;
+        });
+        
         // Preparar dados para a view
         $dados = [
             'quote' => $quote,
             'company' => $company,
-            'items' => $quote->items,
+            'items' => $itemsWithReference,
             'suppliers' => $quote->suppliers,
             'buyer' => $quote->buyer,
             'signatures' => $signatures,

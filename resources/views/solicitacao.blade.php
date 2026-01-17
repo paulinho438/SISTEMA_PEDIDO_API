@@ -262,7 +262,7 @@
         <tbody>
             @foreach($items as $item)
             <tr>
-                <td>{{ $item->reference ?? $item->product_code ?? '-' }}</td>
+                <td>{{ $item->reference ?? '-' }}</td>
                 <td>{{ $item->description ?? '-' }}</td>
                 <td>{{ $item->application ?? '-' }}</td>
                 <td>{{ $item->unit ?? '-' }}</td>
@@ -287,9 +287,6 @@
         </div>
         <div class="summary-item">
             <strong>Volumes:</strong> {{ collect($items)->sum('quantity') ?? 0 }}
-        </div>
-        <div class="summary-item">
-            <strong>Total:</strong> R$ 0,00
         </div>
     </div>
 </body>
