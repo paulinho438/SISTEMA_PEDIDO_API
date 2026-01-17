@@ -34,14 +34,18 @@
         .logo-box {
             width: 120px;
             height: 50px;
-            background-color: #0066CC;
-            color: white;
+            background-color: rgb(30, 58, 138);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 12pt;
             padding: 5px;
+            overflow: hidden;
+        }
+        
+        .logo-box img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
         
         .header-center {
@@ -149,7 +153,7 @@
     <!-- Header -->
     <div class="header">
         <div class="logo-box">
-            {{ $company->company ?? $company->name ?? 'Rialma S.A' }}
+            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
         </div>
         
         <div class="header-center">
