@@ -144,6 +144,67 @@ class PurchaseQuoteController extends Controller
         $perPage = (int) $request->get('per_page', 10);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 10;
 
+        $user = auth()->user();
+        $approvalService = app(PurchaseQuoteApprovalService::class);
+        
+        // Obter company_id do header ou da primeira empresa do usuário
+        $companyId = (int) $request->header('company-id');
+        if (!$companyId && $user->companies()->exists()) {
+            $companyId = $user->companies()->first()->id;
+        }
+        
+        // Verificar se o usuário é apenas comprador (tem apenas nível COMPRADOR)
+        $userLevels = [];
+        if ($companyId) {
+            $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
+        }
+        
+        // Se não encontrou níveis com company_id, tentar sem company_id
+        if (empty($userLevels)) {
+            $userGroups = $user->groups()->pluck('name')->toArray();
+            $groupToLevelMap = [
+                'Comprador' => 'COMPRADOR',
+                'COMPRADOR' => 'COMPRADOR',
+                'Gerente Local' => 'GERENTE_LOCAL',
+                'GERENTE LOCAL' => 'GERENTE_LOCAL',
+                'Engenheiro' => 'ENGENHEIRO',
+                'ENGENHEIRO' => 'ENGENHEIRO',
+                'Gerente Geral' => 'GERENTE_GERAL',
+                'GERENTE GERAL' => 'GERENTE_GERAL',
+                'Diretor' => 'DIRETOR',
+                'DIRETOR' => 'DIRETOR',
+                'Presidente' => 'PRESIDENTE',
+                'PRESIDENTE' => 'PRESIDENTE',
+            ];
+            
+            foreach ($userGroups as $groupName) {
+                foreach ($groupToLevelMap as $mapGroup => $level) {
+                    if (stripos($groupName, $mapGroup) !== false) {
+                        if (!in_array($level, $userLevels)) {
+                            $userLevels[] = $level;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Se o usuário é apenas comprador (tem apenas COMPRADOR e nenhum outro nível), não mostrar solicitações
+        // a menos que seja explicitamente solicitado via my_quotes
+        $isOnlyBuyer = count($userLevels) === 1 && in_array('COMPRADOR', $userLevels);
+        
+        if ($isOnlyBuyer && (!$request->filled('my_quotes') || $request->get('my_quotes') !== 'true')) {
+            // Comprador não deve ver solicitações, retornar vazio
+            return response()->json([
+                'data' => [],
+                'pagination' => [
+                    'current_page' => 1,
+                    'per_page' => $perPage,
+                    'total' => 0,
+                    'last_page' => 1,
+                ],
+            ], Response::HTTP_OK);
+        }
+
         $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
         if ($request->filled('status')) {
@@ -1347,6 +1408,18 @@ class PurchaseQuoteController extends Controller
             'observacao' => 'nullable|string',
             'mensagem' => 'nullable|string',
         ]);
+
+        $user = auth()->user();
+        $approvalService = app(PurchaseQuoteApprovalService::class);
+        
+        // Verificar se o usuário pode aprovar algum nível pendente
+        $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
+        
+        if ($nextLevel === null) {
+            return response()->json([
+                'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
+            ], Response::HTTP_FORBIDDEN);
+        }
 
         $currentStatus = $quote->current_status_slug;
 
