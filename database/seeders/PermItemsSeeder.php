@@ -372,6 +372,14 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Editar Solicitação na Aprovação",
+                "slug"             => "edit_cotacoes_aprovacao",
+                "group"            => "cotacoes_solicitacao"
+            ]
+        );
+
         // Permissões de Cotações - Grupo: cotacoes_edicao (Edição/Detalhes)
         DB::table("permitems")->insert(
             [

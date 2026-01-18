@@ -1136,6 +1136,141 @@ class PurchaseQuoteController extends Controller
         }
     }
 
+    /**
+     * Aplica edições na cotação (usado durante aprovação quando tem permissão de editar)
+     */
+    private function applyQuoteEditions(PurchaseQuote $quote, array $validated): void
+    {
+        // Atualizar dados principais da cotação se fornecidos
+        $updateData = [];
+        
+        if (isset($validated['solicitante'])) {
+            $updateData['requester_id'] = data_get($validated, 'solicitante.id');
+            $updateData['requester_name'] = data_get($validated, 'solicitante.label');
+        }
+        
+        if (isset($validated['empresa'])) {
+            $updateData['company_id'] = data_get($validated, 'empresa.id');
+            $updateData['company_name'] = data_get($validated, 'empresa.label');
+        }
+        
+        if (isset($validated['local'])) {
+            $updateData['location'] = $validated['local'];
+        }
+        
+        if (isset($validated['work_front'])) {
+            $updateData['work_front'] = $validated['work_front'];
+        }
+        
+        if (isset($validated['observacao'])) {
+            $updateData['observation'] = $validated['observacao'];
+        }
+        
+        if (!empty($validated['numero'])) {
+            $updateData['quote_number'] = $validated['numero'];
+        }
+        
+        if (!empty($updateData)) {
+            $updateData['updated_by'] = auth()->id();
+            $this->updateModelWithStringTimestamps($quote, $updateData);
+        }
+        
+        // Atualizar requested_at se fornecido
+        if (!empty($validated['data_solicitacao'])) {
+            try {
+                $requestedAt = null;
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $validated['data_solicitacao'])) {
+                    $parsed = \Carbon\Carbon::createFromFormat('d/m/Y', $validated['data_solicitacao']);
+                    $requestedAt = $parsed->format('Y-m-d');
+                } else {
+                    $parsed = \Carbon\Carbon::parse($validated['data_solicitacao']);
+                    $requestedAt = $parsed->format('Y-m-d');
+                }
+                
+                if ($requestedAt) {
+                    DB::statement("UPDATE [purchase_quotes] SET [requested_at] = CAST(? AS DATE) WHERE [id] = ?", [$requestedAt, $quote->id]);
+                }
+            } catch (\Exception $e) {
+                // Ignorar erro de parsing de data
+            }
+        }
+        
+        // Atualizar itens se fornecidos
+        if (!empty($validated['itens']) && is_array($validated['itens'])) {
+            // Remover itens que não estão mais na lista
+            $itemIdsFromRequest = array_filter(array_map(fn($item) => $item['id'] ?? null, $validated['itens']));
+            if (!empty($itemIdsFromRequest)) {
+                $quote->items()->whereNotIn('id', $itemIdsFromRequest)->delete();
+            } else {
+                // Se nenhum item tem ID, remover todos os existentes (serão recriados)
+                $quote->items()->delete();
+            }
+            
+            $mainCostCenterCode = null;
+            $mainCostCenterDescription = null;
+            $itemCreatedAt = now()->format('Y-m-d H:i:s');
+            $itemUpdatedAt = now()->format('Y-m-d H:i:s');
+            
+            // Atualizar ou criar itens
+            foreach ($validated['itens'] as $itemData) {
+                $centro = $itemData['centro_custo'] ?? null;
+                $costCenterCode = $centro['codigo'] ?? null;
+                $costCenterDescription = $centro['descricao'] ?? null;
+                
+                if (!empty($itemData['id'])) {
+                    // Atualizar item existente
+                    $item = $quote->items()->find($itemData['id']);
+                    if ($item) {
+                        $itemUpdateData = [
+                            'product_code' => $itemData['codigo'] ?? null,
+                            'reference' => $itemData['referencia'] ?? null,
+                            'description' => $itemData['mercadoria'] ?? $item->description,
+                            'quantity' => $itemData['quantidade'] ?? $item->quantity,
+                            'unit' => $itemData['unidade'] ?? null,
+                            'application' => $itemData['aplicacao'] ?? null,
+                            'priority_days' => $itemData['prioridade'] ?? null,
+                            'tag' => $itemData['tag'] ?? null,
+                            'cost_center_code' => $costCenterCode,
+                            'cost_center_description' => $costCenterDescription,
+                        ];
+                        
+                        $this->updateModelWithStringTimestamps($item, $itemUpdateData);
+                    }
+                } else {
+                    // Criar novo item
+                    $newItemData = [
+                        'purchase_quote_id' => $quote->id,
+                        'product_code' => $itemData['codigo'] ?? null,
+                        'reference' => $itemData['referencia'] ?? null,
+                        'description' => $itemData['mercadoria'] ?? '',
+                        'quantity' => $itemData['quantidade'] ?? 0,
+                        'unit' => $itemData['unidade'] ?? null,
+                        'application' => $itemData['aplicacao'] ?? null,
+                        'priority_days' => $itemData['prioridade'] ?? null,
+                        'tag' => $itemData['tag'] ?? null,
+                        'cost_center_code' => $costCenterCode,
+                        'cost_center_description' => $costCenterDescription,
+                    ];
+                    
+                    $this->insertWithStringTimestamps('purchase_quote_items', $newItemData);
+                }
+                
+                if (!$mainCostCenterCode && $costCenterCode) {
+                    $mainCostCenterCode = $costCenterCode;
+                    $mainCostCenterDescription = $costCenterDescription;
+                }
+            }
+            
+            // Atualizar centro de custo principal se houver
+            if ($mainCostCenterCode) {
+                $this->updateModelWithStringTimestamps($quote, [
+                    'main_cost_center_code' => $mainCostCenterCode,
+                    'main_cost_center_description' => $mainCostCenterDescription,
+                ]);
+            }
+        }
+    }
+
     public function saveDetails(Request $request, PurchaseQuote $quote, PurchaseQuoteProductDefaultsService $productDefaultsService)
     {
         // Verificar se o usuário tem permissão para editar detalhes de cotação
@@ -1478,11 +1613,6 @@ class PurchaseQuoteController extends Controller
 
     public function approve(Request $request, PurchaseQuote $quote)
     {
-        $validated = $request->validate([
-            'observacao' => 'nullable|string',
-            'mensagem' => 'nullable|string',
-        ]);
-
         $user = auth()->user();
         
         if (!$user) {
@@ -1490,6 +1620,44 @@ class PurchaseQuoteController extends Controller
                 'message' => 'Usuário não autenticado.',
             ], Response::HTTP_UNAUTHORIZED);
         }
+
+        // Verificar se o usuário tem permissão para editar na aprovação
+        $hasEditPermission = $user->hasPermission('edit_cotacoes_aprovacao');
+        
+        // Validação base: sempre requer observacao/mensagem
+        $validationRules = [
+            'observacao' => 'nullable|string',
+            'mensagem' => 'nullable|string',
+        ];
+        
+        // Se tem permissão de editar na aprovação, aceitar dados de edição opcionais
+        if ($hasEditPermission) {
+            $validationRules = array_merge($validationRules, [
+                'numero' => 'nullable|string|max:30|unique:purchase_quotes,quote_number,' . $quote->id,
+                'data_solicitacao' => 'nullable|date',
+                'solicitante.id' => 'nullable|integer|exists:users,id',
+                'solicitante.label' => 'nullable|string|max:191',
+                'empresa.id' => 'nullable|integer|exists:companies,id',
+                'empresa.label' => 'nullable|string|max:191',
+                'local' => 'nullable|string|max:191',
+                'work_front' => 'nullable|string|max:191',
+                'itens' => 'nullable|array|min:1',
+                'itens.*.id' => 'nullable|integer|exists:purchase_quote_items,id',
+                'itens.*.codigo' => 'nullable|string|max:100',
+                'itens.*.referencia' => 'nullable|string|max:100',
+                'itens.*.mercadoria' => 'nullable|string|max:255',
+                'itens.*.quantidade' => 'nullable|numeric|min:0.0001',
+                'itens.*.unidade' => 'nullable|string|max:20',
+                'itens.*.aplicacao' => 'nullable|string',
+                'itens.*.prioridade' => 'nullable|integer|min:0',
+                'itens.*.tag' => 'nullable|string|max:100',
+                'itens.*.centro_custo.codigo' => 'nullable|string|max:50',
+                'itens.*.centro_custo.descricao' => 'nullable|string',
+                'itens.*.centro_custo.classe' => 'nullable|string|max:20',
+            ]);
+        }
+        
+        $validated = $request->validate($validationRules);
         
         $currentStatus = $quote->current_status_slug;
         $approvalService = app(PurchaseQuoteApprovalService::class);
@@ -1559,6 +1727,13 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
+            // Se tem permissão de editar na aprovação e foram enviados dados de edição, aplicar as mudanças primeiro
+            if ($hasEditPermission && !empty($validated['itens'])) {
+                // Aplicar edições antes de aprovar
+                $this->applyQuoteEditions($quote, $validated);
+                $quote->refresh();
+            }
+            
             // Se é diretor com permissão especial, preencher automaticamente todas as assinaturas intermediárias
             if ($hasDirectorPermission && $isDirector && $status->slug === 'aprovado') {
                 // Preencher automaticamente todas as assinaturas intermediárias pendentes (exceto DIRETOR)
