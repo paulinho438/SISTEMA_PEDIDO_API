@@ -515,6 +515,14 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Pendentes de Análise",
+                "slug"             => "view_pendentes_analise",
+                "group"            => "cotacoes_aprovacao_nivel"
+            ]
+        );
+
         // Permissões de Ativos - Grupo: ativos (Visualização e Listagem)
         DB::table("permitems")->insert(
             [

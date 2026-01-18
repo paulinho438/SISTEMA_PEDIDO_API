@@ -270,11 +270,47 @@ class PurchaseQuoteController extends Controller
             
             if (!empty($userLevels)) {
                 // Buscar cotações que têm aprovações pendentes nos níveis do usuário
-                // Se tem company_id, filtrar por ele, senão mostrar todas (incluindo as sem company_id)
-                $query->whereHas('approvals', function ($q) use ($userLevels) {
-                    $q->whereIn('approval_level', $userLevels)
-                      ->where('required', true)
-                      ->where('approved', false);
+                // Se o status é "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL podem aprovar simultaneamente
+                // Caso contrário, segue a lógica de hierarquia
+                $query->where(function ($q) use ($userLevels, $companyId, $approvalService) {
+                    // Para status "analisada" ou "analisada_aguardando", mostrar cotações com aprovações pendentes
+                    // de ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (podem aprovar simultaneamente)
+                    $q->where(function ($subQ) use ($userLevels) {
+                        $subQ->whereIn('current_status_slug', ['analisada', 'analisada_aguardando'])
+                            ->whereHas('approvals', function ($approvalQ) use ($userLevels) {
+                                $approvalQ->whereIn('approval_level', array_intersect($userLevels, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL']))
+                                    ->where('required', true)
+                                    ->where('approved', false);
+                            });
+                    })
+                    // Para status "analise_gerencia", mostrar para DIRETOR apenas se TODAS as assinaturas anteriores foram aprovadas
+                    ->orWhere(function ($subQ) use ($userLevels, $approvalService) {
+                        // Verificar se o usuário é DIRETOR
+                        if (in_array('DIRETOR', $userLevels)) {
+                            $subQ->where('current_status_slug', 'analise_gerencia')
+                                ->whereHas('approvals', function ($approvalQ) {
+                                    // Verificar se DIRETOR tem aprovação pendente
+                                    $approvalQ->where('approval_level', 'DIRETOR')
+                                        ->where('required', true)
+                                        ->where('approved', false);
+                                })
+                                // Garantir que TODAS as assinaturas anteriores (exceto DIRETOR) foram aprovadas
+                                ->whereDoesntHave('approvals', function ($approvalQ) {
+                                    $approvalQ->where('approval_level', '!=', 'DIRETOR')
+                                        ->where('required', true)
+                                        ->where('approved', false);
+                                });
+                        }
+                    })
+                    // Para outros status, seguir a lógica normal de hierarquia
+                    ->orWhere(function ($subQ) use ($userLevels, $approvalService) {
+                        $subQ->whereNotIn('current_status_slug', ['analisada', 'analisada_aguardando', 'analise_gerencia'])
+                            ->whereHas('approvals', function ($approvalQ) use ($userLevels) {
+                                $approvalQ->whereIn('approval_level', $userLevels)
+                                    ->where('required', true)
+                                    ->where('approved', false);
+                            });
+                    });
                 });
                 
                 if ($companyId) {
@@ -1448,9 +1484,20 @@ class PurchaseQuoteController extends Controller
         }
         
         $currentStatus = $quote->current_status_slug;
+        $approvalService = app(PurchaseQuoteApprovalService::class);
         
-        // Verificar permissão baseada no status atual
-        if ($currentStatus === 'aguardando') {
+        // Verificar se o diretor tem permissão "Aprovar como Diretor" e pode aprovar diretamente
+        $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
+        $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
+        $isDirector = in_array('DIRETOR', $userLevels);
+        
+        // Se é diretor com permissão especial, pode aprovar diretamente qualquer cotação (exceto aprovado/reprovado)
+        if ($hasDirectorPermission && $isDirector && !in_array($currentStatus, ['aprovado', 'reprovado'], true)) {
+            $nextStatusSlug = 'aprovado';
+            $defaultNote = 'Cotação aprovada diretamente pelo diretor.';
+        }
+        // Verificar permissão baseada no status atual (lógica normal)
+        elseif ($currentStatus === 'aguardando') {
             // Para autorizar, verificar permissão específica
             if (!$user->hasPermission('cotacoes_autorizar')) {
                 return response()->json([
@@ -1504,6 +1551,50 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
+            // Se é diretor com permissão especial, preencher automaticamente todas as assinaturas intermediárias
+            if ($hasDirectorPermission && $isDirector && $status->slug === 'aprovado') {
+                // Preencher automaticamente todas as assinaturas intermediárias pendentes (exceto DIRETOR)
+                $order = $approvalService->getApprovalOrder();
+                $pendingApprovals = $quote->approvals()
+                    ->required()
+                    ->where('approved', false)
+                    ->where('approval_level', '!=', 'DIRETOR')
+                    ->get();
+                
+                $directorOrder = $order['DIRETOR'] ?? 999;
+                
+                foreach ($pendingApprovals as $approval) {
+                    $approvalOrder = $order[$approval->approval_level] ?? 999;
+                    // Aprovar apenas níveis anteriores ao DIRETOR
+                    if ($approvalOrder < $directorOrder) {
+                        $this->updateModelWithStringTimestamps($approval, [
+                            'approved' => true,
+                            'approved_by' => $user->id,
+                            'approved_by_name' => $user->nome_completo ?? $user->name,
+                            'approved_at' => now()->format('Y-m-d H:i:s'),
+                            'notes' => 'Aprovado automaticamente pelo diretor.',
+                        ]);
+                    }
+                }
+                
+                // Agora aprovar o DIRETOR
+                $directorApproval = $quote->approvals()
+                    ->byLevel('DIRETOR')
+                    ->required()
+                    ->where('approved', false)
+                    ->first();
+                
+                if ($directorApproval) {
+                    $this->updateModelWithStringTimestamps($directorApproval, [
+                        'approved' => true,
+                        'approved_by' => $user->id,
+                        'approved_by_name' => $user->nome_completo ?? $user->name,
+                        'approved_at' => now()->format('Y-m-d H:i:s'),
+                        'notes' => $note,
+                    ]);
+                }
+            }
+            
             $this->transitionStatus($quote, $status, $note);
 
             if ($status->slug === 'aprovado') {
@@ -1591,6 +1682,75 @@ class PurchaseQuoteController extends Controller
         }
 
         $normalizedMessage = trim((string) ($validated['mensagem'] ?? $validated['observacao'] ?? ''));
+
+        // Se o diretor está reprovando (status "aprovado" ou "analise_gerencia"), limpar assinaturas exceto COMPRADOR
+        $isDirectorRejecting = in_array($quote->current_status_slug, ['aprovado', 'analise_gerencia'], true);
+        $approvalService = app(PurchaseQuoteApprovalService::class);
+        $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
+        $isDirector = in_array('DIRETOR', $userLevels);
+
+        if ($isDirectorRejecting && $isDirector) {
+            if ($normalizedMessage === '') {
+                return response()->json([
+                    'message' => 'Informe o motivo da reprovação.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            $statusCotacao = PurchaseQuoteStatus::where('slug', 'cotacao')->first();
+
+            if (!$statusCotacao) {
+                return response()->json([
+                    'message' => 'Status "cotacao" não configurado. Execute as migrations novamente.',
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
+            }
+
+            DB::beginTransaction();
+
+            try {
+                // Limpar todas as assinaturas exceto COMPRADOR
+                $quote->approvals()
+                    ->where('approval_level', '!=', 'COMPRADOR')
+                    ->update([
+                        'approved' => false,
+                        'approved_by' => null,
+                        'approved_by_name' => null,
+                        'approved_at' => null,
+                        'notes' => null,
+                    ]);
+
+                // Inserir mensagem de reprovação
+                $this->insertWithStringTimestamps('purchase_quote_messages', [
+                    'purchase_quote_id' => $quote->id,
+                    'user_id' => auth()->id(),
+                    'type' => 'reprova',
+                    'message' => $normalizedMessage,
+                ]);
+
+                $this->transitionStatus($quote, $statusCotacao, $normalizedMessage);
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'Cotação reprovada pelo diretor e retornada para cotação. Todas as assinaturas foram removidas exceto a do comprador.',
+                    'status' => [
+                        'slug' => $statusCotacao->slug,
+                        'label' => $statusCotacao->label,
+                    ],
+                ]);
+            } catch (\Throwable $exception) {
+                DB::rollBack();
+
+                Log::error('Falha ao reprovar cotação pelo diretor', [
+                    'quote_id' => $quote->id,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Não foi possível reprovar a cotação.',
+                    'error' => $exception->getMessage(),
+                ], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
 
         if ($quote->current_status_slug === 'finalizada') {
             if ($normalizedMessage === '') {
