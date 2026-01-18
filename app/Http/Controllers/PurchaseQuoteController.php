@@ -1404,6 +1404,14 @@ class PurchaseQuoteController extends Controller
 
     public function assignBuyer(Request $request, PurchaseQuote $quote)
     {
+        // Verificar se o usuário tem permissão para atribuir comprador
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_assign_buyer')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para atribuir comprador à cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $validated = $request->validate([
             'buyer_id' => 'required|integer|exists:users,id',
             'observacao' => 'nullable|string',
@@ -2274,6 +2282,14 @@ class PurchaseQuoteController extends Controller
      */
     public function analyzeAndSelectApprovals(Request $request, PurchaseQuote $quote)
     {
+        // Verificar se o usuário tem permissão para selecionar níveis de aprovação
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_analisar_selecionar')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para selecionar níveis de aprovação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $validated = $request->validate([
             'niveis_aprovacao' => 'required|array|min:1',
             'niveis_aprovacao.*' => 'required|string|in:COMPRADOR,GERENTE_LOCAL,ENGENHEIRO,GERENTE_GERAL,DIRETOR,PRESIDENTE',
