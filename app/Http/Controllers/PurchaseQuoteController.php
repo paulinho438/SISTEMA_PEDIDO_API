@@ -464,6 +464,7 @@ class PurchaseQuoteController extends Controller
                 'tipo_frete' => $supplier->freight_type,
                 'valor_frete' => $supplier->freight_value,
                 'desconto' => $supplier->discount,
+                'difal_percent' => $supplier->difal_percent,
                 'itens' => $itemQuotes,
             ];
         });
@@ -1126,6 +1127,7 @@ class PurchaseQuoteController extends Controller
             'fornecedores.*.tipo_frete' => 'nullable|string|max:10',
             'fornecedores.*.valor_frete' => 'nullable|numeric',
             'fornecedores.*.desconto' => 'nullable|numeric',
+            'fornecedores.*.difal_percent' => 'nullable|numeric',
             'fornecedores.*.itens' => 'required|array',
             'fornecedores.*.itens.*.item_id' => 'required|integer|exists:purchase_quote_items,id',
             'fornecedores.*.itens.*.marca' => 'nullable|string|max:255',
@@ -1197,6 +1199,7 @@ class PurchaseQuoteController extends Controller
                     'freight_type' => $supplierPayload['tipo_frete'] ?? null,
                     'freight_value' => $normalizeNumber($supplierPayload['valor_frete'] ?? null),
                     'discount' => $normalizeNumber($supplierPayload['desconto'] ?? null),
+                    'difal_percent' => $normalizeNumber($supplierPayload['difal_percent'] ?? null),
                 ];
 
                 if ($isNewSupplier) {

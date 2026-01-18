@@ -32,6 +32,7 @@ class PurchaseQuoteSupplier extends Model
         'freight_type',
         'freight_value',
         'discount',
+        'difal_percent',
     ];
 
     protected $casts = [
