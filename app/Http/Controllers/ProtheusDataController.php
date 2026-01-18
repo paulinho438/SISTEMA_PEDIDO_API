@@ -470,7 +470,7 @@ class ProtheusDataController extends Controller
             'fornecedores' => [
                 'descricao' => 'Fornecedor',
                 'label' => 'Fornecedores',
-                'columns' => ['A2_COD', 'A2_NOME', 'A2_CGC', 'A2_END', 'A2_MUN', 'A2_CEP'],
+                'columns' => ['A2_COD', 'A2_NOME', 'A2_CGC', 'A2_END', 'A2_MUN', 'A2_EST', 'A2_CEP'],
                 'order_by' => 'A2_NOME',
                 'filters' => [
                     'codigo' => ['column' => 'A2_COD', 'operator' => '='],

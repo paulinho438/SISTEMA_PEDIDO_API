@@ -316,14 +316,6 @@ class PermItemsSeeder extends Seeder
 
         DB::table("permitems")->insert(
             [
-                "name"             => "Editar empresas",
-                "slug"             => "view_editar_empresas",
-                "group"            => "companies"
-            ]
-        );
-
-        DB::table("permitems")->insert(
-            [
                 "name"             => "Visualizar Permissões MASTERGERAL",
                 "slug"             => "view_mastergeral",
                 "group"            => "geral"

@@ -143,7 +143,7 @@ class FornecedorController extends Controller
                 $fornecedores = $this->protheusDataService->paginate(
                     $request,
                     (string) $association->tabela_protheus,
-                    ['A2_COD', 'A2_NOME', 'A2_CGC', 'A2_END', 'A2_MUN', 'A2_CEP'],
+                    ['A2_COD', 'A2_NOME', 'A2_CGC', 'A2_END', 'A2_MUN', 'A2_EST', 'A2_CEP'],
                     [],
                     'A2_NOME'
                 );
