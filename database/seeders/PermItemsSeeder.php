@@ -500,6 +500,14 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Visualizar Solicitações Pendentes",
+                "slug"             => "view_solicitacoes_pendentes",
+                "group"            => "cotacoes_solicitacao"
+            ]
+        );
+
         // Permissões de Cotações - Grupo: cotacoes_edicao (Edição/Detalhes)
         DB::table("permitems")->insert(
             [
