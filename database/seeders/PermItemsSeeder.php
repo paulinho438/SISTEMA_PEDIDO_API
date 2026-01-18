@@ -358,7 +358,7 @@ class PermItemsSeeder extends Seeder
         // Permissões de Cotações - Grupo: cotacoes_solicitacao (Criação)
         DB::table("permitems")->insert(
             [
-                "name"             => "Criar Cotação",
+                "name"             => "Criar Solicitação",
                 "slug"             => "create_cotacoes",
                 "group"            => "cotacoes_solicitacao"
             ]
