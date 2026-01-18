@@ -437,11 +437,22 @@ class PurchaseQuoteController extends Controller
                 ];
             });
 
+            $municipality = $supplier->municipality;
+            $state = $supplier->state;
+            $municipioEstado = null;
+            if ($municipality || $state) {
+                $parts = array_filter([trim($municipality ?? ''), trim($state ?? '')]);
+                $municipioEstado = !empty($parts) ? implode(' - ', $parts) : null;
+            }
+
             return [
                 'id' => $supplier->id,
                 'codigo' => $supplier->supplier_code,
                 'nome' => $supplier->supplier_name,
                 'cnpj' => $supplier->supplier_document,
+                'municipio' => $municipality,
+                'estado' => $state,
+                'municipio_estado' => $municipioEstado,
                 'vendedor' => $supplier->vendor_name,
                 'telefone' => $supplier->vendor_phone,
                 'email' => $supplier->vendor_email,
@@ -1104,6 +1115,8 @@ class PurchaseQuoteController extends Controller
             'fornecedores.*.codigo' => 'nullable|string|max:60',
             'fornecedores.*.nome' => 'required|string|max:255',
             'fornecedores.*.cnpj' => 'nullable|string|max:30',
+            'fornecedores.*.municipality' => 'nullable|string|max:100',
+            'fornecedores.*.state' => 'nullable|string|max:2',
             'fornecedores.*.vendedor' => 'nullable|string|max:191',
             'fornecedores.*.telefone' => 'nullable|string|max:50',
             'fornecedores.*.email' => 'nullable|string|max:191',
@@ -1173,6 +1186,8 @@ class PurchaseQuoteController extends Controller
                     'supplier_code' => $supplierPayload['codigo'] ?? null,
                     'supplier_name' => $supplierPayload['nome'],
                     'supplier_document' => $supplierPayload['cnpj'] ?? null,
+                    'municipality' => !empty($supplierPayload['municipality']) ? trim($supplierPayload['municipality']) : null,
+                    'state' => !empty($supplierPayload['state']) ? trim($supplierPayload['state']) : null,
                     'vendor_name' => $supplierPayload['vendedor'] ?? null,
                     'vendor_phone' => $supplierPayload['telefone'] ?? null,
                     'vendor_email' => $supplierPayload['email'] ?? null,

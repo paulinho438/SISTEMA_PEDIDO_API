@@ -16,6 +16,8 @@ class PurchaseQuoteSupplier extends Model
         'supplier_code',
         'supplier_name',
         'supplier_document',
+        'municipality',
+        'state',
         'vendor_name',
         'vendor_phone',
         'vendor_email',

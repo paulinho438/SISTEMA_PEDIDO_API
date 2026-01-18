@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('purchase_quote_supplier_items', function (Blueprint $table) {
-            $table->decimal('difal', 15, 4)->nullable()->after('unit_cost_with_ipi');
+            $table->decimal('difal', 15, 4)->nullable();
         });
     }
 
