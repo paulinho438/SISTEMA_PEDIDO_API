@@ -1089,6 +1089,14 @@ class PurchaseQuoteController extends Controller
 
     public function saveDetails(Request $request, PurchaseQuote $quote, PurchaseQuoteProductDefaultsService $productDefaultsService)
     {
+        // Verificar se o usuário tem permissão para editar detalhes de cotação
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('edit_cotacoes_detalhes')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar detalhes de cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $validated = $request->validate([
             'fornecedores' => 'required|array|min:1',
             'fornecedores.*.id' => 'nullable|integer|exists:purchase_quote_suppliers,id',
@@ -1750,6 +1758,14 @@ class PurchaseQuoteController extends Controller
 
     public function analyzeQuote(Request $request, PurchaseQuote $quote)
     {
+        // Verificar se o usuário tem permissão para analisar cotação
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_analisar')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para analisar esta cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $validated = $request->validate([
             'status' => 'required|string|in:analisada,analisada_aguardando,analise_gerencia,aprovado',
             'observacao' => 'nullable|string',
@@ -2599,6 +2615,11 @@ class PurchaseQuoteController extends Controller
     private function canUserEditQuote(PurchaseQuote $quote, ?User $user): bool
     {
         if (!$user) {
+            return false;
+        }
+
+        // Verificar se o usuário tem permissão para editar cotações
+        if (!$user->hasPermission('edit_cotacoes')) {
             return false;
         }
 

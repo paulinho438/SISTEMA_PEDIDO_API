@@ -372,15 +372,15 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
-        // Permissões de Cotações - Grupo: cotacoes_edicao (Edição/Detalhes)
         DB::table("permitems")->insert(
             [
-                "name"             => "Editar Cotações",
+                "name"             => "Editar Solicitação",
                 "slug"             => "edit_cotacoes",
-                "group"            => "cotacoes_edicao"
+                "group"            => "cotacoes_solicitacao"
             ]
         );
 
+        // Permissões de Cotações - Grupo: cotacoes_edicao (Edição/Detalhes)
         DB::table("permitems")->insert(
             [
                 "name"             => "Editar Detalhes de Cotação",
@@ -389,15 +389,15 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
-        // Permissões de Cotações - Grupo: cotacoes_comprador (Ações do Comprador)
         DB::table("permitems")->insert(
             [
-                "name"             => "Atribuir Comprador à Cotação",
-                "slug"             => "cotacoes_assign_buyer",
-                "group"            => "cotacoes_comprador"
+                "name"             => "Imprimir Cotação",
+                "slug"             => "cotacoes_imprimir",
+                "group"            => "cotacoes_edicao"
             ]
         );
 
+        // Permissões de Cotações - Grupo: cotacoes_comprador (Ações do Comprador)
         DB::table("permitems")->insert(
             [
                 "name"             => "Finalizar Cotação",
@@ -432,14 +432,6 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
-        DB::table("permitems")->insert(
-            [
-                "name"             => "Aprovar Análise Supervisor",
-                "slug"             => "cotacoes_aprovar_supervisor",
-                "group"            => "cotacoes_analise"
-            ]
-        );
-
         // Permissões de Cotações - Grupo: cotacoes_gerencia (Aprovação Gerência)
         DB::table("permitems")->insert(
             [
@@ -449,39 +441,36 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
-        // Permissões de Cotações - Grupo: cotacoes_reprovar (Reprovação)
-        DB::table("permitems")->insert(
-            [
-                "name"             => "Reprovar Cotação",
-                "slug"             => "cotacoes_reprovar",
-                "group"            => "cotacoes_reprovar"
-            ]
-        );
-
-        // Permissões de Cotações - Grupo: cotacoes_impressao (Relatórios)
-        DB::table("permitems")->insert(
-            [
-                "name"             => "Imprimir Cotação",
-                "slug"             => "cotacoes_imprimir",
-                "group"            => "cotacoes_impressao"
-            ]
-        );
-
-        // Permissões de Cotações - Grupo: cotacoes_admin (Administração)
         DB::table("permitems")->insert(
             [
                 "name"             => "Excluir Cotações",
                 "slug"             => "cotacoes_delete",
-                "group"            => "cotacoes_admin"
+                "group"            => "cotacoes_gerencia"
             ]
         );
 
-        // Permissões de Cotações - Grupo: cotacoes_selecao (Seleção de Níveis)
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Reprovar Cotação",
+                "slug"             => "cotacoes_reprovar",
+                "group"            => "cotacoes_gerencia"
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Atribuir Comprador à Cotação",
+                "slug"             => "cotacoes_assign_buyer",
+                "group"            => "cotacoes_gerencia"
+            ]
+        );
+
+        // Permissões de Cotações - Grupo: cotacoes_selecao_niveis (Seleção de Níveis)
         DB::table("permitems")->insert(
             [
                 "name"             => "Selecionar Níveis de Aprovação",
                 "slug"             => "cotacoes_analisar_selecionar",
-                "group"            => "cotacoes_selecao"
+                "group"            => "cotacoes_selecao_niveis"
             ]
         );
 
