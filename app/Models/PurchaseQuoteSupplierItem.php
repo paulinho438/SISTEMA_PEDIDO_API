@@ -17,6 +17,7 @@ class PurchaseQuoteSupplierItem extends Model
         'unit_cost',
         'ipi',
         'unit_cost_with_ipi',
+        'difal',
         'icms',
         'icms_total',
         'final_cost',
