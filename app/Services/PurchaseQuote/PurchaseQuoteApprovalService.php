@@ -379,6 +379,9 @@ class PurchaseQuoteApprovalService
             return null;
         }
 
+        $currentStatus = $quote->current_status_slug ?? '';
+        $simultaneousLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
+        
         $pendingApprovals = $quote->approvals()
             ->required()
             ->pending()
@@ -387,9 +390,19 @@ class PurchaseQuoteApprovalService
 
         foreach ($pendingApprovals as $approval) {
             if (in_array($approval->approval_level, $userLevels)) {
-                // Verificar se pode aprovar (todos os anteriores foram aprovados)
-                if ($this->canApproveLevel($quote, $approval->approval_level, $user)) {
-                    return $approval->approval_level;
+                // Se o status é "finalizada", "analisada" ou "analisada_aguardando" e o nível é um dos simultâneos,
+                // verificar apenas se o usuário pertence ao grupo/perfil correspondente
+                if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && 
+                    in_array($approval->approval_level, $simultaneousLevels, true)) {
+                    // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
+                    if ($this->userHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
+                        return $approval->approval_level;
+                    }
+                } else {
+                    // Para outros casos, verificar se pode aprovar (todos os anteriores foram aprovados)
+                    if ($this->canApproveLevel($quote, $approval->approval_level, $user)) {
+                        return $approval->approval_level;
+                    }
                 }
             }
         }
