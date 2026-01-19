@@ -1641,11 +1641,23 @@ class PurchaseQuoteController extends Controller
         // Verificar se o usuário tem permissão para editar na aprovação
         $hasEditPermission = $user->hasPermission('edit_cotacoes_aprovacao');
         
+        // Verificar se o diretor tem permissão "Aprovar como Diretor" (para validação dinâmica)
+        $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
+        $approvalService = app(PurchaseQuoteApprovalService::class);
+        $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
+        $isDirector = in_array('DIRETOR', $userLevels);
+        
         // Validação base: sempre requer observacao/mensagem
+        // Se o Diretor tem permissão especial, pode enviar status "aprovado"
+        $allowedStatuses = ['analisada', 'analisada_aguardando'];
+        if ($hasDirectorPermission && $isDirector) {
+            $allowedStatuses[] = 'aprovado';
+        }
+        
         $validationRules = [
             'observacao' => 'nullable|string',
             'mensagem' => 'nullable|string',
-            'status' => 'nullable|string|in:analisada,analisada_aguardando', // Status opcional para quando o status atual é "finalizada"
+            'status' => 'nullable|string|in:' . implode(',', $allowedStatuses), // Status opcional
         ];
         
         // Se tem permissão de editar na aprovação, aceitar dados de edição opcionais
@@ -1678,22 +1690,20 @@ class PurchaseQuoteController extends Controller
         $validated = $request->validate($validationRules);
         
         $currentStatus = $quote->current_status_slug;
-        $approvalService = app(PurchaseQuoteApprovalService::class);
-        
-        // Verificar se o diretor tem permissão "Aprovar como Diretor" e pode aprovar diretamente
-        $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
-        $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
-        $isDirector = in_array('DIRETOR', $userLevels);
         
         // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
         // 1. A cotação tem comprador associado (buyer_id não é null)
         // 2. O status é "finalizada" ou superior (finalizada, analisada, analisada_aguardando, analise_gerencia)
         // 3. Não está aprovado ou reprovado
+        // 4. Se o status foi enviado explicitamente como "aprovado" no payload, usar ele
         $allowedStatusesForDirectApproval = ['finalizada', 'analisada', 'analisada_aguardando', 'analise_gerencia'];
         $hasBuyer = $quote->buyer_id !== null;
+        $requestedStatus = $validated['status'] ?? null;
         
+        // Se o Diretor pode aprovar diretamente e (enviou status "aprovado" OU não enviou status)
         if ($hasDirectorPermission && $isDirector && $hasBuyer && 
-            in_array($currentStatus, $allowedStatusesForDirectApproval, true)) {
+            in_array($currentStatus, $allowedStatusesForDirectApproval, true) &&
+            ($requestedStatus === 'aprovado' || $requestedStatus === null)) {
             $nextStatusSlug = 'aprovado';
             $defaultNote = 'Cotação aprovada diretamente pelo diretor.';
         }
