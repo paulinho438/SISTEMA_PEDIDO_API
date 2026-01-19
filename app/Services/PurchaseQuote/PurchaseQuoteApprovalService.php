@@ -87,16 +87,21 @@ class PurchaseQuoteApprovalService
     }
     /**
      * Ordem hierárquica padrão de aprovação
+     *
+     * COMPRADOR: ordem 1
+     * ENGENHEIRO, GERENTE_LOCAL, GERENTE_GERAL: ordem 2 (sem ordem entre eles - simultâneos)
+     * DIRETOR: ordem 3
+     * PRESIDENTE: ordem 4
      */
     public function getApprovalOrder(): array
     {
         return [
             'COMPRADOR' => 1,
-            'ENGENHEIRO' => 2, // Engenheiro vem ANTES do Gerente Local
-            'GERENTE_LOCAL' => 3,
-            'GERENTE_GERAL' => 4,
-            'DIRETOR' => 5,
-            'PRESIDENTE' => 6,
+            'ENGENHEIRO' => 2, // Sem ordem entre os três intermediários
+            'GERENTE_LOCAL' => 2, // Sem ordem entre os três intermediários
+            'GERENTE_GERAL' => 2, // Sem ordem entre os três intermediários
+            'DIRETOR' => 3,
+            'PRESIDENTE' => 4,
         ];
     }
 
@@ -172,40 +177,86 @@ class PurchaseQuoteApprovalService
         $simultaneousLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
         $currentStatus = $quote->current_status_slug ?? '';
 
-        if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && 
+        if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
             in_array($level, $simultaneousLevels, true)) {
             // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
-            return $this->userHasLevelPermission($user, $level, $quote->company_id);
+            return $this->checkUserHasLevelPermission($user, $level, $quote->company_id);
         }
 
         // Para outros casos, verificar se todos os níveis anteriores foram aprovados
         $order = $this->getApprovalOrder();
         $currentOrder = $order[$level] ?? 999;
+        
+        // Níveis intermediários simultâneos (todos têm ordem 2)
+        $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
 
-        $previousLevels = array_filter($order, function ($orderValue) use ($currentOrder) {
-            return $orderValue < $currentOrder;
-        });
+        // Se o nível atual é DIRETOR ou PRESIDENTE, verificar:
+        // 1. Níveis de ordem menor (COMPRADOR)
+        // 2. Todos os níveis intermediários (ordem 2) devem estar aprovados
+        if (in_array($level, ['DIRETOR', 'PRESIDENTE'], true)) {
+            // Verificar níveis de ordem menor (apenas COMPRADOR tem ordem 1)
+            $previousOrderLevels = array_filter($order, function ($orderValue) use ($currentOrder) {
+                return $orderValue < $currentOrder;
+            });
+            
+            foreach ($previousOrderLevels as $prevLevel => $prevOrder) {
+                $prevApproval = $quote->approvals()
+                    ->byLevel($prevLevel)
+                    ->required()
+                    ->first();
 
-        foreach ($previousLevels as $prevLevel => $prevOrder) {
-            $prevApproval = $quote->approvals()
-                ->byLevel($prevLevel)
+                // Se o nível anterior é requerido mas não foi aprovado, não pode aprovar este
+                if ($prevApproval && !$prevApproval->approved) {
+                    return false;
+                }
+            }
+            
+            // Verificar se todos os níveis intermediários requeridos foram aprovados
+            $requiredIntermediateApprovals = $quote->approvals()
                 ->required()
-                ->first();
+                ->whereIn('approval_level', $intermediateLevels)
+                ->get();
+            
+            foreach ($requiredIntermediateApprovals as $intermediateApproval) {
+                if (!$intermediateApproval->approved) {
+                    return false;
+                }
+            }
+        } else {
+            // Para outros níveis (COMPRADOR), verificar apenas níveis de ordem menor
+            $previousLevels = array_filter($order, function ($orderValue) use ($currentOrder) {
+                return $orderValue < $currentOrder;
+            });
 
-            // Se o nível anterior é requerido mas não foi aprovado, não pode aprovar este
-            if ($prevApproval && !$prevApproval->approved) {
-                return false;
+            foreach ($previousLevels as $prevLevel => $prevOrder) {
+                $prevApproval = $quote->approvals()
+                    ->byLevel($prevLevel)
+                    ->required()
+                    ->first();
+
+                // Se o nível anterior é requerido mas não foi aprovado, não pode aprovar este
+                if ($prevApproval && !$prevApproval->approved) {
+                    return false;
+                }
             }
         }
 
         // Verificar se o usuário pertence ao grupo/perfil correspondente
-        return $this->userHasLevelPermission($user, $level, $quote->company_id);
+        return $this->checkUserHasLevelPermission($user, $level, $quote->company_id);
     }
 
     /**
-     * Verifica se o usuário tem permissão para o nível
+     * Verifica se o usuário tem permissão para o nível (método público para uso externo)
      */
-    protected function userHasLevelPermission(User $user, string $level, ?int $companyId): bool
+    public function userHasLevelPermission(User $user, string $level, ?int $companyId): bool
+    {
+        return $this->checkUserHasLevelPermission($user, $level, $companyId);
+    }
+    
+    /**
+     * Verifica se o usuário tem permissão para o nível (método protegido interno)
+     */
+    protected function checkUserHasLevelPermission(User $user, string $level, ?int $companyId): bool
     {
         if (!$companyId) {
             return false;
@@ -329,7 +380,7 @@ class PurchaseQuoteApprovalService
         $order = $this->getApprovalOrder();
 
         foreach ($order as $level => $orderValue) {
-            if ($this->userHasLevelPermission($user, $level, $companyId)) {
+            if ($this->checkUserHasLevelPermission($user, $level, $companyId)) {
                 $levels[] = $level;
             }
         }
@@ -392,10 +443,10 @@ class PurchaseQuoteApprovalService
             if (in_array($approval->approval_level, $userLevels)) {
                 // Se o status é "finalizada", "analisada" ou "analisada_aguardando" e o nível é um dos simultâneos,
                 // verificar apenas se o usuário pertence ao grupo/perfil correspondente
-                if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && 
+                if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
                     in_array($approval->approval_level, $simultaneousLevels, true)) {
                     // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
-                    if ($this->userHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
+                    if ($this->checkUserHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
                         return $approval->approval_level;
                     }
                 } else {

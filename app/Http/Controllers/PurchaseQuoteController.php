@@ -1689,6 +1689,50 @@ class PurchaseQuoteController extends Controller
             $approvalService = app(PurchaseQuoteApprovalService::class);
             $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
             
+            // Se não encontrou nível pendente, verificar se o usuário tem algum dos níveis intermediários
+            // e se há aprovações pendentes para esses níveis (para status "finalizada")
+            if ($nextLevel === null && $currentStatus === 'finalizada') {
+                $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
+                $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
+                $userIntermediateLevels = array_intersect($userLevels, $intermediateLevels);
+                
+                if (!empty($userIntermediateLevels)) {
+                    // Verificar se há aprovações pendentes para algum dos níveis intermediários do usuário
+                    $pendingIntermediateApprovals = $quote->approvals()
+                        ->required()
+                        ->pending()
+                        ->whereIn('approval_level', $userIntermediateLevels)
+                        ->get();
+                    
+                    if ($pendingIntermediateApprovals->isNotEmpty()) {
+                        // Pegar o primeiro nível pendente que o usuário pode aprovar
+                        foreach ($pendingIntermediateApprovals as $approval) {
+                            if ($approvalService->userHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
+                                $nextLevel = $approval->approval_level;
+                                break;
+                            }
+                        }
+                    } else {
+                        // Se não há aprovações pendentes, verificar se o usuário pode aprovar algum dos seus níveis
+                        // e usar o primeiro nível que ele tem permissão
+                        foreach ($userIntermediateLevels as $level) {
+                            if ($approvalService->userHasLevelPermission($user, $level, $quote->company_id)) {
+                                // Verificar se já existe uma aprovação para esse nível (mesmo que aprovada)
+                                $existingApproval = $quote->approvals()
+                                    ->byLevel($level)
+                                    ->first();
+                                
+                                // Se não existe ou não está aprovada, usar esse nível
+                                if (!$existingApproval || !$existingApproval->approved) {
+                                    $nextLevel = $level;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             if (!$hasGenericPermission && $nextLevel === null) {
                 return response()->json([
                     'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
@@ -1754,6 +1798,25 @@ class PurchaseQuoteController extends Controller
                 
                 // Aprovar o nível do usuário primeiro
                 if ($nextLevel) {
+                    // Verificar se a aprovação existe, se não existir, criar
+                    $approval = $quote->approvals()
+                        ->byLevel($nextLevel)
+                        ->first();
+                    
+                    if (!$approval) {
+                        // Criar aprovação se não existir
+                        $order = $approvalService->getApprovalOrder();
+                        $this->insertWithStringTimestamps('purchase_quote_approvals', [
+                            'purchase_quote_id' => $quote->id,
+                            'approval_level' => $nextLevel,
+                            'required' => true,
+                            'approved' => false,
+                            'order' => $order[$nextLevel] ?? 999,
+                        ]);
+                        $quote->refresh();
+                    }
+                    
+                    // Agora aprovar o nível
                     $approvalService->approveLevel($quote, $nextLevel, $user, $note);
                     $quote->refresh();
                 }
@@ -1777,28 +1840,15 @@ class PurchaseQuoteController extends Controller
                     $defaultNote = 'Cotação encaminhada para análise da gerência.';
                     $note = $validated['observacao'] ?? $defaultNote;
                 } else {
-                    // Encontrar o último nível intermediário (maior ordem antes do DIRETOR)
-                    $lastIntermediateLevel = null;
-                    $lastIntermediateOrder = 0;
-                    
-                    foreach ($intermediateApprovals as $approval) {
-                        $approvalOrder = $order[$approval->approval_level] ?? 0;
-                        if ($approvalOrder > $lastIntermediateOrder) {
-                            $lastIntermediateOrder = $approvalOrder;
-                            $lastIntermediateLevel = $approval->approval_level;
-                        }
-                    }
-                    
-                    // Verificar se o nível que acabou de aprovar é o último intermediário
-                    $isLastIntermediate = ($nextLevel === $lastIntermediateLevel);
-                    
                     // Verificar se todos os níveis intermediários foram aprovados
+                    // Como ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL têm a mesma ordem (2),
+                    // não há "último" - todos são simultâneos
                     $allIntermediateApproved = $intermediateApprovals->every(function ($approval) {
                         return $approval->approved;
                     });
                     
-                    // Se o nível que aprovou é o último E todos foram aprovados, mudar status
-                    if ($isLastIntermediate && $allIntermediateApproved) {
+                    // Se todos os níveis intermediários foram aprovados, mudar status para DIRETOR
+                    if ($allIntermediateApproved) {
                         $nextStatusSlug = 'analise_gerencia';
                         $defaultNote = 'Cotação encaminhada para análise da gerência.';
                         $note = $validated['observacao'] ?? $defaultNote;
