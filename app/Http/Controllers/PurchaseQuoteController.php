@@ -270,7 +270,7 @@ class PurchaseQuoteController extends Controller
             
             if (!empty($userLevels)) {
                 // Buscar cotações que têm aprovações pendentes nos níveis do usuário
-                // Se o status é "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL podem aprovar simultaneamente
+                // Se o status é "finalizada", "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL podem aprovar simultaneamente
                 // Caso contrário, segue a lógica de hierarquia
                 $query->where(function ($q) use ($userLevels, $companyId, $approvalService) {
                     // Para status "finalizada", "analisada" ou "analisada_aguardando", mostrar cotações com aprovações pendentes

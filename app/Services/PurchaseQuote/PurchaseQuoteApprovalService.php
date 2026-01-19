@@ -167,12 +167,12 @@ class PurchaseQuoteApprovalService
             return false;
         }
 
-        // Se o status é "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL
+        // Se o status é "finalizada", "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL
         // podem aprovar simultaneamente (sem necessidade de ordem)
         $simultaneousLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
         $currentStatus = $quote->current_status_slug ?? '';
 
-        if (in_array($currentStatus, ['analisada', 'analisada_aguardando'], true) && 
+        if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && 
             in_array($level, $simultaneousLevels, true)) {
             // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
             return $this->userHasLevelPermission($user, $level, $quote->company_id);
