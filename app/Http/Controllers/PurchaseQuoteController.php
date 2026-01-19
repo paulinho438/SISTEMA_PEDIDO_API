@@ -2310,9 +2310,14 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
         
-        // Verificar permissão baseada no contexto
+        $validated = $request->validate([
+            'status' => 'required|string|in:analisada,analisada_aguardando,analise_gerencia,aprovado',
+            'observacao' => 'nullable|string',
+        ]);
+        
+        // Verificar permissão baseada no contexto (após validação)
         $currentStatus = $quote->current_status_slug;
-        $requestedStatus = $request->input('status');
+        $requestedStatus = $validated['status'];
         
         // Se está tentando aprovar como Diretor (status atual é analise_gerencia e status desejado é aprovado)
         if ($currentStatus === 'analise_gerencia' && $requestedStatus === 'aprovado') {
@@ -2330,11 +2335,6 @@ class PurchaseQuoteController extends Controller
                 ], Response::HTTP_FORBIDDEN);
             }
         }
-
-        $validated = $request->validate([
-            'status' => 'required|string|in:analisada,analisada_aguardando,analise_gerencia,aprovado',
-            'observacao' => 'nullable|string',
-        ]);
 
         $currentStatus = $quote->current_status_slug;
 
