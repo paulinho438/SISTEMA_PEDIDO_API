@@ -30,16 +30,22 @@
         }
         
         .logo {
-            width: 100px;
-            height: 50px;
-            background-color: #0066cc;
-            color: white;
+            width: 120px;
+            height: 60px;
+            background-color: rgb(30, 58, 138);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 10pt;
+            padding: 10px;
+            border-radius: 8px;
+            overflow: hidden;
             margin-right: 20px;
+        }
+        
+        .logo img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
         
         .header-title {
@@ -242,7 +248,9 @@
 
     <!-- PRIMEIRA PÁGINA: Quadro Comparativo + 1 Cotação -->
     <div class="header">
-        <div class="logo">RIALMA S.A</div>
+        <div class="logo">
+            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+        </div>
         <div class="header-title">
             <h1>QUADRO COMPARATIVO DE PREÇOS</h1>
         </div>
@@ -426,7 +434,6 @@
 
     <!-- Rodapé Primeira Página -->
     <div class="footer-totals">
-        <div>COMPRADOR: {{ strtoupper($buyer->nome_completo ?? $buyer->name ?? '') }}</div>
         @php
             $totalSemDifalGeral = 0;
             $totalComDifalGeral = 0;
@@ -441,8 +448,6 @@
                 }
             }
         @endphp
-        <div>TOTAL COMPRADO S/ DIFAL: R$ {{ number_format($totalSemDifalGeral, 2, ',', '.') }}</div>
-        <div>TOTAL COMPRADO C/ DIFAL: R$ {{ number_format($totalComDifalGeral, 2, ',', '.') }}</div>
     </div>
 
     @if($totalSuppliers > 1)
@@ -451,7 +456,9 @@
             <div class="page-break"></div>
             
             <div class="header">
-                <div class="logo">RIALMA S.A</div>
+                <div class="logo">
+                    <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+                </div>
                 <div class="header-title">
                     <h1>QUADRO COMPARATIVO DE PREÇOS</h1>
                 </div>
@@ -613,9 +620,6 @@
                 @endfor
             </div>
 
-            <div class="footer-totals">
-                <div>COMPRADOR: {{ strtoupper($buyer->nome_completo ?? $buyer->name ?? '') }}</div>
-            </div>
         @endfor
     @endif
 
@@ -623,7 +627,9 @@
     <div class="page-break"></div>
     
     <div class="header">
-        <div class="logo">RIALMA S.A</div>
+        <div class="logo">
+            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+        </div>
         <div class="header-title">
             <h1>QUADRO RESUMO DA COTAÇÃO E COMPRA</h1>
         </div>
@@ -768,8 +774,8 @@
     <!-- Rodapé Última Página -->
     <div class="footer-totals">
         <div>COMPRADOR: {{ strtoupper($buyer->nome_completo ?? $buyer->name ?? '') }}</div>
-        <div>TOTAL COMPRADO S/ DIFAL: R$ {{ number_format($totalSemDifal, 2, ',', '.') }}</div>
-        <div>TOTAL COMPRADO C/ DIFAL: R$ {{ number_format($totalDecisao, 2, ',', '.') }}</div>
+        <div>TOTAL S/ DIFAL: R$ {{ number_format($totalSemDifal, 2, ',', '.') }}</div>
+        <div>TOTAL C/ DIFAL: R$ {{ number_format($totalDecisao, 2, ',', '.') }}</div>
     </div>
 </body>
 </html>

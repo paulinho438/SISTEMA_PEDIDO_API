@@ -53,16 +53,21 @@
         }
         
         .logo {
-            width: 80px;
-            height: 40px;
-            background-color: #0066CC;
-            color: white;
+            width: 120px;
+            height: 60px;
+            background-color: rgb(30, 58, 138);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            font-size: 14pt;
-            padding: 5px;
+            padding: 10px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .logo img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
         }
         
         .header-center {
@@ -298,7 +303,9 @@
     <div class="top">
         <!-- Cabeçalho -->
         <div class="header">
-            <div class="logo">RIALMA</div>
+            <div class="logo">
+                <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+            </div>
             <div class="header-center">
                 <h1>PEDIDO DE COMPRA</h1>
             </div>
@@ -315,6 +322,15 @@
                 <div class="info-block-title">FORNECEDOR</div>
                 <div class="info-block-content">
                     <div class="text-bold">{{ strtoupper($order->supplier_name ?? '') }}</div>
+                    @php
+                        $quoteSupplier = $order->quoteSupplier;
+                    @endphp
+                    @if($quoteSupplier && $quoteSupplier->municipality)
+                        <div><strong>END:</strong> {{ strtoupper($quoteSupplier->municipality) }}</div>
+                    @endif
+                    @if($quoteSupplier && $quoteSupplier->state)
+                        <div><strong>CIDADE:</strong> {{ strtoupper($quoteSupplier->municipality ?? '') }} - {{ strtoupper($quoteSupplier->state) }}</div>
+                    @endif
                     @if($order->supplier_document)
                         <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $order->supplier_document) }}</div>
                     @endif
@@ -327,7 +343,25 @@
             <div class="info-block info-block-right">
                 <div class="info-block-title">FATURAR A</div>
                 <div class="info-block-content">
-                    <div class="text-bold">{{ strtoupper($order->quote && $order->quote->location ? $order->quote->location : ($company->company ?? '')) }}</div>
+                    <div class="text-bold">{{ strtoupper($company->razao_social ?? $company->company ?? '') }}</div>
+                    @if($company->endereco)
+                        <div><strong>ENDERECO:</strong> {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif</div>
+                    @endif
+                    @if($company->bairro)
+                        <div><strong>BAIRRO:</strong> {{ strtoupper($company->bairro) }}</div>
+                    @endif
+                    @if($company->cidade)
+                        <div><strong>CIDADE:</strong> {{ strtoupper($company->cidade) }}@if($company->uf){{ ' - ' . strtoupper($company->uf) }}@endif</div>
+                    @endif
+                    @if($company->cep)
+                        <div><strong>CEP:</strong> {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $company->cep) }}</div>
+                    @endif
+                    @if($company->cnpj)
+                        <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $company->cnpj) }}</div>
+                    @endif
+                    @if($company->inscricao_estadual)
+                        <div><strong>INSC.EST.:</strong> {{ $company->inscricao_estadual }}</div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -338,8 +372,14 @@
             <div class="delivery-row">
                 <div class="delivery-row-item">
                     {{ strtoupper($company->company ?? '') }}
-                    @if($order->quote && $order->quote->location)
-                        {{ strtoupper($order->quote->location) }}
+                    @if($company->endereco)
+                        {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif
+                    @endif
+                    @if($company->bairro)
+                        {{ strtoupper($company->bairro) }}
+                    @endif
+                    @if($company->cidade)
+                        {{ strtoupper($company->cidade) }}@if($company->uf){{ ' ' . strtoupper($company->uf) }}@endif
                     @endif
                 </div>
                 <div class="delivery-row-item" style="text-align: right;">

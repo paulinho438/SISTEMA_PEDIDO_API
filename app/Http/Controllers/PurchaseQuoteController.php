@@ -3294,42 +3294,21 @@ class PurchaseQuoteController extends Controller
         // Se vier da tela de cotação, usar template comparativo (se houver fornecedores)
         $tipo = $request->get('tipo', null);
         
+        // Verificar se há fornecedores
+        $hasSuppliers = $quote->suppliers()->count() > 0;
+        
         if ($tipo === 'solicitacao') {
             // Sempre usar template de solicitação quando vem da tela de solicitação
             $viewTemplate = 'solicitacao';
             $paperOrientation = 'portrait';
-        } elseif ($tipo === 'cotacao') {
-            // Quando vem da tela de cotação, usar template comparativo se houver fornecedores
-            $viewTemplate = ($quote->suppliers()->count() > 0) ? 'cotacao-comparativa' : 'solicitacao';
-            $paperOrientation = ($quote->suppliers()->count() > 0) ? 'landscape' : 'portrait';
+        } elseif ($tipo === 'cotacao' || $hasSuppliers) {
+            // Quando vem da tela de cotação ou tem fornecedores, sempre usar template comparativo
+            $viewTemplate = 'cotacao-comparativa';
+            $paperOrientation = 'landscape';
         } else {
-            // Fallback: verificar se há fornecedores com valores preenchidos
-            $hasSuppliersWithValues = false;
-            $suppliers = $quote->suppliers;
-            
-            if ($suppliers->count() > 0) {
-                foreach ($suppliers as $supplier) {
-                    $hasItemsWithValues = $supplier->items()->where(function($query) {
-                        $query->whereNotNull('unit_cost')
-                              ->orWhereNotNull('final_cost')
-                              ->orWhere('unit_cost', '>', 0)
-                              ->orWhere('final_cost', '>', 0);
-                    })->exists();
-                    
-                    if ($hasItemsWithValues) {
-                        $hasSuppliersWithValues = true;
-                        break;
-                    }
-                }
-            }
-            
-            if ($hasSuppliersWithValues) {
-                $viewTemplate = 'cotacao-comparativa';
-                $paperOrientation = 'landscape';
-            } else {
-                $viewTemplate = 'solicitacao';
-                $paperOrientation = 'portrait';
-            }
+            // Fallback: sem fornecedores, usar template de solicitação
+            $viewTemplate = 'solicitacao';
+            $paperOrientation = 'portrait';
         }
         
         $pdf = Pdf::loadView($viewTemplate, $dados);
