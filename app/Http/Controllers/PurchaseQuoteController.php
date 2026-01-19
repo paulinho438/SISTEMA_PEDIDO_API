@@ -247,15 +247,12 @@ class PurchaseQuoteController extends Controller
             }
             
             // Obter níveis que o usuário pode aprovar
-            // Primeiro tentar com company_id (se existir), depois sem company_id
-            $userLevels = [];
-            if ($companyId) {
-                $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
-            }
+            // Primeiro tentar sem company_id (permissões são globais), depois com company_id se existir
+            $userLevels = $approvalService->getUserApprovalLevels($user);
             
-            // Se não encontrou níveis com company_id, tentar sem company_id (para cotações sem company_id)
-            if (empty($userLevels)) {
-                $userLevels = $approvalService->getUserApprovalLevels($user);
+            // Se não encontrou níveis sem company_id, tentar com company_id (se existir)
+            if (empty($userLevels) && $companyId) {
+                $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
             }
             
             // Se ainda não encontrou níveis, tentar buscar por grupos como fallback
@@ -303,9 +300,11 @@ class PurchaseQuoteController extends Controller
                                 ->where('required', true)
                                 ->where('approved', false);
                         })
-                        // Garantir que TODAS as assinaturas anteriores (exceto DIRETOR) foram aprovadas
+                        // Garantir que TODAS as assinaturas anteriores ao DIRETOR foram aprovadas
+                        // (COMPRADOR ordem 1, ENGENHEIRO/GERENTE_LOCAL/GERENTE_GERAL ordem 2)
+                        // Não verificar PRESIDENTE (ordem 4) pois vem depois do DIRETOR
                         ->whereDoesntHave('approvals', function ($approvalQ) {
-                            $approvalQ->where('approval_level', '!=', 'DIRETOR')
+                            $approvalQ->whereIn('approval_level', ['COMPRADOR', 'ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'])
                                 ->where('required', true)
                                 ->where('approved', false);
                         });
@@ -329,13 +328,15 @@ class PurchaseQuoteController extends Controller
                     });
                 }
                 
+                // Filtrar por company_id se disponível, mas sempre incluir cotações sem company_id
+                // Se não há company_id, não aplicar filtro (mostrar todas as cotações)
                 if ($companyId) {
-                    // Filtrar por company_id se disponível, mas também incluir cotações sem company_id
                     $query->where(function ($q) use ($companyId) {
                         $q->where('company_id', $companyId)
                           ->orWhereNull('company_id');
                     });
                 }
+                // Se não há company_id, não aplicar filtro de company_id (mostrar todas as cotações)
             } else {
                 // Se o usuário não tem níveis de aprovação, retornar vazio
                 $query->whereRaw('1 = 0');
