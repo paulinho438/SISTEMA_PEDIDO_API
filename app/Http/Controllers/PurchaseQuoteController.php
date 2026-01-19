@@ -2456,6 +2456,23 @@ class PurchaseQuoteController extends Controller
                         }
                     }
                 }
+            } elseif ($currentStatus === 'analise_gerencia' && $status->slug === 'aprovado') {
+                // Quando o status atual é 'analise_gerencia' e muda para 'aprovado',
+                // o Diretor está aprovando, então deve registrar a aprovação do DIRETOR
+                $directorApproval = $quote->approvals()
+                    ->byLevel('DIRETOR')
+                    ->required()
+                    ->where('approved', false)
+                    ->first();
+                
+                if ($directorApproval && $approvalService->canApproveLevel($quote, 'DIRETOR', $user)) {
+                    // Aprovar o nível DIRETOR
+                    $approvalService->approveLevel($quote, 'DIRETOR', $user, $validated['observacao'] ?? null);
+                    
+                    // Recarregar a cotação com os relacionamentos atualizados
+                    $quote->refresh();
+                    $quote->load(['approvals.approver']);
+                }
             } elseif ($status->slug === 'analise_gerencia') {
                 // Quando o status atual é 'analisada' ou 'analisada_aguardando' e muda para 'analise_gerencia',
                 // pode ser GERENTE_LOCAL ou GERENTE_GERAL que está encaminhando, então deve aprovar automaticamente
