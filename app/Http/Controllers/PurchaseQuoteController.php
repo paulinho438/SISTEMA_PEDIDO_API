@@ -246,7 +246,8 @@ class PurchaseQuoteController extends Controller
                 $companyId = $user->companies()->first()->id;
             }
             
-            // Obter níveis que o usuário pode aprovar (tentar com company_id, se não encontrar, tentar sem)
+            // Obter níveis que o usuário pode aprovar
+            // Primeiro tentar com company_id (se existir), depois sem company_id
             $userLevels = [];
             if ($companyId) {
                 $userLevels = $approvalService->getUserApprovalLevels($user, $companyId);
@@ -254,7 +255,11 @@ class PurchaseQuoteController extends Controller
             
             // Se não encontrou níveis com company_id, tentar sem company_id (para cotações sem company_id)
             if (empty($userLevels)) {
-                // Tentar buscar grupos sem filtrar por company_id
+                $userLevels = $approvalService->getUserApprovalLevels($user);
+            }
+            
+            // Se ainda não encontrou níveis, tentar buscar por grupos como fallback
+            if (empty($userLevels)) {
                 $userGroups = $user->groups()->pluck('name')->toArray();
                 
                 $groupToLevelMap = [
