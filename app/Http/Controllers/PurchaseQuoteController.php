@@ -2284,12 +2284,30 @@ class PurchaseQuoteController extends Controller
                 ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
 
+            // Verificar se a cotação já passou por "aprovado" no histórico
+            // Se sim, significa que ela foi aprovada e depois reprovada
+            // Nesse caso, vai direto para "analise_gerencia" em vez de "finalizada"
+            $quote->load('statusHistory');
+            $hasBeenApproved = $quote->statusHistory()
+                ->where('status_slug', 'aprovado')
+                ->exists();
+            
+            $statusToUse = $status;
+            if ($hasBeenApproved) {
+                // Se já foi aprovada antes, ir direto para "analise_gerencia"
+                $statusAnaliseGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
+                if ($statusAnaliseGerencia) {
+                    $statusToUse = $statusAnaliseGerencia;
+                }
+            }
+
             $this->updateModelWithStringTimestamps($quote, [
                 'updated_by' => auth()->id(),
                 'requires_response' => false,
             ]);
 
-            $this->transitionStatus($quote, $status, $validated['observacao'] ?? 'Cotação finalizada.');
+            $observacao = $validated['observacao'] ?? ($hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da gerência.' : 'Cotação finalizada.');
+            $this->transitionStatus($quote, $statusToUse, $observacao);
 
             if ($normalizedMessage !== '') {
                 // Usar helper para inserir com timestamps como strings
@@ -2303,11 +2321,14 @@ class PurchaseQuoteController extends Controller
 
             DB::commit();
 
+            // Recarregar a cotação para ter o status atualizado
+            $quote->refresh();
+
             return response()->json([
-                'message' => 'Cotação finalizada com sucesso.',
+                'message' => $hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da gerência.' : 'Cotação finalizada com sucesso.',
                 'status' => [
-                    'slug' => $status->slug,
-                    'label' => $status->label,
+                    'slug' => $statusToUse->slug,
+                    'label' => $statusToUse->label,
                 ],
             ], Response::HTTP_OK);
         } catch (\Throwable $exception) {

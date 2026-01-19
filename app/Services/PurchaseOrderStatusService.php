@@ -163,11 +163,17 @@ class PurchaseOrderStatusService
     protected function createQuoteMessage(PurchaseQuote $quote, string $message, PurchaseOrder $order): void
     {
         try {
-            \App\Models\PurchaseQuoteMessage::create([
+            // Usar inserção com timestamps como strings (compatível com SQL Server)
+            $createdAt = now()->format('Y-m-d H:i:s');
+            $updatedAt = now()->format('Y-m-d H:i:s');
+            
+            DB::table('purchase_quote_messages')->insert([
                 'purchase_quote_id' => $quote->id,
-                'user_id' => auth()->id(),
+                'user_id' => auth()->id() ?? 1, // Fallback para sistema se não houver usuário autenticado
                 'type' => 'link_reprovado',
                 'message' => "LINK Reprovado - Pedido {$order->order_number}: {$message}",
+                'created_at' => DB::raw("CAST('{$createdAt}' AS DATETIME2)"),
+                'updated_at' => DB::raw("CAST('{$updatedAt}' AS DATETIME2)"),
             ]);
         } catch (\Exception $e) {
             Log::warning('Erro ao criar mensagem na cotação', [
