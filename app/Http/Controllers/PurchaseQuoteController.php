@@ -220,6 +220,21 @@ class PurchaseQuoteController extends Controller
         // NOTA: Não aplicar filtro de company_id por padrão para mostrar todas as cotações
         // O filtro de company_id só é aplicado quando my_approvals está ativo
 
+        // Se o usuário é Diretor e NÃO está usando my_approvals, excluir cotações com status "analise_gerencia"
+        // (essas devem aparecer apenas na tela "Pendentes de Análise" que usa my_approvals=true)
+        if (!$request->filled('my_approvals') || $request->get('my_approvals') !== 'true') {
+            $user = auth()->user();
+            if ($user) {
+                $approvalService = app(PurchaseQuoteApprovalService::class);
+                $userLevels = $approvalService->getUserApprovalLevels($user);
+                
+                // Se o usuário é DIRETOR, excluir cotações com status "analise_gerencia"
+                if (in_array('DIRETOR', $userLevels)) {
+                    $query->where('current_status_slug', '!=', 'analise_gerencia');
+                }
+            }
+        }
+
         // Filtro para mostrar apenas cotações pendentes no nível do usuário logado
         if ($request->filled('my_approvals') && $request->get('my_approvals') === 'true') {
             $user = auth()->user();
