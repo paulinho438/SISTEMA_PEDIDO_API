@@ -1705,18 +1705,29 @@ class PurchaseQuoteController extends Controller
                         ->get();
                     
                     if ($pendingIntermediateApprovals->isNotEmpty()) {
-                        // Pegar o primeiro nível pendente que o usuário pode aprovar
-                        foreach ($pendingIntermediateApprovals as $approval) {
-                            if ($approvalService->userHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
+                        // Priorizar o nível de maior hierarquia quando o usuário tem múltiplos níveis
+                        // Ordem de prioridade: GERENTE_GERAL > GERENTE_LOCAL > ENGENHEIRO
+                        $priorityOrder = ['GERENTE_GERAL' => 1, 'GERENTE_LOCAL' => 2, 'ENGENHEIRO' => 3];
+                        $sortedApprovals = $pendingIntermediateApprovals->sortBy(function ($approval) use ($priorityOrder) {
+                            return $priorityOrder[$approval->approval_level] ?? 999;
+                        });
+                        
+                        foreach ($sortedApprovals as $approval) {
+                            if ($approvalService->userHasLevelPermission($user, $approval->approval_level)) {
                                 $nextLevel = $approval->approval_level;
                                 break;
                             }
                         }
                     } else {
                         // Se não há aprovações pendentes, verificar se o usuário pode aprovar algum dos seus níveis
-                        // e usar o primeiro nível que ele tem permissão
-                        foreach ($userIntermediateLevels as $level) {
-                            if ($approvalService->userHasLevelPermission($user, $level, $quote->company_id)) {
+                        // Priorizar o nível de maior hierarquia quando o usuário tem múltiplos níveis
+                        $priorityOrder = ['GERENTE_GERAL' => 1, 'GERENTE_LOCAL' => 2, 'ENGENHEIRO' => 3];
+                        $sortedUserLevels = collect($userIntermediateLevels)->sortBy(function ($level) use ($priorityOrder) {
+                            return $priorityOrder[$level] ?? 999;
+                        });
+                        
+                        foreach ($sortedUserLevels as $level) {
+                            if ($approvalService->userHasLevelPermission($user, $level)) {
                                 // Verificar se já existe uma aprovação para esse nível (mesmo que aprovada)
                                 $existingApproval = $quote->approvals()
                                     ->byLevel($level)

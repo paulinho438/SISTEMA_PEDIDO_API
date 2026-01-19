@@ -179,8 +179,8 @@ class PurchaseQuoteApprovalService
 
         if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
             in_array($level, $simultaneousLevels, true)) {
-            // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
-            return $this->checkUserHasLevelPermission($user, $level, $quote->company_id);
+            // Verificar se o usuário tem a permissão específica para o nível
+            return $this->checkUserHasLevelPermission($user, $level);
         }
 
         // Para outros casos, verificar se todos os níveis anteriores foram aprovados
@@ -241,55 +241,42 @@ class PurchaseQuoteApprovalService
             }
         }
 
-        // Verificar se o usuário pertence ao grupo/perfil correspondente
-        return $this->checkUserHasLevelPermission($user, $level, $quote->company_id);
+        // Verificar se o usuário tem a permissão específica para o nível
+        return $this->checkUserHasLevelPermission($user, $level);
     }
 
     /**
      * Verifica se o usuário tem permissão para o nível (método público para uso externo)
      */
-    public function userHasLevelPermission(User $user, string $level, ?int $companyId): bool
+    public function userHasLevelPermission(User $user, string $level): bool
     {
-        return $this->checkUserHasLevelPermission($user, $level, $companyId);
+        return $this->checkUserHasLevelPermission($user, $level);
     }
     
     /**
      * Verifica se o usuário tem permissão para o nível (método protegido interno)
+     * Verifica as permissões específicas do usuário, não os grupos
      */
-    protected function checkUserHasLevelPermission(User $user, string $level, ?int $companyId): bool
+    protected function checkUserHasLevelPermission(User $user, string $level): bool
     {
-        // Mapear nível para nome de grupo/perfil
-        $levelToGroupMap = [
-            'COMPRADOR' => ['Comprador', 'COMPRADOR'],
-            'GERENTE_LOCAL' => ['Gerente Local', 'GERENTE LOCAL'],
-            'ENGENHEIRO' => ['Engenheiro', 'ENGENHEIRO'],
-            'GERENTE_GERAL' => ['Gerente Geral', 'GERENTE GERAL'],
-            'DIRETOR' => ['Diretor', 'DIRETOR'],
-            'PRESIDENTE' => ['Presidente', 'PRESIDENTE'],
+        // Mapear nível para slug de permissão
+        $levelToPermissionMap = [
+            'COMPRADOR' => 'cotacoes_aprovar_comprador',
+            'ENGENHEIRO' => 'cotacoes_aprovar_engenheiro',
+            'GERENTE_LOCAL' => 'cotacoes_aprovar_gerente_local',
+            'GERENTE_GERAL' => 'cotacoes_aprovar_gerente_geral',
+            'DIRETOR' => 'cotacoes_aprovar_diretor',
+            'PRESIDENTE' => 'cotacoes_aprovar_presidente',
         ];
 
-        $groupNames = $levelToGroupMap[$level] ?? [];
-
-        // Se tem company_id, filtrar por company_id
-        if ($companyId) {
-            return $user->groups()
-                ->where('company_id', $companyId)
-                ->where(function ($query) use ($groupNames) {
-                    foreach ($groupNames as $groupName) {
-                        $query->orWhere('name', 'LIKE', "%{$groupName}%");
-                    }
-                })
-                ->exists();
-        } else {
-            // Se não tem company_id, buscar em todos os grupos do usuário
-            return $user->groups()
-                ->where(function ($query) use ($groupNames) {
-                    foreach ($groupNames as $groupName) {
-                        $query->orWhere('name', 'LIKE', "%{$groupName}%");
-                    }
-                })
-                ->exists();
+        $permissionSlug = $levelToPermissionMap[$level] ?? null;
+        
+        if (!$permissionSlug) {
+            return false;
         }
+
+        // Verificar se o usuário tem a permissão específica
+        return $user->hasPermission($permissionSlug);
     }
 
     /**
@@ -381,51 +368,27 @@ class PurchaseQuoteApprovalService
 
     /**
      * Retorna os níveis de aprovação que o usuário pode aprovar
+     * Baseado nas permissões específicas do usuário, não nos grupos
      */
     public function getUserApprovalLevels(User $user, ?int $companyId = null): array
     {
         $levels = [];
-        $order = $this->getApprovalOrder();
-
-        foreach ($order as $level => $orderValue) {
-            if ($this->checkUserHasLevelPermission($user, $level, $companyId)) {
+        
+        // Mapear permissões para níveis de aprovação
+        // Ordem importa: verificar níveis de maior hierarquia primeiro
+        $permissionToLevelMap = [
+            'cotacoes_aprovar_presidente' => 'PRESIDENTE',
+            'cotacoes_aprovar_diretor' => 'DIRETOR',
+            'cotacoes_aprovar_gerente_geral' => 'GERENTE_GERAL',
+            'cotacoes_aprovar_gerente_local' => 'GERENTE_LOCAL',
+            'cotacoes_aprovar_engenheiro' => 'ENGENHEIRO',
+            'cotacoes_aprovar_comprador' => 'COMPRADOR',
+        ];
+        
+        // Verificar cada permissão e adicionar o nível correspondente se o usuário tiver a permissão
+        foreach ($permissionToLevelMap as $permissionSlug => $level) {
+            if ($user->hasPermission($permissionSlug)) {
                 $levels[] = $level;
-            }
-        }
-
-        // Se não encontrou níveis, tentar buscar por grupos diretamente (fallback)
-        if (empty($levels)) {
-            // Se tem company_id, filtrar por company_id, senão buscar todos os grupos
-            $userGroupsQuery = $user->groups();
-            if ($companyId) {
-                $userGroupsQuery->where('company_id', $companyId);
-            }
-            $userGroups = $userGroupsQuery->pluck('name')->toArray();
-            
-            // Mapear grupos para níveis de aprovação
-            $groupToLevelMap = [
-                'Comprador' => 'COMPRADOR',
-                'COMPRADOR' => 'COMPRADOR',
-                'Gerente Local' => 'GERENTE_LOCAL',
-                'GERENTE LOCAL' => 'GERENTE_LOCAL',
-                'Engenheiro' => 'ENGENHEIRO',
-                'ENGENHEIRO' => 'ENGENHEIRO',
-                'Gerente Geral' => 'GERENTE_GERAL',
-                'GERENTE GERAL' => 'GERENTE_GERAL',
-                'Diretor' => 'DIRETOR',
-                'DIRETOR' => 'DIRETOR',
-                'Presidente' => 'PRESIDENTE',
-                'PRESIDENTE' => 'PRESIDENTE',
-            ];
-            
-            foreach ($userGroups as $groupName) {
-                foreach ($groupToLevelMap as $mapGroup => $level) {
-                    if (stripos($groupName, $mapGroup) !== false) {
-                        if (!in_array($level, $levels)) {
-                            $levels[] = $level;
-                        }
-                    }
-                }
             }
         }
 
@@ -452,14 +415,21 @@ class PurchaseQuoteApprovalService
             ->ordered()
             ->get();
 
-        foreach ($pendingApprovals as $approval) {
+        // Priorizar o nível de maior hierarquia quando o usuário tem múltiplos níveis
+        // Ordem de prioridade: GERENTE_GERAL > GERENTE_LOCAL > ENGENHEIRO
+        $priorityOrder = ['GERENTE_GERAL' => 1, 'GERENTE_LOCAL' => 2, 'ENGENHEIRO' => 3, 'DIRETOR' => 4, 'PRESIDENTE' => 5];
+        $sortedApprovals = $pendingApprovals->sortBy(function ($approval) use ($priorityOrder) {
+            return $priorityOrder[$approval->approval_level] ?? 999;
+        });
+        
+        foreach ($sortedApprovals as $approval) {
             if (in_array($approval->approval_level, $userLevels)) {
                 // Se o status é "finalizada", "analisada" ou "analisada_aguardando" e o nível é um dos simultâneos,
                 // verificar apenas se o usuário pertence ao grupo/perfil correspondente
                 if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
                     in_array($approval->approval_level, $simultaneousLevels, true)) {
-                    // Verificar apenas se o usuário pertence ao grupo/perfil correspondente
-                    if ($this->checkUserHasLevelPermission($user, $approval->approval_level, $quote->company_id)) {
+                    // Verificar se o usuário tem a permissão específica para o nível
+                    if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
                         return $approval->approval_level;
                     }
                 } else {
