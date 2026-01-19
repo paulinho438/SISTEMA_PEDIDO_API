@@ -258,10 +258,6 @@ class PurchaseQuoteApprovalService
      */
     protected function checkUserHasLevelPermission(User $user, string $level, ?int $companyId): bool
     {
-        if (!$companyId) {
-            return false;
-        }
-
         // Mapear nível para nome de grupo/perfil
         $levelToGroupMap = [
             'COMPRADOR' => ['Comprador', 'COMPRADOR'],
@@ -274,14 +270,26 @@ class PurchaseQuoteApprovalService
 
         $groupNames = $levelToGroupMap[$level] ?? [];
 
-        return $user->groups()
-            ->where('company_id', $companyId)
-            ->where(function ($query) use ($groupNames) {
-                foreach ($groupNames as $groupName) {
-                    $query->orWhere('name', 'LIKE', "%{$groupName}%");
-                }
-            })
-            ->exists();
+        // Se tem company_id, filtrar por company_id
+        if ($companyId) {
+            return $user->groups()
+                ->where('company_id', $companyId)
+                ->where(function ($query) use ($groupNames) {
+                    foreach ($groupNames as $groupName) {
+                        $query->orWhere('name', 'LIKE', "%{$groupName}%");
+                    }
+                })
+                ->exists();
+        } else {
+            // Se não tem company_id, buscar em todos os grupos do usuário
+            return $user->groups()
+                ->where(function ($query) use ($groupNames) {
+                    foreach ($groupNames as $groupName) {
+                        $query->orWhere('name', 'LIKE', "%{$groupName}%");
+                    }
+                })
+                ->exists();
+        }
     }
 
     /**
@@ -386,8 +394,13 @@ class PurchaseQuoteApprovalService
         }
 
         // Se não encontrou níveis, tentar buscar por grupos diretamente (fallback)
-        if (empty($levels) && $companyId) {
-            $userGroups = $user->groups()->where('company_id', $companyId)->pluck('name')->toArray();
+        if (empty($levels)) {
+            // Se tem company_id, filtrar por company_id, senão buscar todos os grupos
+            $userGroupsQuery = $user->groups();
+            if ($companyId) {
+                $userGroupsQuery->where('company_id', $companyId);
+            }
+            $userGroups = $userGroupsQuery->pluck('name')->toArray();
             
             // Mapear grupos para níveis de aprovação
             $groupToLevelMap = [

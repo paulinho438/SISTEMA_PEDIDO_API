@@ -1722,6 +1722,19 @@ class PurchaseQuoteController extends Controller
                                     ->byLevel($level)
                                     ->first();
                                 
+                                // Se não existe, criar a aprovação automaticamente
+                                if (!$existingApproval) {
+                                    $order = $approvalService->getApprovalOrder();
+                                    $this->insertWithStringTimestamps('purchase_quote_approvals', [
+                                        'purchase_quote_id' => $quote->id,
+                                        'approval_level' => $level,
+                                        'required' => true,
+                                        'approved' => false,
+                                        'order' => $order[$level] ?? 999,
+                                    ]);
+                                    $quote->refresh();
+                                }
+                                
                                 // Se não existe ou não está aprovada, usar esse nível
                                 if (!$existingApproval || !$existingApproval->approved) {
                                     $nextLevel = $level;
