@@ -1693,8 +1693,11 @@ class PurchaseQuoteController extends Controller
                     'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
                 ], Response::HTTP_FORBIDDEN);
             }
-            $nextStatusSlug = 'analise_gerencia';
-            $defaultNote = 'Cotação encaminhada para análise da gerência.';
+            
+            // Não definir nextStatusSlug ainda - será determinado após salvar a assinatura
+            // Verificaremos se todas as aprovações intermediárias foram concluídas
+            $nextStatusSlug = null; // Será determinado depois
+            $defaultNote = 'Assinatura registrada.';
         } elseif ($currentStatus === 'analise_gerencia') {
             // Para aprovar na gerência, verificar permissão genérica ou nível de aprovação
             $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
@@ -1711,14 +1714,6 @@ class PurchaseQuoteController extends Controller
         } else {
             return response()->json([
                 'message' => 'O status atual da solicitação não permite aprovação.',
-            ], Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $status = PurchaseQuoteStatus::where('slug', $nextStatusSlug)->first();
-
-        if (!$status) {
-            return response()->json([
-                'message' => sprintf('Status "%s" não configurado.', $nextStatusSlug),
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -1742,6 +1737,85 @@ class PurchaseQuoteController extends Controller
                 // Aplicar edições antes de aprovar
                 $this->applyQuoteEditions($quote, $validated);
                 $quote->refresh();
+            }
+            
+            // Se o status é "analisada" ou "analisada_aguardando", primeiro aprovar o nível do usuário
+            if (in_array($currentStatus, ['analisada', 'analisada_aguardando'], true) && $nextStatusSlug === null) {
+                // Aprovar o nível do usuário primeiro
+                if ($nextLevel) {
+                    $approvalService->approveLevel($quote, $nextLevel, $user, $note);
+                    $quote->refresh();
+                }
+                
+                // Verificar se todas as aprovações intermediárias (ENGENHEIRO, GERENTE_LOCAL, GERENTE_GERAL) foram concluídas
+                // Esses são os níveis que devem aprovar antes de ir para o DIRETOR
+                $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
+                $allIntermediateApproved = true;
+                
+                foreach ($intermediateLevels as $level) {
+                    $approval = $quote->approvals()
+                        ->byLevel($level)
+                        ->required()
+                        ->first();
+                    
+                    // Se o nível é requerido mas não foi aprovado, ainda faltam assinaturas
+                    if ($approval && !$approval->approved) {
+                        $allIntermediateApproved = false;
+                        break;
+                    }
+                }
+                
+                // Se não há nenhuma aprovação intermediária requerida, considerar como aprovado
+                // (caso especial onde apenas DIRETOR é requerido)
+                $hasIntermediateLevels = $quote->approvals()
+                    ->required()
+                    ->whereIn('approval_level', $intermediateLevels)
+                    ->exists();
+                
+                if (!$hasIntermediateLevels) {
+                    $allIntermediateApproved = true; // Se não há níveis intermediários, pode ir direto para DIRETOR
+                }
+                
+                // Se todas as aprovações intermediárias foram concluídas, mudar para analise_gerencia
+                if ($allIntermediateApproved) {
+                    $nextStatusSlug = 'analise_gerencia';
+                    $defaultNote = 'Cotação encaminhada para análise da gerência.';
+                    $note = $validated['observacao'] ?? $defaultNote;
+                } else {
+                    // Manter o status atual - não mudar status, apenas a assinatura já foi salva
+                    // Registrar no histórico que a assinatura foi registrada
+                    $currentStatusObj = PurchaseQuoteStatus::where('slug', $currentStatus)->first();
+                    if ($currentStatusObj) {
+                        $this->insertWithStringTimestamps('purchase_quote_status_histories', [
+                            'purchase_quote_id' => $quote->id,
+                            'status_id' => $currentStatusObj->id,
+                            'status_slug' => $currentStatusObj->slug,
+                            'status_label' => $currentStatusObj->label,
+                            'acted_by' => $user->id,
+                            'acted_by_name' => $user->nome_completo ?? $user->name,
+                            'notes' => $validated['observacao'] ?? 'Assinatura registrada.',
+                        ]);
+                    }
+                    
+                    DB::commit();
+                    
+                    return response()->json([
+                        'message' => 'Assinatura registrada com sucesso.',
+                        'status' => [
+                            'slug' => $currentStatus,
+                            'label' => $currentStatusObj->label ?? $currentStatus,
+                        ],
+                    ]);
+                }
+            }
+            
+            // Buscar o status apenas agora que foi determinado
+            $status = PurchaseQuoteStatus::where('slug', $nextStatusSlug)->first();
+
+            if (!$status) {
+                return response()->json([
+                    'message' => sprintf('Status "%s" não configurado.', $nextStatusSlug),
+                ], Response::HTTP_UNPROCESSABLE_ENTITY);
             }
             
             // Se é diretor com permissão especial, preencher automaticamente todas as assinaturas intermediárias
