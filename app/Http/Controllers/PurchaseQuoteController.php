@@ -1788,6 +1788,7 @@ class PurchaseQuoteController extends Controller
         $validated = $request->validate($validationRules);
         
         $currentStatus = $quote->current_status_slug;
+        $nextLevel = null; // Inicializar variável para evitar erro
         
         // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
         // 1. A cotação tem comprador associado (buyer_id não é null)
@@ -1918,7 +1919,7 @@ class PurchaseQuoteController extends Controller
 
         // Verificar se há tentativa de aprovar nível ENGENHEIRO sem engenheiro atribuído
         // Se o nível ENGENHEIRO está sendo aprovado e não há engenheiro atribuído, verificar permissão ANTES da transação
-        if ($nextLevel === 'ENGENHEIRO' && $quote->engineer_id === null) {
+        if ($nextLevel !== null && $nextLevel === 'ENGENHEIRO' && $quote->engineer_id === null) {
             if (!$user->hasPermission('cotacoes_assign_engineer')) {
                 return response()->json([
                     'message' => 'Você não tem permissão para atribuir engenheiro à cotação. É necessário atribuir um engenheiro antes de aprovar.',
