@@ -402,6 +402,7 @@ class StockProductService
                 'B1_COD' => $product->code,
                 'B1_DESC' => $product->description,
                 'B1_UM' => $product->unit,
+                'B1_REF' => $product->reference ?? null, // Adicionar referência
                 'source' => 'internal', // Identificar como produto interno
                 'internal_id' => $product->id,
             ];
@@ -425,7 +426,7 @@ class StockProductService
                         if (!empty($tableIdentifier)) {
                             $query = $connection->table(DB::raw("[$databaseName].[dbo].[$tableIdentifier]"))
                                 ->where('D_E_L_E_T_', '<>', '*')
-                                ->select('B1_COD', 'B1_DESC', 'B1_UM');
+                                ->select('B1_COD', 'B1_DESC', 'B1_UM', 'B1_REF');
                             
                             if (!empty($search)) {
                                 $searchUpper = mb_strtoupper(trim($search));
@@ -443,6 +444,7 @@ class StockProductService
                                         'B1_COD' => trim($item->B1_COD ?? ''),
                                         'B1_DESC' => trim($item->B1_DESC ?? ''),
                                         'B1_UM' => trim($item->B1_UM ?? 'UN'),
+                                        'B1_REF' => trim($item->B1_REF ?? '') ?: null, // Adicionar referência do Protheus
                                         'source' => 'protheus', // Identificar como produto do Protheus
                                         'internal_id' => null,
                                     ];
