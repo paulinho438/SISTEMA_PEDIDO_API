@@ -9,6 +9,7 @@ use App\Models\PurchaseQuoteSupplier;
 use App\Models\PurchaseQuoteSupplierItem;
 use App\Models\PurchaseQuoteStatusHistory;
 use App\Models\PurchaseQuoteMessage;
+use App\Models\PurchaseOrder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -3669,6 +3670,34 @@ class PurchaseQuoteController extends Controller
             // Número Protheus (se houver exportação)
             $numeroProtheus = $quote->protheus_export_status === 'exported' ? $quote->quote_number : null;
             
+            // Se a cotação foi aprovada e tem pedidos de compra, usar o status do pedido mais recente
+            $statusFinal = $quote->current_status_label;
+            $statusSlugFinal = $quote->current_status_slug;
+            
+            if ($quote->current_status_slug === 'aprovado' && $quote->orders && $quote->orders->isNotEmpty()) {
+                // Buscar o pedido mais recente
+                $pedidoMaisRecente = $quote->orders->sortByDesc('created_at')->first();
+                
+                if ($pedidoMaisRecente && $pedidoMaisRecente->status) {
+                    // Mapear status do pedido para labels legíveis
+                    $statusPedidoMap = [
+                        PurchaseOrder::STATUS_PENDENTE => 'Pedido Pendente',
+                        PurchaseOrder::STATUS_LINK => 'Link',
+                        PurchaseOrder::STATUS_LINK_APROVADO => 'Link Aprovado',
+                        PurchaseOrder::STATUS_LINK_REPROVADO => 'Link Reprovado',
+                        PurchaseOrder::STATUS_COLETA => 'Coleta',
+                        PurchaseOrder::STATUS_EM_TRANSITO => 'Em Trânsito',
+                        PurchaseOrder::STATUS_ATENDIDO => 'Atendido',
+                        PurchaseOrder::STATUS_ATENDIDO_PARCIAL => 'Atendido Parcial',
+                        PurchaseOrder::STATUS_PAGAMENTO => 'Pagamento',
+                        PurchaseOrder::STATUS_ENCERRADO => 'Encerrado',
+                    ];
+                    
+                    $statusSlugFinal = $pedidoMaisRecente->status;
+                    $statusFinal = $statusPedidoMap[$pedidoMaisRecente->status] ?? ucfirst(str_replace('_', ' ', $pedidoMaisRecente->status));
+                }
+            }
+            
             return [
                 'numero_rm' => $quote->quote_number,
                 'numero_protheus' => $numeroProtheus,
@@ -3691,8 +3720,8 @@ class PurchaseQuoteController extends Controller
                 'data_atendimento' => $dataAtendimento ? $dataAtendimento->format('d/m/Y') : null,
                 'dias_atraso_coleta_atendimento' => $diasAtrasoColetaAtendimento,
                 'quantidade_dias_entrega' => $diasParaEntrega,
-                'status' => $quote->current_status_label,
-                'status_slug' => $quote->current_status_slug,
+                'status' => $statusFinal,
+                'status_slug' => $statusSlugFinal,
                 'descricao' => $descricao,
                 'id' => $quote->id,
             ];
