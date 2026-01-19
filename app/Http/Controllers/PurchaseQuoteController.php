@@ -1728,7 +1728,17 @@ class PurchaseQuoteController extends Controller
 
         try {
             // Se tem permissão de editar na aprovação e foram enviados dados de edição, aplicar as mudanças primeiro
-            if ($hasEditPermission && !empty($validated['itens'])) {
+            $hasEditData = $hasEditPermission && (
+                !empty($validated['itens']) ||
+                isset($validated['numero']) ||
+                isset($validated['data_solicitacao']) ||
+                isset($validated['solicitante']) ||
+                isset($validated['empresa']) ||
+                isset($validated['local']) ||
+                isset($validated['observacao'])
+            );
+            
+            if ($hasEditData) {
                 // Aplicar edições antes de aprovar
                 $this->applyQuoteEditions($quote, $validated);
                 $quote->refresh();
