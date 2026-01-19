@@ -2319,6 +2319,100 @@ class PurchaseQuoteController extends Controller
             $observacao = $validated['observacao'] ?? ($hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da gerência.' : 'Cotação finalizada.');
             $this->transitionStatus($quote, $statusToUse, $observacao);
 
+            // Se foi direto para "analise_gerencia", garantir que as aprovações estejam configuradas corretamente
+            if ($hasBeenApproved && $statusToUse->slug === 'analise_gerencia') {
+                $approvalService = app(PurchaseQuoteApprovalService::class);
+                $order = $approvalService->getApprovalOrder();
+                
+                // Garantir que COMPRADOR está aprovado (se não estiver, aprovar)
+                $compradorApproval = $quote->approvals()
+                    ->byLevel('COMPRADOR')
+                    ->first();
+                
+                if (!$compradorApproval) {
+                    $this->insertWithStringTimestamps('purchase_quote_approvals', [
+                        'purchase_quote_id' => $quote->id,
+                        'approval_level' => 'COMPRADOR',
+                        'required' => true,
+                        'approved' => true,
+                        'approved_by' => $quote->buyer_id ?? auth()->id(),
+                        'approved_by_name' => $quote->buyer_name ?? optional(auth()->user())->nome_completo ?? optional(auth()->user())->name,
+                        'approved_at' => now()->format('Y-m-d H:i:s'),
+                        'order' => $order['COMPRADOR'] ?? 1,
+                        'notes' => 'Cotação salva pelo comprador.',
+                    ]);
+                } elseif (!$compradorApproval->approved) {
+                    $this->updateModelWithStringTimestamps($compradorApproval, [
+                        'approved' => true,
+                        'approved_by' => $quote->buyer_id ?? auth()->id(),
+                        'approved_by_name' => $quote->buyer_name ?? optional(auth()->user())->nome_completo ?? optional(auth()->user())->name,
+                        'approved_at' => now()->format('Y-m-d H:i:s'),
+                        'notes' => 'Cotação salva pelo comprador.',
+                    ]);
+                }
+                
+                // Marcar níveis intermediários (ENGENHEIRO, GERENTE_LOCAL, GERENTE_GERAL) como aprovados automaticamente
+                $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
+                foreach ($intermediateLevels as $level) {
+                    $approval = $quote->approvals()
+                        ->byLevel($level)
+                        ->first();
+                    
+                    if (!$approval) {
+                        $this->insertWithStringTimestamps('purchase_quote_approvals', [
+                            'purchase_quote_id' => $quote->id,
+                            'approval_level' => $level,
+                            'required' => true,
+                            'approved' => true,
+                            'approved_by' => null,
+                            'approved_by_name' => 'Sistema',
+                            'approved_at' => now()->format('Y-m-d H:i:s'),
+                            'order' => $order[$level] ?? 2,
+                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da gerência.',
+                        ]);
+                    } elseif (!$approval->approved) {
+                        $this->updateModelWithStringTimestamps($approval, [
+                            'approved' => true,
+                            'approved_by' => null,
+                            'approved_by_name' => 'Sistema',
+                            'approved_at' => now()->format('Y-m-d H:i:s'),
+                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da gerência.',
+                        ]);
+                    }
+                }
+                
+                // Garantir que DIRETOR tem aprovação pendente
+                $diretorApproval = $quote->approvals()
+                    ->byLevel('DIRETOR')
+                    ->first();
+                
+                if (!$diretorApproval) {
+                    $this->insertWithStringTimestamps('purchase_quote_approvals', [
+                        'purchase_quote_id' => $quote->id,
+                        'approval_level' => 'DIRETOR',
+                        'required' => true,
+                        'approved' => false,
+                        'approved_by' => null,
+                        'approved_by_name' => null,
+                        'approved_at' => null,
+                        'order' => $order['DIRETOR'] ?? 3,
+                        'notes' => null,
+                    ]);
+                } elseif ($diretorApproval->approved) {
+                    // Se já estava aprovado, resetar para pendente
+                    $this->updateModelWithStringTimestamps($diretorApproval, [
+                        'approved' => false,
+                        'approved_by' => null,
+                        'approved_by_name' => null,
+                        'approved_at' => null,
+                        'notes' => null,
+                    ]);
+                }
+                
+                // Recarregar a cotação para ter as aprovações atualizadas
+                $quote->refresh();
+            }
+
             if ($normalizedMessage !== '') {
                 // Usar helper para inserir com timestamps como strings
                 $this->insertWithStringTimestamps('purchase_quote_messages', [
