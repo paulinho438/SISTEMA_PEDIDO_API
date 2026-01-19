@@ -182,6 +182,13 @@ class PurchaseQuoteApprovalService
             // Verificar se o usuário tem a permissão específica para o nível
             return $this->checkUserHasLevelPermission($user, $level);
         }
+        
+        // Se o status é "analise_gerencia", DIRETOR e PRESIDENTE podem aprovar diretamente
+        // (todos os níveis anteriores já foram aprovados quando chegou nesse status)
+        if ($currentStatus === 'analise_gerencia' && in_array($level, ['DIRETOR', 'PRESIDENTE'], true)) {
+            // Verificar apenas se o usuário tem a permissão específica para o nível
+            return $this->checkUserHasLevelPermission($user, $level);
+        }
 
         // Para outros casos, verificar se todos os níveis anteriores foram aprovados
         $order = $this->getApprovalOrder();

@@ -2321,11 +2321,41 @@ class PurchaseQuoteController extends Controller
         
         // Se está tentando aprovar como Diretor (status atual é analise_gerencia e status desejado é aprovado)
         if ($currentStatus === 'analise_gerencia' && $requestedStatus === 'aprovado') {
-            // Verificar se tem permissão de aprovar como diretor
-            if (!$user->hasPermission('cotacoes_aprovar_diretor')) {
-                return response()->json([
-                    'message' => 'Você não tem permissão para aprovar esta cotação.',
-                ], Response::HTTP_FORBIDDEN);
+            // Verificar através do ApprovalService se o usuário pode aprovar como DIRETOR
+            $approvalService = app(PurchaseQuoteApprovalService::class);
+            
+            // Verificar se pode aprovar o nível DIRETOR através do ApprovalService
+            $directorApproval = $quote->approvals()
+                ->byLevel('DIRETOR')
+                ->required()
+                ->where('approved', false)
+                ->first();
+            
+            if ($directorApproval) {
+                // Se há aprovação pendente, verificar se pode aprovar através do ApprovalService
+                $canApproveLevel = $approvalService->canApproveLevel($quote, 'DIRETOR', $user);
+                
+                if (!$canApproveLevel) {
+                    // Se não pode aprovar através do ApprovalService, verificar permissões diretas como fallback
+                    $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
+                    $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+                    
+                    if (!$hasDirectorPermission && !$hasGenericPermission) {
+                        return response()->json([
+                            'message' => 'Você não tem permissão para aprovar esta cotação.',
+                        ], Response::HTTP_FORBIDDEN);
+                    }
+                }
+            } else {
+                // Se não há aprovação pendente, verificar permissões diretas
+                $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
+                $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
+                
+                if (!$hasDirectorPermission && !$hasGenericPermission) {
+                    return response()->json([
+                        'message' => 'Você não tem permissão para aprovar esta cotação.',
+                    ], Response::HTTP_FORBIDDEN);
+                }
             }
         } else {
             // Para outros casos, verificar permissão genérica de analisar
@@ -2335,8 +2365,6 @@ class PurchaseQuoteController extends Controller
                 ], Response::HTTP_FORBIDDEN);
             }
         }
-
-        $currentStatus = $quote->current_status_slug;
 
         $transitions = [
             'finalizada' => [
