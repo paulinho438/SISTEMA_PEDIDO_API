@@ -269,49 +269,45 @@ class PurchaseQuoteController extends Controller
             }
             
             if (!empty($userLevels)) {
-                // Buscar cotações que têm aprovações pendentes nos níveis do usuário
-                // Se o status é "finalizada", "analisada" ou "analisada_aguardando", ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL podem aprovar simultaneamente
-                // Caso contrário, segue a lógica de hierarquia
-                $query->where(function ($q) use ($userLevels, $companyId, $approvalService) {
-                    // Para status "finalizada", "analisada" ou "analisada_aguardando", mostrar cotações com aprovações pendentes
-                    // de ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (podem aprovar simultaneamente)
-                    $q->where(function ($subQ) use ($userLevels) {
-                        $subQ->whereIn('current_status_slug', ['finalizada', 'analisada', 'analisada_aguardando'])
-                            ->whereHas('approvals', function ($approvalQ) use ($userLevels) {
-                                $approvalQ->whereIn('approval_level', array_intersect($userLevels, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL']))
-                                    ->where('required', true)
-                                    ->where('approved', false);
-                            });
-                    })
-                    // Para status "analise_gerencia", mostrar para DIRETOR apenas se TODAS as assinaturas anteriores foram aprovadas
-                    ->orWhere(function ($subQ) use ($userLevels, $approvalService) {
-                        // Verificar se o usuário é DIRETOR
-                        if (in_array('DIRETOR', $userLevels)) {
-                            $subQ->where('current_status_slug', 'analise_gerencia')
-                                ->whereHas('approvals', function ($approvalQ) {
-                                    // Verificar se DIRETOR tem aprovação pendente
-                                    $approvalQ->where('approval_level', 'DIRETOR')
-                                        ->where('required', true)
-                                        ->where('approved', false);
-                                })
-                                // Garantir que TODAS as assinaturas anteriores (exceto DIRETOR) foram aprovadas
-                                ->whereDoesntHave('approvals', function ($approvalQ) {
-                                    $approvalQ->where('approval_level', '!=', 'DIRETOR')
-                                        ->where('required', true)
-                                        ->where('approved', false);
-                                });
-                        }
-                    })
-                    // Para outros status, seguir a lógica normal de hierarquia
-                    ->orWhere(function ($subQ) use ($userLevels, $approvalService) {
-                        $subQ->whereNotIn('current_status_slug', ['finalizada', 'analisada', 'analisada_aguardando', 'analise_gerencia'])
-                            ->whereHas('approvals', function ($approvalQ) use ($userLevels) {
-                                $approvalQ->whereIn('approval_level', $userLevels)
-                                    ->where('required', true)
-                                    ->where('approved', false);
-                            });
+                // Separar lógica por tipo de usuário
+                $isDirector = in_array('DIRETOR', $userLevels);
+                $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
+                $isIntermediate = !empty(array_intersect($userLevels, $intermediateLevels));
+                
+                // Se é DIRETOR: mostrar APENAS cotações com status "analise_gerencia"
+                if ($isDirector) {
+                    $query->where('current_status_slug', 'analise_gerencia')
+                        ->whereHas('approvals', function ($approvalQ) {
+                            // Verificar se DIRETOR tem aprovação pendente
+                            $approvalQ->where('approval_level', 'DIRETOR')
+                                ->where('required', true)
+                                ->where('approved', false);
+                        })
+                        // Garantir que TODAS as assinaturas anteriores (exceto DIRETOR) foram aprovadas
+                        ->whereDoesntHave('approvals', function ($approvalQ) {
+                            $approvalQ->where('approval_level', '!=', 'DIRETOR')
+                                ->where('required', true)
+                                ->where('approved', false);
+                        });
+                }
+                // Se é ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (e não é DIRETOR): mostrar APENAS cotações com status "finalizada" ou "analisada"
+                elseif ($isIntermediate) {
+                    $query->whereIn('current_status_slug', ['finalizada', 'analisada', 'analisada_aguardando'])
+                        ->whereHas('approvals', function ($approvalQ) use ($userLevels, $intermediateLevels) {
+                            // Verificar se tem aprovação pendente para algum dos níveis intermediários do usuário
+                            $approvalQ->whereIn('approval_level', array_intersect($userLevels, $intermediateLevels))
+                                ->where('required', true)
+                                ->where('approved', false);
+                        });
+                }
+                // Se não é DIRETOR nem intermediário, seguir lógica normal de hierarquia
+                else {
+                    $query->whereHas('approvals', function ($approvalQ) use ($userLevels) {
+                        $approvalQ->whereIn('approval_level', $userLevels)
+                            ->where('required', true)
+                            ->where('approved', false);
                     });
-                });
+                }
                 
                 if ($companyId) {
                     // Filtrar por company_id se disponível, mas também incluir cotações sem company_id
