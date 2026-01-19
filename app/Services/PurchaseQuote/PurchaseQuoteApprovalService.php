@@ -183,7 +183,8 @@ class PurchaseQuoteApprovalService
             if ($level === 'ENGENHEIRO') {
                 // Se a cotação tem um engenheiro atribuído, apenas ele pode aprovar
                 if ($quote->engineer_id) {
-                    return $quote->engineer_id === $user->id;
+                    // Converter ambos para int para garantir comparação correta
+                    return (int) $quote->engineer_id === (int) $user->id;
                 }
                 // Se não tem engenheiro atribuído, verificar se o usuário tem a permissão
                 return $this->checkUserHasLevelPermission($user, $level);
@@ -448,7 +449,8 @@ class PurchaseQuoteApprovalService
                     if ($approval->approval_level === 'ENGENHEIRO') {
                         // Se a cotação tem um engenheiro atribuído, apenas ele pode aprovar
                         if ($quote->engineer_id) {
-                            if ($quote->engineer_id === $user->id) {
+                            // Converter ambos para int para garantir comparação correta
+                            if ((int) $quote->engineer_id === (int) $user->id) {
                                 return $approval->approval_level;
                             }
                             continue; // Não é o engenheiro atribuído, pular
