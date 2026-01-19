@@ -318,6 +318,14 @@ class PurchaseQuoteController extends Controller
                                 ->where('required', true)
                                 ->where('approved', false);
                         });
+                    
+                    // Se o usuário é ENGENHEIRO, filtrar apenas cotações onde ele é o engenheiro atribuído
+                    if (in_array('ENGENHEIRO', $userLevels)) {
+                        $query->where(function ($q) use ($user) {
+                            // Mostrar apenas cotações onde o engenheiro atribuído é o usuário atual
+                            $q->where('engineer_id', $user->id);
+                        });
+                    }
                 }
                 // Se não é DIRETOR nem intermediário, seguir lógica normal de hierarquia
                 else {
@@ -559,6 +567,26 @@ class PurchaseQuoteController extends Controller
             'label' => $user->nome_completo ?? $user->login,
         ]);
 
+        // Buscar engenheiros (usuários com permissão cotacoes_aprovar_engenheiro)
+        $engineersQuery = User::query()
+            ->select(['id', 'nome_completo', 'login'])
+            ->whereHas('groups', function ($query) use ($quote) {
+                if ($quote->company_id) {
+                    $query->where('company_id', $quote->company_id);
+                }
+
+                $query->whereHas('items', function ($itemQuery) {
+                    $itemQuery->where('slug', 'cotacoes_aprovar_engenheiro');
+                });
+            })
+            ->orderBy('nome_completo')
+            ->distinct();
+
+        $engineers = $engineersQuery->get()->map(fn (User $user) => [
+            'id' => $user->id,
+            'label' => $user->nome_completo ?? $user->login,
+        ]);
+
         // Buscar razão social da empresa
         $empresaNome = $quote->company_name;
         
@@ -636,6 +664,10 @@ class PurchaseQuoteController extends Controller
                     'id' => $quote->buyer_id ? (int) $quote->buyer_id : null,
                     'name' => $quote->buyer_name,
                 ],
+                'engineer' => [
+                    'id' => $quote->engineer_id ? (int) $quote->engineer_id : null,
+                    'name' => $quote->engineer_name,
+                ],
                 'mensagens' => $quote->messages
                     ->sortBy('created_at')
                     ->map(fn (PurchaseQuoteMessage $message) => [
@@ -701,6 +733,7 @@ class PurchaseQuoteController extends Controller
                 ],
             ],
             'buyers' => $buyers,
+            'engineers' => $engineers,
         ]);
     }
 
@@ -1623,6 +1656,70 @@ class PurchaseQuoteController extends Controller
 
             return response()->json([
                 'message' => 'Não foi possível vincular a solicitação.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function assignEngineer(Request $request, PurchaseQuote $quote)
+    {
+        // Verificar se o usuário tem permissão para atribuir engenheiro
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_assign_engineer')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para atribuir engenheiro à cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'engineer_id' => 'required|integer|exists:users,id',
+            'observacao' => 'nullable|string',
+        ]);
+
+        $engineer = User::find($validated['engineer_id']);
+
+        if (!$engineer) {
+            return response()->json([
+                'message' => 'Engenheiro informado não foi encontrado.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $this->updateModelWithStringTimestamps($quote, [
+                'engineer_id' => $engineer->id,
+                'engineer_name' => $engineer->nome_completo ?? $engineer->name,
+                'updated_by' => auth()->id(),
+            ]);
+
+            // Se houver observação, salvar como mensagem
+            if (!empty($validated['observacao'])) {
+                $normalizedMessage = trim((string) $validated['observacao']);
+                if ($normalizedMessage !== '') {
+                    $this->insertWithStringTimestamps('purchase_quote_messages', [
+                        'purchase_quote_id' => $quote->id,
+                        'user_id' => auth()->id(),
+                        'type' => 'instrucao',
+                        'message' => $normalizedMessage,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Engenheiro vinculado com sucesso.',
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            Log::error('Falha ao vincular engenheiro', [
+                'quote_id' => $quote->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Não foi possível vincular o engenheiro.',
                 'error' => $exception->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }

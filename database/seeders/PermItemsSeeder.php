@@ -461,6 +461,13 @@ class PermItemsSeeder extends Seeder
             [
                 "name"             => "Atribuir Comprador à Cotação",
                 "slug"             => "cotacoes_assign_buyer",
+            ]
+        );
+
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Atribuir Engenheiro à Cotação",
+                "slug"             => "cotacoes_assign_engineer",
                 "group"            => "cotacoes_gerencia"
             ]
         );

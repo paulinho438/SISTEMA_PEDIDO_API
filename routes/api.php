@@ -286,6 +286,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/cotacoes/{quote}', [PurchaseQuoteController::class, 'show']);
     Route::post('/cotacoes/{quote}/detalhes', [PurchaseQuoteController::class, 'saveDetails']);
     Route::post('/cotacoes/{quote}/assign-buyer', [PurchaseQuoteController::class, 'assignBuyer']);
+    Route::post('/cotacoes/{quote}/assign-engineer', [PurchaseQuoteController::class, 'assignEngineer']);
     Route::post('/cotacoes/{quote}/approve', [PurchaseQuoteController::class, 'approve']);
     Route::post('/cotacoes/{quote}/reject', [PurchaseQuoteController::class, 'reject']);
     Route::post('/cotacoes/{quote}/finalizar', [PurchaseQuoteController::class, 'finalizeQuote']);

@@ -32,6 +32,8 @@ class PurchaseQuote extends Model
         'main_cost_center_description',
         'buyer_id',
         'buyer_name',
+        'engineer_id',
+        'engineer_name',
         'created_by',
         'updated_by',
         'payment_condition_code',
@@ -177,6 +179,11 @@ class PurchaseQuote extends Model
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'buyer_id')->withDefault();
+    }
+
+    public function engineer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'engineer_id')->withDefault();
     }
 
     public function company(): BelongsTo

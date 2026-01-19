@@ -179,7 +179,16 @@ class PurchaseQuoteApprovalService
 
         if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
             in_array($level, $simultaneousLevels, true)) {
-            // Verificar se o usuário tem a permissão específica para o nível
+            // Para ENGENHEIRO, verificar se o usuário é o engenheiro atribuído à cotação
+            if ($level === 'ENGENHEIRO') {
+                // Se a cotação tem um engenheiro atribuído, apenas ele pode aprovar
+                if ($quote->engineer_id) {
+                    return $quote->engineer_id === $user->id;
+                }
+                // Se não tem engenheiro atribuído, verificar se o usuário tem a permissão
+                return $this->checkUserHasLevelPermission($user, $level);
+            }
+            // Para outros níveis intermediários, verificar apenas a permissão
             return $this->checkUserHasLevelPermission($user, $level);
         }
         
@@ -435,9 +444,24 @@ class PurchaseQuoteApprovalService
                 // verificar apenas se o usuário tem a permissão específica
                 if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
                     in_array($approval->approval_level, $simultaneousLevels, true)) {
-                    // Verificar se o usuário tem a permissão específica para o nível
-                    if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
-                        return $approval->approval_level;
+                    // Para ENGENHEIRO, verificar se o usuário é o engenheiro atribuído
+                    if ($approval->approval_level === 'ENGENHEIRO') {
+                        // Se a cotação tem um engenheiro atribuído, apenas ele pode aprovar
+                        if ($quote->engineer_id) {
+                            if ($quote->engineer_id === $user->id) {
+                                return $approval->approval_level;
+                            }
+                            continue; // Não é o engenheiro atribuído, pular
+                        }
+                        // Se não tem engenheiro atribuído, verificar se o usuário tem a permissão
+                        if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
+                            return $approval->approval_level;
+                        }
+                    } else {
+                        // Para outros níveis intermediários, verificar apenas a permissão
+                        if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
+                            return $approval->approval_level;
+                        }
                     }
                 } elseif ($currentStatus === 'analise_gerencia') {
                     // Para status "analise_gerencia", verificar apenas se o usuário tem a permissão específica
