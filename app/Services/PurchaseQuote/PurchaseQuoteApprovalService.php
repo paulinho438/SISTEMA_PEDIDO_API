@@ -425,10 +425,16 @@ class PurchaseQuoteApprovalService
         foreach ($sortedApprovals as $approval) {
             if (in_array($approval->approval_level, $userLevels)) {
                 // Se o status é "finalizada", "analisada" ou "analisada_aguardando" e o nível é um dos simultâneos,
-                // verificar apenas se o usuário pertence ao grupo/perfil correspondente
+                // verificar apenas se o usuário tem a permissão específica
                 if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) &&
                     in_array($approval->approval_level, $simultaneousLevels, true)) {
                     // Verificar se o usuário tem a permissão específica para o nível
+                    if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
+                        return $approval->approval_level;
+                    }
+                } elseif ($currentStatus === 'analise_gerencia') {
+                    // Para status "analise_gerencia", verificar apenas se o usuário tem a permissão específica
+                    // (todos os níveis anteriores já foram aprovados quando chegou nesse status)
                     if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
                         return $approval->approval_level;
                     }
