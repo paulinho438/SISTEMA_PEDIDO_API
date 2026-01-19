@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('purchase_quotes', function (Blueprint $table) {
-            $table->foreignId('engineer_id')->nullable()->after('buyer_name')->constrained('users')->nullOnDelete();
+            $table->foreignId('engineer_id')->nullable()->after('buyer_name')->constrained('users')->onDelete('no action');
             $table->string('engineer_name')->nullable()->after('engineer_id');
         });
     }
