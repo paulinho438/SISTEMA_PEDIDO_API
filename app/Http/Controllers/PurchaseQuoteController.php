@@ -1920,6 +1920,16 @@ class PurchaseQuoteController extends Controller
 
         $note = $validated['observacao'] ?? $defaultNote;
 
+        // Verificar se há tentativa de aprovar nível ENGENHEIRO sem engenheiro atribuído
+        // Se o nível ENGENHEIRO está sendo aprovado e não há engenheiro atribuído, verificar permissão ANTES da transação
+        if ($nextLevel === 'ENGENHEIRO' && $quote->engineer_id === null) {
+            if (!$user->hasPermission('cotacoes_assign_engineer')) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para atribuir engenheiro à cotação. É necessário atribuir um engenheiro antes de aprovar.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         DB::beginTransaction();
 
         try {
