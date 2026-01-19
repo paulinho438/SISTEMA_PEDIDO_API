@@ -1628,6 +1628,7 @@ class PurchaseQuoteController extends Controller
         $validationRules = [
             'observacao' => 'nullable|string',
             'mensagem' => 'nullable|string',
+            'status' => 'nullable|string|in:analisada,analisada_aguardando', // Status opcional para quando o status atual é "finalizada"
         ];
         
         // Se tem permissão de editar na aprovação, aceitar dados de edição opcionais
@@ -1741,6 +1742,16 @@ class PurchaseQuoteController extends Controller
             
             // Se o status é "finalizada", "analisada" ou "analisada_aguardando", primeiro aprovar o nível do usuário
             if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && $nextStatusSlug === null) {
+                // Se o status atual é "finalizada" e foi enviado um status desejado, mudar o status primeiro
+                if ($currentStatus === 'finalizada' && !empty($validated['status'])) {
+                    $desiredStatus = PurchaseQuoteStatus::where('slug', $validated['status'])->first();
+                    if ($desiredStatus) {
+                        $this->transitionStatus($quote, $desiredStatus, 'Status atualizado para análise.');
+                        $quote->refresh();
+                        $currentStatus = $quote->current_status_slug; // Atualizar o status atual
+                    }
+                }
+                
                 // Aprovar o nível do usuário primeiro
                 if ($nextLevel) {
                     $approvalService->approveLevel($quote, $nextLevel, $user, $note);
