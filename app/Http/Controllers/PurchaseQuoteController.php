@@ -1668,8 +1668,15 @@ class PurchaseQuoteController extends Controller
         $userLevels = $approvalService->getUserApprovalLevels($user, $quote->company_id);
         $isDirector = in_array('DIRETOR', $userLevels);
         
-        // Se é diretor com permissão especial, pode aprovar diretamente qualquer cotação (exceto aprovado/reprovado)
-        if ($hasDirectorPermission && $isDirector && !in_array($currentStatus, ['aprovado', 'reprovado'], true)) {
+        // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
+        // 1. A cotação tem comprador associado (buyer_id não é null)
+        // 2. O status é "finalizada" ou superior (finalizada, analisada, analisada_aguardando, analise_gerencia)
+        // 3. Não está aprovado ou reprovado
+        $allowedStatusesForDirectApproval = ['finalizada', 'analisada', 'analisada_aguardando', 'analise_gerencia'];
+        $hasBuyer = $quote->buyer_id !== null;
+        
+        if ($hasDirectorPermission && $isDirector && $hasBuyer && 
+            in_array($currentStatus, $allowedStatusesForDirectApproval, true)) {
             $nextStatusSlug = 'aprovado';
             $defaultNote = 'Cotação aprovada diretamente pelo diretor.';
         }
@@ -1774,8 +1781,8 @@ class PurchaseQuoteController extends Controller
             $nextLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
             
             if (!$hasGenericPermission && $nextLevel === null) {
-                return response()->json([
-                    'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
+                return response()                   ->json([
+                    'message' =>                     'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
                 ], Response::HTTP_FORBIDDEN);
             }
             $nextStatusSlug = 'aprovado';
