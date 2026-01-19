@@ -2303,12 +2303,32 @@ class PurchaseQuoteController extends Controller
 
     public function analyzeQuote(Request $request, PurchaseQuote $quote)
     {
-        // Verificar se o usuário tem permissão para analisar cotação
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('cotacoes_analisar')) {
+        if (!$user) {
             return response()->json([
-                'message' => 'Você não tem permissão para analisar esta cotação.',
-            ], Response::HTTP_FORBIDDEN);
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        // Verificar permissão baseada no contexto
+        $currentStatus = $quote->current_status_slug;
+        $requestedStatus = $request->input('status');
+        
+        // Se está tentando aprovar como Diretor (status atual é analise_gerencia e status desejado é aprovado)
+        if ($currentStatus === 'analise_gerencia' && $requestedStatus === 'aprovado') {
+            // Verificar se tem permissão de aprovar como diretor
+            if (!$user->hasPermission('cotacoes_aprovar_diretor')) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para aprovar esta cotação.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        } else {
+            // Para outros casos, verificar permissão genérica de analisar
+            if (!$user->hasPermission('cotacoes_analisar')) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para analisar esta cotação.',
+                ], Response::HTTP_FORBIDDEN);
+            }
         }
 
         $validated = $request->validate([
