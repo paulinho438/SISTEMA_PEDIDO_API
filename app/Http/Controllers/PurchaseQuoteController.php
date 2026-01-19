@@ -1860,25 +1860,21 @@ class PurchaseQuoteController extends Controller
                         
                         foreach ($sortedUserLevels as $level) {
                             if ($approvalService->userHasLevelPermission($user, $level)) {
+                                // Se o nível é ENGENHEIRO e não há engenheiro atribuído, verificar permissão ANTES de continuar
+                                if ($level === 'ENGENHEIRO' && $quote->engineer_id === null) {
+                                    if (!$user->hasPermission('cotacoes_assign_engineer')) {
+                                        // Não definir nextLevel para este nível, continuar procurando outros níveis
+                                        continue;
+                                    }
+                                }
+                                
                                 // Verificar se já existe uma aprovação para esse nível (mesmo que aprovada)
                                 $existingApproval = $quote->approvals()
                                     ->byLevel($level)
                                     ->first();
                                 
-                                // Se não existe, criar a aprovação automaticamente
-                                if (!$existingApproval) {
-                                    $order = $approvalService->getApprovalOrder();
-                                    $this->insertWithStringTimestamps('purchase_quote_approvals', [
-                                        'purchase_quote_id' => $quote->id,
-                                        'approval_level' => $level,
-                                        'required' => true,
-                                        'approved' => false,
-                                        'order' => $order[$level] ?? 999,
-                                    ]);
-                                    $quote->refresh();
-                                }
-                                
                                 // Se não existe ou não está aprovada, usar esse nível
+                                // A criação da aprovação será feita dentro da transação, após validação
                                 if (!$existingApproval || !$existingApproval->approved) {
                                     $nextLevel = $level;
                                     break;
