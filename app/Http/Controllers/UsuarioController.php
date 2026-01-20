@@ -187,7 +187,7 @@ class UsuarioController extends Controller
             'rg' => 'nullable|string',
             'data_nascimento' => 'nullable|string',
             'sexo' => 'nullable|string',
-            'email' => 'required',
+            'email' => 'nullable|email',
             'telefone_celular' => 'required',
             'signature' => 'nullable|image|mimes:png|max:2048',
         ]);
@@ -453,7 +453,7 @@ class UsuarioController extends Controller
                 'data_nascimento' => 'nullable|string',
                 'sexo' => 'nullable|string',
                 'telefone_celular' => 'required|string',
-                'email' => 'required|email',
+                'email' => 'nullable|email',
             ];
             
             // Adicionar validação do arquivo apenas se for enviado
