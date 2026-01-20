@@ -234,9 +234,10 @@ class StockMovementController extends Controller
     {
         $user = auth()->user();
         
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
+        // Permitir gerar documento se tiver permissão de visualizar ou criar movimentações
+        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_movimentacoes_create'))) {
             return response()->json([
-                'message' => 'Você não tem permissão para visualizar movimentações de estoque.',
+                'message' => 'Você não tem permissão para gerar documentos de transferência.',
             ], Response::HTTP_FORBIDDEN);
         }
 
