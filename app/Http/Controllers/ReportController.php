@@ -418,8 +418,9 @@ class ReportController extends Controller
         $start = $request->get('start_date');
         $end = $request->get('end_date');
 
-        $startDate = $start ? Carbon::parse($start)->startOfDay() : null;
-        $endDate = $end ? Carbon::parse($end)->endOfDay() : null;
+        // Parse das datas como data local (sem timezone) para evitar problemas de conversão
+        $startDate = $start ? Carbon::createFromFormat('Y-m-d', $start)->startOfDay() : null;
+        $endDate = $end ? Carbon::createFromFormat('Y-m-d', $end)->endOfDay() : null;
 
         $historyRecords = PurchaseQuoteStatusHistory::query()
             ->select([
