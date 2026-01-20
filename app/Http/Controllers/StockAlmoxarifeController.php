@@ -93,13 +93,13 @@ class StockAlmoxarifeController extends Controller
             ], Response::HTTP_CONFLICT);
         }
 
-        DB::table('stock_almoxarife_locations')->insert([
-            'user_id' => $user->id,
-            'stock_location_id' => $locationId,
-            'company_id' => $companyId,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        // Usar timestamps como string para compatibilidade com SQL Server
+        $now = now()->format('Y-m-d H:i:s');
+        DB::statement(
+            "INSERT INTO [stock_almoxarife_locations] ([user_id], [stock_location_id], [company_id], [created_at], [updated_at]) 
+             VALUES (?, ?, ?, CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
+            [$user->id, $locationId, $companyId, $now, $now]
+        );
 
         return response()->json([
             'message' => 'Associação criada com sucesso.',
@@ -141,7 +141,7 @@ class StockAlmoxarifeController extends Controller
         }
 
         $locationIds = $validator['location_ids'];
-        $inserts = [];
+        $now = now()->format('Y-m-d H:i:s');
 
         foreach ($locationIds as $locationId) {
             // Verificar se local pertence à empresa
@@ -161,18 +161,13 @@ class StockAlmoxarifeController extends Controller
                 ->exists();
 
             if (!$exists) {
-                $inserts[] = [
-                    'user_id' => $userId,
-                    'stock_location_id' => $locationId,
-                    'company_id' => $companyId,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                // Usar timestamps como string para compatibilidade com SQL Server
+                DB::statement(
+                    "INSERT INTO [stock_almoxarife_locations] ([user_id], [stock_location_id], [company_id], [created_at], [updated_at]) 
+                     VALUES (?, ?, ?, CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
+                    [$userId, $locationId, $companyId, $now, $now]
+                );
             }
-        }
-
-        if (!empty($inserts)) {
-            DB::table('stock_almoxarife_locations')->insert($inserts);
         }
 
         return response()->json([
