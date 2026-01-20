@@ -24,7 +24,10 @@ class StockMovementService
         $perPage = (int) $request->get('per_page', 15);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
         
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
+        if (!$companyId) {
+            throw new \Exception('Company ID é obrigatório.');
+        }
         $query = StockMovement::where('stock_movements.company_id', $companyId)
             ->with(['product', 'location', 'user']);
 
@@ -73,7 +76,11 @@ class StockMovementService
         }
 
         $stock = Stock::findOrFail($request->input('stock_id'));
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
+
+        if (!$companyId) {
+            throw new \Exception('Company ID é obrigatório.');
+        }
 
         // Verificar acesso
         if (!$this->accessService->canAccessLocation($user, $stock->stock_location_id, $companyId)) {
@@ -149,7 +156,11 @@ class StockMovementService
             throw new \Exception($validator->errors()->first());
         }
 
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
+
+        if (!$companyId) {
+            throw new \Exception('Company ID é obrigatório.');
+        }
 
         // Verificar acesso ao local de destino
         if (!$this->accessService->canAccessLocation($user, $request->input('location_id'), $companyId)) {
@@ -236,9 +247,13 @@ class StockMovementService
         }
 
         $stock = Stock::findOrFail($request->input('stock_id'));
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
         $toLocationId = $request->input('to_location_id');
         $quantity = $request->input('quantity');
+
+        if (!$companyId) {
+            throw new \Exception('Company ID é obrigatório.');
+        }
 
         // Verificar acesso ao local de origem
         if (!$this->accessService->canAccessLocation($user, $stock->stock_location_id, $companyId)) {
