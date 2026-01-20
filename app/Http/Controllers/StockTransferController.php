@@ -216,7 +216,10 @@ class StockTransferController extends Controller
             $options = new \Dompdf\Options();
             $options->set('isRemoteEnabled', true);
             $options->set('isHtml5ParserEnabled', true);
-            Pdf::setOptions($options);
+            $options->set('isPhpEnabled', true);
+            
+            $pdf->getDomPDF()->setOptions($options);
+            $pdf->setPaper('A4', 'portrait');
 
             return $pdf->download("transferencia-{$transfer->transfer_number}.pdf");
         } catch (\Exception $e) {
