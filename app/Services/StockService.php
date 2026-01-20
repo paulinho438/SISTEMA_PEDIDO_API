@@ -99,7 +99,7 @@ class StockService
             ]);
 
             // Criar movimentação
-            StockMovement::create([
+            $movementId = $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stock->id,
                 'stock_product_id' => $stock->stock_product_id,
                 'stock_location_id' => $stock->stock_location_id,
@@ -152,7 +152,7 @@ class StockService
             ]);
 
             // Criar movimentação
-            StockMovement::create([
+            $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stock->id,
                 'stock_product_id' => $stock->stock_product_id,
                 'stock_location_id' => $stock->stock_location_id,
@@ -213,7 +213,7 @@ class StockService
             ]);
 
             // Criar movimentação com motivo do cancelamento
-            StockMovement::create([
+            $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stock->id,
                 'stock_product_id' => $stock->stock_product_id,
                 'stock_location_id' => $stock->stock_location_id,
@@ -269,7 +269,7 @@ class StockService
             ]);
 
             // Criar movimentação de saída
-            StockMovement::create([
+            $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stock->id,
                 'stock_product_id' => $stock->stock_product_id,
                 'stock_location_id' => $stock->stock_location_id,
@@ -344,7 +344,7 @@ class StockService
             ]);
 
             // 3. Criar movimentação de saída na origem
-            $movementFrom = StockMovement::create([
+            $movementFromId = $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stockOrigem->id,
                 'stock_product_id' => $stockOrigem->stock_product_id,
                 'stock_location_id' => $stockOrigem->stock_location_id,
@@ -358,20 +358,25 @@ class StockService
                 'company_id' => $companyId,
                 'movement_date' => Carbon::now()->toDateString(),
             ]);
+            $movementFrom = StockMovement::find($movementFromId);
 
             // 4. Buscar ou criar estoque no destino
-            $stockDestino = Stock::firstOrCreate(
-                [
+            $stockDestino = Stock::where('stock_product_id', $stockOrigem->stock_product_id)
+                ->where('stock_location_id', $locationDestinoId)
+                ->where('company_id', $companyId)
+                ->first();
+            
+            if (!$stockDestino) {
+                $stockDestinoId = $this->insertStockWithStringTimestamps([
                     'stock_product_id' => $stockOrigem->stock_product_id,
                     'stock_location_id' => $locationDestinoId,
                     'company_id' => $companyId,
-                ],
-                [
                     'quantity_available' => 0,
                     'quantity_reserved' => 0,
                     'quantity_total' => 0,
-                ]
-            );
+                ]);
+                $stockDestino = Stock::find($stockDestinoId);
+            }
 
             // 5. Adicionar ao estoque RESERVADO no destino (mantém o status de reservado)
             $reservedDestinoBefore = $stockDestino->quantity_reserved;
@@ -386,7 +391,7 @@ class StockService
             ]);
 
             // 6. Criar movimentação de entrada no destino (como reservado)
-            $movementTo = StockMovement::create([
+            $movementToId = $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stockDestino->id,
                 'stock_product_id' => $stockOrigem->stock_product_id,
                 'stock_location_id' => $locationDestinoId,
@@ -400,6 +405,7 @@ class StockService
                 'company_id' => $companyId,
                 'movement_date' => Carbon::now()->toDateString(),
             ]);
+            $movementTo = StockMovement::find($movementToId);
 
             DB::commit();
 
@@ -453,7 +459,7 @@ class StockService
             ]);
 
             // 2. Criar movimentação de saída
-            $movement = StockMovement::create([
+            $this->insertMovementWithStringTimestamps([
                 'stock_id' => $stock->id,
                 'stock_product_id' => $stock->stock_product_id,
                 'stock_location_id' => $stock->stock_location_id,
@@ -632,6 +638,85 @@ class StockService
         $model->refresh();
         
         return $model;
+    }
+
+    /**
+     * Helper para inserir movimentações com timestamps como strings (compatível com SQL Server)
+     */
+    private function insertMovementWithStringTimestamps($data)
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            // Campos de data precisam de CAST
+            if ($column === 'movement_date') {
+                $placeholders[] = "CAST(? AS DATE)";
+            } else {
+                $placeholders[] = "?";
+            }
+            $values[] = $data[$column];
+        }
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stock_movements] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        
+        DB::statement($sql, $values);
+        
+        // Retornar o ID do último registro inserido
+        return DB::getPdo()->lastInsertId();
+    }
+
+    /**
+     * Helper para inserir estoque com timestamps como strings (compatível com SQL Server)
+     */
+    private function insertStockWithStringTimestamps($data)
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            $placeholders[] = "?";
+            $values[] = $data[$column];
+        }
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stocks] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        
+        DB::statement($sql, $values);
+        
+        // Retornar o ID do último registro inserido
+        return DB::getPdo()->lastInsertId();
     }
 }
 
