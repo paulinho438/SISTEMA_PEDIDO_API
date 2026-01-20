@@ -225,15 +225,57 @@ class StockProductService
             'reference' => 'nullable|string|max:100',
             'description' => 'sometimes|required|string|max:255',
             'unit' => 'sometimes|required|string|max:20',
+            'min_stock' => 'nullable|integer',
+            'max_stock' => 'nullable|integer',
+            'image_path' => 'nullable|string|max:500',
         ]);
 
         if ($validator->fails()) {
             throw new \Exception($validator->errors()->first());
         }
 
-        $product->update($data);
+        // Usar método que trata timestamps como string para SQL Server
+        $this->updateModelWithStringTimestamps($product, $data);
         
         return $product->fresh();
+    }
+
+    /**
+     * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
+     */
+    private function updateModelWithStringTimestamps($model, array $data)
+    {
+        // Adicionar updated_at como string
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+        
+        // Usar DB::statement() para garantir que updated_at seja string
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            if ($column === 'updated_at') {
+                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = "[{$column}] = ?";
+            }
+            $values[] = $data[$column];
+        }
+        
+        $values[] = $id; // Para o WHERE
+        
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $placeholders) . " WHERE [{$idColumn}] = ?";
+        
+        DB::statement($sql, $values);
+        
+        // Recarregar o modelo
+        $model->refresh();
+        
+        return $model;
     }
 
     /**
@@ -241,7 +283,7 @@ class StockProductService
      */
     public function toggleActive(StockProduct $product): StockProduct
     {
-        $product->update(['active' => !$product->active]);
+        $this->updateModelWithStringTimestamps($product, ['active' => !$product->active]);
         
         return $product->fresh();
     }
