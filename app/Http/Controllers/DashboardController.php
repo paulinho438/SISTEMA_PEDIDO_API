@@ -145,12 +145,33 @@ class DashboardController extends Controller
             return $a['percentage'] <=> $b['percentage'];
         });
 
+        // Buscar últimas 10 movimentações
+        $recentMovements = \App\Models\StockMovement::where('stock_movements.company_id', $companyId)
+            ->with(['product', 'location', 'user'])
+            ->orderBy('stock_movements.created_at', 'desc')
+            ->limit(10)
+            ->get()
+            ->map(function($movement) {
+                return [
+                    'id' => $movement->id,
+                    'movement_date' => $movement->movement_date ? $movement->movement_date->format('Y-m-d') : ($movement->created_at ? \Carbon\Carbon::parse($movement->created_at)->format('Y-m-d') : null),
+                    'product_code' => $movement->product->code ?? null,
+                    'product_description' => $movement->product->description ?? null,
+                    'location_name' => $movement->location->name ?? null,
+                    'movement_type' => $movement->movement_type,
+                    'quantity' => $movement->quantity,
+                    'observation' => $movement->observation,
+                    'user_name' => $movement->user->nome_completo ?? null,
+                ];
+            });
+
         return response()->json([
             'total_products' => $totalProducts,
             'low_stock_products' => $lowStockProducts,
             'out_of_stock_products' => $outOfStockProducts,
             'total_low_stock' => count($lowStockProducts) + count($outOfStockProducts),
             'total_value' => $totalValue,
+            'recent_movements' => $recentMovements,
         ]);
     }
 
