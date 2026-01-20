@@ -78,7 +78,36 @@ class StockService
             }
         }
 
-        return $query->orderByDesc('last_movement_at')->paginate($perPage);
+        $stocks = $query->orderByDesc('last_movement_at')->paginate($perPage);
+
+        // Para cada stock com reserva, buscar a última movimentação de reserva
+        foreach ($stocks->items() as $stock) {
+            if ($stock->quantity_reserved > 0) {
+                // Buscar a última movimentação que criou reserva (ajuste com quantidade negativa e observation contendo "Reserva")
+                $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                    ->where('movement_type', 'ajuste')
+                    ->where('quantity', '<', 0)
+                    ->where(function($q) {
+                        $q->where('observation', 'like', '%Reserva%')
+                          ->orWhere('observation', 'like', '%reserva%');
+                    })
+                    ->with('user')
+                    ->orderByDesc('created_at')
+                    ->first();
+
+                if ($lastReservationMovement) {
+                    // Usar movement_date se disponível, senão usar created_at
+                    $reservationDate = $lastReservationMovement->movement_date 
+                        ? \Carbon\Carbon::parse($lastReservationMovement->movement_date)
+                        : \Carbon\Carbon::parse($lastReservationMovement->created_at);
+                    
+                    $stock->reservation_date = $reservationDate;
+                    $stock->reservation_user = $lastReservationMovement->user;
+                }
+            }
+        }
+
+        return $stocks;
     }
 
     public function find($id)
