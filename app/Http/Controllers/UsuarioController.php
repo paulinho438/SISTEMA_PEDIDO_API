@@ -230,6 +230,9 @@ class UsuarioController extends Controller
             if (!isset($dados['sexo']) || empty($dados['sexo'])) {
                 $dados['sexo'] = null;
             }
+            if (!isset($dados['email']) || empty($dados['email'])) {
+                $dados['email'] = null;
+            }
 
             $dados['password'] = password_hash($dados['password'], PASSWORD_DEFAULT);
 
@@ -257,10 +260,14 @@ class UsuarioController extends Controller
             
             $userData = array_intersect_key($dados, array_flip($fillable));
             
-            // Remover campos null ou arrays
-            $userData = array_filter($userData, function($value) {
+            // Remover campos null ou arrays (exceto email que pode ser null)
+            $userData = array_filter($userData, function($value, $key) {
+                if ($key === 'email') {
+                    // Email pode ser null, então manter mesmo se null
+                    return !is_array($value);
+                }
                 return !is_array($value) && $value !== null;
-            });
+            }, ARRAY_FILTER_USE_BOTH);
 
             // Usar helper para inserir com timestamps como strings
             $userId = $this->insertWithStringTimestamps('users', $userData);
@@ -510,9 +517,13 @@ class UsuarioController extends Controller
                 'data_nascimento' => $dataNascimento,
                 'sexo' => $dados['sexo'] ?? null,
                 'telefone_celular' => $dados['telefone_celular'],
-                'email' => $dados['email'],
                 'password' => $dados['password'],
             ];
+            
+            // Incluir email apenas se fornecido e não vazio
+            if (isset($dados['email']) && !empty(trim($dados['email']))) {
+                $updateData['email'] = trim($dados['email']);
+            }
             
             // Processar upload/remoção de assinatura
             if ($request->hasFile('signature') && $request->file('signature')->isValid()) {
