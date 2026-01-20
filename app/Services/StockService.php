@@ -83,10 +83,12 @@ class StockService
         // Para cada stock com reserva, buscar a última movimentação de reserva
         foreach ($stocks->items() as $stock) {
             if ($stock->quantity_reserved > 0) {
-                // Buscar a última movimentação que criou reserva (ajuste com quantidade negativa e observation contendo "Reserva")
+                // Buscar a última movimentação que criou reserva
+                // Priorizar movimentações com observation contendo "Reserva"
                 $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
                     ->where('movement_type', 'ajuste')
                     ->where('quantity', '<', 0)
+                    ->whereNotNull('user_id')
                     ->where(function($q) {
                         $q->where('observation', 'like', '%Reserva%')
                           ->orWhere('observation', 'like', '%reserva%');
@@ -95,7 +97,30 @@ class StockService
                     ->orderByDesc('created_at')
                     ->first();
 
-                if ($lastReservationMovement) {
+                // Se não encontrou com "Reserva" na observação, buscar qualquer movimentação de ajuste recente
+                // que não seja cancelamento ou saída
+                if (!$lastReservationMovement) {
+                    $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                        ->where('movement_type', 'ajuste')
+                        ->where('quantity', '<', 0)
+                        ->whereNotNull('user_id')
+                        ->where(function($q) {
+                            $q->where(function($subQ) {
+                                $subQ->where('observation', 'not like', '%Cancelamento%')
+                                     ->where('observation', 'not like', '%cancelamento%')
+                                     ->where('observation', 'not like', '%Saída%')
+                                     ->where('observation', 'not like', '%saída%')
+                                     ->where('observation', 'not like', '%Transferência%')
+                                     ->where('observation', 'not like', '%transferência%');
+                            })
+                            ->orWhereNull('observation');
+                        })
+                        ->with('user')
+                        ->orderByDesc('created_at')
+                        ->first();
+                }
+
+                if ($lastReservationMovement && $lastReservationMovement->user) {
                     // Usar movement_date se disponível, senão usar created_at
                     $reservationDate = $lastReservationMovement->movement_date 
                         ? \Carbon\Carbon::parse($lastReservationMovement->movement_date)
