@@ -445,6 +445,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/{id}/baixar', [AssetController::class, 'baixar']);
         Route::post('/{id}/transferir', [AssetController::class, 'transferir']);
         Route::post('/{id}/alterar-responsavel', [AssetController::class, 'alterarResponsavel']);
+        Route::post('/{id}/upload-image', [AssetController::class, 'uploadImage']);
+        Route::delete('/{id}/remove-image', [AssetController::class, 'removeImage']);
         
         // Movimentações
         Route::get('/{id}/movimentacoes', [AssetMovementController::class, 'index']);

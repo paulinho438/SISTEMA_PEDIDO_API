@@ -7,6 +7,8 @@ use App\Http\Resources\AssetResource;
 use App\Services\AssetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class AssetController extends Controller
@@ -199,6 +201,111 @@ class AssetController extends Controller
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
         }
+    }
+
+    /**
+     * Upload de imagem do ativo
+     */
+    public function uploadImage(Request $request, $id)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png|max:5120', // Máximo 5MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Arquivo inválido',
+                'error' => $validator->errors()->first()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $asset = $this->service->find($id);
+
+            // Deletar imagem antiga se existir
+            if ($asset->image_path && Storage::disk('public')->exists($asset->image_path)) {
+                Storage::disk('public')->delete($asset->image_path);
+            }
+
+            $imagePath = $this->uploadImageFile($request->file('image'), $asset->asset_number ?? 'asset_' . $asset->id);
+
+            // Usar o service para atualizar, garantindo compatibilidade com SQL Server
+            $asset = $this->service->update($asset, ['image_path' => $imagePath], $user->id);
+
+            return response()->json([
+                'message' => 'Imagem enviada com sucesso',
+                'data' => [
+                    'image_path' => $imagePath,
+                    'image_url' => $request->getSchemeAndHttpHost() . '/storage/' . $imagePath
+                ]
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao fazer upload da imagem',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Remover imagem do ativo
+     */
+    public function removeImage(Request $request, $id)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $asset = $this->service->find($id);
+
+            // Deletar imagem se existir
+            if ($asset->image_path && Storage::disk('public')->exists($asset->image_path)) {
+                Storage::disk('public')->delete($asset->image_path);
+            }
+
+            // Usar o service para atualizar, garantindo compatibilidade com SQL Server
+            $this->service->update($asset, ['image_path' => null], $user->id);
+
+            return response()->json([
+                'message' => 'Imagem removida com sucesso'
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao remover imagem',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Método privado para fazer upload do arquivo de imagem
+     */
+    private function uploadImageFile($file, $assetNumber)
+    {
+        $extension = $file->getClientOriginalExtension();
+        $filename = 'asset_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $assetNumber) . '_' . time() . '.' . $extension;
+        $path = 'assets/' . $filename;
+        
+        // Criar diretório se não existir
+        Storage::disk('public')->makeDirectory('assets');
+        
+        // Salvar arquivo
+        Storage::disk('public')->put($path, file_get_contents($file));
+        
+        return $path;
     }
 }
 

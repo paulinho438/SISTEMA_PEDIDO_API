@@ -39,6 +39,7 @@ class Asset extends Model
         'nfe_key',
         'observation',
         'asset_url',
+        'image_path',
         'branch_id',
         'account_id',
         'cost_center_id',

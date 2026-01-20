@@ -57,6 +57,8 @@ class AssetResource extends JsonResource
             'images' => $this->whenLoaded('images', function() {
                 return AssetImageResource::collection($this->images);
             }),
+            'image_path' => $this->image_path,
+            'image_url' => $this->image_path ? url('/storage/' . $this->image_path) : null,
             'created_at' => $this->created_at ? $this->created_at->format('d/m/Y H:i:s') : null,
         ];
     }
