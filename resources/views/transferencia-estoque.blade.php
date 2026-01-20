@@ -117,22 +117,38 @@
         }
         
         .signature-section {
+            display: table;
+            width: 100%;
             margin-top: 30px;
-            display: flex;
-            justify-content: space-between;
+            padding-top: 20px;
         }
         
         .signature-box {
-            width: 30%;
-            border-top: 1px solid #000;
-            padding-top: 5px;
+            display: table-cell;
             text-align: center;
-            font-size: 8pt;
+            width: 33.33%;
+            vertical-align: top;
+            padding: 0 5px;
+        }
+        
+        .signature-line {
+            padding-top: 5px;
+            margin-bottom: 5px;
+            min-height: 60px;
+            text-align: center;
+        }
+        
+        .signature-name-line {
+            border-bottom: 1px solid #000;
+            margin-top: 5px;
+            padding-bottom: 5px;
+            min-height: 20px;
         }
         
         .signature-label {
+            font-size: 9pt;
             font-weight: bold;
-            margin-bottom: 40px;
+            margin-top: 5px;
         }
         
         .page-break {
@@ -143,11 +159,7 @@
 <body>
     <div class="header">
         <div class="logo">
-            @if($company && $company->logo)
-                <img src="{{ $company->logo }}" alt="Logo" />
-            @else
-                <div style="color: white; font-weight: bold;">{{ $company->name ?? 'EMPRESA' }}</div>
-            @endif
+            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
         </div>
         <div class="header-center">
             <h1>Transferência</h1>
@@ -239,12 +251,18 @@
 
     <div class="signature-section">
         <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name-line"></div>
             <div class="signature-label">ALMOXERIFADO ORIGEM</div>
         </div>
         <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name-line"></div>
             <div class="signature-label">MOTORISTA / PLACA / CARRO</div>
         </div>
         <div class="signature-box">
+            <div class="signature-line"></div>
+            <div class="signature-name-line"></div>
             <div class="signature-label">RECEBEDOR DO ALMOXERIFADO</div>
         </div>
     </div>
