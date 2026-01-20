@@ -289,8 +289,8 @@ class StockProductController extends Controller
 
             $imagePath = $this->uploadImageFile($request->file('image'), $product->code ?? 'product_' . $product->id);
 
-            $product->image_path = $imagePath;
-            $product->save();
+            // Usar o service para atualizar, garantindo compatibilidade com SQL Server
+            $product = $this->service->update($product, ['image_path' => $imagePath]);
 
             return response()->json([
                 'message' => 'Imagem enviada com sucesso',
@@ -328,8 +328,8 @@ class StockProductController extends Controller
                 Storage::disk('public')->delete($product->image_path);
             }
 
-            $product->image_path = null;
-            $product->save();
+            // Usar o service para atualizar, garantindo compatibilidade com SQL Server
+            $this->service->update($product, ['image_path' => null]);
 
             return response()->json([
                 'message' => 'Imagem removida com sucesso'
