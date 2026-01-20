@@ -7,6 +7,7 @@ use App\Models\CustomLog;
 use App\Models\Emprestimo;
 use App\Services\PurchaseQuote\PurchaseQuoteDashboardService;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 class DashboardController extends Controller
 {
     protected CustomLog $custom_log;
@@ -77,6 +78,80 @@ class DashboardController extends Controller
         $metrics = $this->purchaseQuoteDashboardService->getMetrics($companyId ? (int) $companyId : null);
 
         return response()->json($metrics);
+    }
+
+    public function stockMetrics(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_dashboard')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar o dashboard de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $companyId = $request->header('company-id');
+        
+        // Buscar produtos com estoque total calculado
+        $products = \App\Models\StockProduct::where('stock_products.company_id', $companyId)
+            ->where('stock_products.active', true)
+            ->leftJoin('stocks', 'stock_products.id', '=', 'stocks.stock_product_id')
+            ->select(
+                'stock_products.id',
+                'stock_products.code',
+                'stock_products.description',
+                'stock_products.unit',
+                'stock_products.min_stock',
+                'stock_products.max_stock',
+                \DB::raw('COALESCE(SUM(stocks.quantity_available), 0) as total_available')
+            )
+            ->groupBy('stock_products.id', 'stock_products.code', 'stock_products.description', 'stock_products.unit', 'stock_products.min_stock', 'stock_products.max_stock')
+            ->get();
+
+        $totalProducts = $products->count();
+        $lowStockProducts = [];
+        $outOfStockProducts = [];
+        $totalValue = 0;
+
+        foreach ($products as $product) {
+            $totalAvailable = (float) $product->total_available;
+            
+            // Verificar se está abaixo do mínimo (ou se não tem mínimo definido mas está zerado)
+            if (($product->min_stock !== null && $totalAvailable <= $product->min_stock) || 
+                ($product->min_stock === null && $totalAvailable == 0)) {
+                $percentage = $product->min_stock > 0 ? ($totalAvailable / $product->min_stock) * 100 : 0;
+                
+                $productData = [
+                    'id' => $product->id,
+                    'code' => $product->code,
+                    'description' => $product->description,
+                    'min_stock' => $product->min_stock,
+                    'max_stock' => $product->max_stock,
+                    'current_stock' => $totalAvailable,
+                    'percentage' => round($percentage, 2),
+                    'unit' => $product->unit,
+                ];
+
+                if ($totalAvailable == 0) {
+                    $outOfStockProducts[] = $productData;
+                } else {
+                    $lowStockProducts[] = $productData;
+                }
+            }
+        }
+
+        // Ordenar por porcentagem (menor primeiro)
+        usort($lowStockProducts, function($a, $b) {
+            return $a['percentage'] <=> $b['percentage'];
+        });
+
+        return response()->json([
+            'total_products' => $totalProducts,
+            'low_stock_products' => $lowStockProducts,
+            'out_of_stock_products' => $outOfStockProducts,
+            'total_low_stock' => count($lowStockProducts) + count($outOfStockProducts),
+            'total_value' => $totalValue,
+        ]);
     }
 
 

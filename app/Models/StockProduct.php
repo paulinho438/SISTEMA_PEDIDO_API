@@ -18,10 +18,15 @@ class StockProduct extends Model
         'unit',
         'active',
         'company_id',
+        'image_path',
+        'min_stock',
+        'max_stock',
     ];
 
     protected $casts = [
         'active' => 'boolean',
+        'min_stock' => 'decimal:4',
+        'max_stock' => 'decimal:4',
     ];
 
     /**

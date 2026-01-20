@@ -7,6 +7,8 @@ use App\Http\Resources\StockProductResource;
 use App\Services\StockProductService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
 class StockProductController extends Controller
@@ -249,6 +251,111 @@ class StockProductController extends Controller
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
         }
+    }
+
+    /**
+     * Upload de imagem do produto
+     */
+    public function uploadImage(Request $request, $id)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'image' => 'required|image|mimes:jpeg,jpg,png|max:5120', // Máximo 5MB
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Arquivo inválido',
+                'error' => $validator->errors()->first()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $product = $this->service->find($id);
+
+            // Deletar imagem antiga se existir
+            if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                Storage::disk('public')->delete($product->image_path);
+            }
+
+            $imagePath = $this->uploadImageFile($request->file('image'), $product->code ?? 'product_' . $product->id);
+
+            $product->image_path = $imagePath;
+            $product->save();
+
+            return response()->json([
+                'message' => 'Imagem enviada com sucesso',
+                'data' => [
+                    'image_path' => $imagePath,
+                    'image_url' => $request->getSchemeAndHttpHost() . '/storage/' . $imagePath
+                ]
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao fazer upload da imagem',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Remover imagem do produto
+     */
+    public function removeImage(Request $request, $id)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $product = $this->service->find($id);
+
+            // Deletar imagem se existir
+            if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                Storage::disk('public')->delete($product->image_path);
+            }
+
+            $product->image_path = null;
+            $product->save();
+
+            return response()->json([
+                'message' => 'Imagem removida com sucesso'
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao remover imagem',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Método privado para fazer upload do arquivo de imagem
+     */
+    private function uploadImageFile($file, $productCode)
+    {
+        $extension = $file->getClientOriginalExtension();
+        $filename = 'product_' . preg_replace('/[^a-zA-Z0-9_]/', '_', $productCode) . '_' . time() . '.' . $extension;
+        $path = 'stock-products/' . $filename;
+        
+        // Criar diretório se não existir
+        Storage::disk('public')->makeDirectory('stock-products');
+        
+        // Salvar arquivo
+        $file->storeAs('stock-products', $filename, 'public');
+        
+        return $path;
     }
 }
 

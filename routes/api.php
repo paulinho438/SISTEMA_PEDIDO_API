@@ -142,6 +142,7 @@ Route::prefix('integrations/protheus')
 Route::middleware('auth:api')->group(function () {
     Route::get('/dashboard/info-conta', [DashboardController::class, 'infoConta']);
     Route::get('/dashboard/purchase-metrics', [DashboardController::class, 'purchaseQuoteMetrics']);
+    Route::get('/dashboard/stock-metrics', [DashboardController::class, 'stockMetrics']);
     Route::get('/relatorios/custos-centro-custo', [ReportController::class, 'costsByCostCenter']);
     Route::get('/relatorios/cotacoes', [ReportController::class, 'quotesSummary']);
     Route::get('/relatorios/custos-fornecedor', [ReportController::class, 'costsBySupplier']);
@@ -337,6 +338,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/produtos/cadastrar-com-protheus', [StockProductController::class, 'cadastrarComProtheus']);
         Route::put('/produtos/{id}', [StockProductController::class, 'update']);
         Route::patch('/produtos/{id}/toggle-active', [StockProductController::class, 'toggleActive']);
+        Route::post('/produtos/{id}/upload-image', [StockProductController::class, 'uploadImage']);
+        Route::delete('/produtos/{id}/remove-image', [StockProductController::class, 'removeImage']);
         
         // Locais
         Route::get('/locais/{location_id}/almoxarifes', [StockAlmoxarifeController::class, 'listByLocation']);
