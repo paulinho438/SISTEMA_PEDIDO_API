@@ -148,8 +148,8 @@ class DashboardController extends Controller
                         $minCurrentStock = $quantityAvailable;
                     }
 
-                    // Se este local está abaixo do mínimo, adicionar à lista
-                    if ($quantityAvailable < $product->min_stock) {
+                    // Se este local está abaixo ou igual ao mínimo, adicionar à lista
+                    if ($quantityAvailable <= $product->min_stock) {
                         $hasLowStock = true;
                         $lowLocations[] = [
                             'location_id' => $stock->stock_location_id,
