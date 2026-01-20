@@ -245,10 +245,25 @@ class StockProductService
      */
     private function updateModelWithStringTimestamps($model, array $data)
     {
+        // Remover campos que não devem ser atualizados
+        unset($data['id'], $data['created_at']);
+        
         // Adicionar updated_at como string
         $data['updated_at'] = now()->format('Y-m-d H:i:s');
         
-        // Usar DB::statement() para garantir que updated_at seja string
+        // Se não há dados para atualizar além do updated_at, apenas atualizar o timestamp
+        if (empty($data) || (count($data) === 1 && isset($data['updated_at']))) {
+            $table = $model->getTable();
+            $id = $model->getKey();
+            $idColumn = $model->getKeyName();
+            
+            $sql = "UPDATE [{$table}] SET [updated_at] = CAST(? AS DATETIME2) WHERE [{$idColumn}] = ?";
+            DB::statement($sql, [$data['updated_at'], $id]);
+            $model->refresh();
+            return $model;
+        }
+        
+        // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
         $table = $model->getTable();
         $id = $model->getKey();
         $idColumn = $model->getKeyName();
