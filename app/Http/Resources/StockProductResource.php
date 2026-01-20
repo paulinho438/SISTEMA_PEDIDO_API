@@ -24,6 +24,7 @@ class StockProductResource extends JsonResource
             'min_stock' => $this->min_stock,
             'max_stock' => $this->max_stock,
             'image_path' => $this->image_path,
+            'image_url' => $this->image_path ? url('/storage/' . $this->image_path) : null,
             'company_id' => $this->company_id,
             'created_at' => $this->created_at ? $this->created_at->format('d/m/Y H:i:s') : null,
             'updated_at' => $this->updated_at ? $this->updated_at->format('d/m/Y H:i:s') : null,
