@@ -328,6 +328,8 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/movimentacoes/ajuste', [StockMovementController::class, 'ajuste']);
         Route::post('/movimentacoes/entrada', [StockMovementController::class, 'entrada']);
         Route::post('/movimentacoes/transferir', [StockMovementController::class, 'transferir']);
+        Route::post('/movimentacoes/transferir-lote', [StockMovementController::class, 'transferirLote']);
+        Route::post('/transferencias/gerar-documento', [StockMovementController::class, 'gerarDocumentoTransferencia']);
         
         // Produtos
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);
