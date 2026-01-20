@@ -94,6 +94,9 @@ class DashboardController extends Controller
         $companyId = $request->header('company-id');
         
         // Buscar produtos com estoque total calculado
+        // IMPORTANTE: O estoque mínimo/máximo é verificado pela SOMA de todos os estoques
+        // do produto em TODOS os locais. Exemplo: se min_stock = 5, a soma de todos os
+        // locais deve ser >= 5 para não estar abaixo do mínimo.
         $products = \App\Models\StockProduct::where('stock_products.company_id', $companyId)
             ->where('stock_products.active', true)
             ->leftJoin('stocks', 'stock_products.id', '=', 'stocks.stock_product_id')
@@ -104,6 +107,7 @@ class DashboardController extends Controller
                 'stock_products.unit',
                 'stock_products.min_stock',
                 'stock_products.max_stock',
+                // Soma o estoque disponível de TODOS os locais para cada produto
                 \DB::raw('COALESCE(SUM(stocks.quantity_available), 0) as total_available')
             )
             ->groupBy('stock_products.id', 'stock_products.code', 'stock_products.description', 'stock_products.unit', 'stock_products.min_stock', 'stock_products.max_stock')
@@ -115,9 +119,11 @@ class DashboardController extends Controller
         $totalValue = 0;
 
         foreach ($products as $product) {
+            // total_available já é a soma de todos os estoques em todos os locais
             $totalAvailable = (float) $product->total_available;
             
-            // Verificar se está abaixo do mínimo (ou se não tem mínimo definido mas está zerado)
+            // Verificar se a SOMA de todos os estoques está abaixo do mínimo
+            // (ou se não tem mínimo definido mas está zerado)
             if (($product->min_stock !== null && $totalAvailable <= $product->min_stock) || 
                 ($product->min_stock === null && $totalAvailable == 0)) {
                 $percentage = $product->min_stock > 0 ? ($totalAvailable / $product->min_stock) * 100 : 0;
