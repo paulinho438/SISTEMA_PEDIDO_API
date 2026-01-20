@@ -162,6 +162,7 @@ class StockMovementController extends Controller
             $localDestinoId = $request->input('local_destino_id');
             $itens = $request->input('itens');
             $observacao = $request->input('observacao');
+            $companyId = $request->header('company-id');
 
             $resultados = [];
             $sucessos = 0;
@@ -188,6 +189,9 @@ class StockMovementController extends Controller
                         'quantity' => $itemData['quantidade'],
                         'observation' => $observacao,
                     ]);
+                    
+                    // Adicionar o header company-id ao Request
+                    $dadosTransferencia->headers->set('company-id', $companyId);
 
                     $resultado = $this->service->transferir($dadosTransferencia, $user);
 
