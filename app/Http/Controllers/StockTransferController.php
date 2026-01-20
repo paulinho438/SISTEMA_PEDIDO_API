@@ -103,7 +103,7 @@ class StockTransferController extends Controller
     {
         $user = auth()->user();
         
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_movimentacoes_create'))) {
             return response()->json([
                 'message' => 'Você não tem permissão para receber transferências.',
             ], Response::HTTP_FORBIDDEN);
