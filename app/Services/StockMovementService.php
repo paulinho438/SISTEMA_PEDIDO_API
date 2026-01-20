@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Stock;
 use App\Models\StockMovement;
+use App\Models\StockLocation;
 use App\Services\StockAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -255,14 +256,19 @@ class StockMovementService
             throw new \Exception('Company ID é obrigatório.');
         }
 
-        // Verificar acesso ao local de origem
+        // Verificar acesso ao local de origem (obrigatório)
         if (!$this->accessService->canAccessLocation($user, $stock->stock_location_id, $companyId)) {
             throw new \Exception('Acesso negado ao local de origem.');
         }
 
-        // Verificar acesso ao local de destino
-        if (!$this->accessService->canAccessLocation($user, $toLocationId, $companyId)) {
-            throw new \Exception('Acesso negado ao local de destino.');
+        // Verificar se o local de destino existe e está ativo (não precisa de acesso específico)
+        $toLocation = StockLocation::where('id', $toLocationId)
+            ->where('company_id', $companyId)
+            ->where('active', true)
+            ->first();
+            
+        if (!$toLocation) {
+            throw new \Exception('Local de destino inválido ou inativo.');
         }
 
         // Verificar se é o mesmo local
