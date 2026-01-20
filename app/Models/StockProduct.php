@@ -65,7 +65,7 @@ class StockProduct extends Model
 
     public function stocks(): HasMany
     {
-        return $this->hasMany(Stock::class);
+        return $this->hasMany(Stock::class, 'stock_product_id');
     }
 
     public function movements(): HasMany
