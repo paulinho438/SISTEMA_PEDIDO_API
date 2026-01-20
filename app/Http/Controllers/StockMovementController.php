@@ -19,16 +19,32 @@ class StockMovementController extends Controller
 
     public function index(Request $request)
     {
-        $movements = $this->service->list($request, auth()->user());
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar movimentações de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $movements = $this->service->list($request, $user);
         return StockMovementResource::collection($movements);
     }
 
     public function ajuste(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar movimentações de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
-            $movement = $this->service->ajuste($request, auth()->user());
+            $movement = $this->service->ajuste($request, $user);
             
             DB::commit();
             
@@ -45,10 +61,18 @@ class StockMovementController extends Controller
 
     public function entrada(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar movimentações de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
-            $movement = $this->service->entrada($request, auth()->user());
+            $movement = $this->service->entrada($request, $user);
             
             DB::commit();
             
@@ -65,10 +89,18 @@ class StockMovementController extends Controller
 
     public function transferir(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar movimentações de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
-            $result = $this->service->transferir($request, auth()->user());
+            $result = $this->service->transferir($request, $user);
             
             DB::commit();
             

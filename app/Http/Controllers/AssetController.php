@@ -22,6 +22,14 @@ class AssetController extends Controller
 
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $assets = $this->service->list($request);
         return AssetResource::collection($assets);
     }
@@ -34,17 +42,33 @@ class AssetController extends Controller
 
     public function show(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $asset = $this->service->find($id);
         return new AssetResource($asset);
     }
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
             $companyId = $request->header('company-id');
-            $asset = $this->service->create($request->all(), $companyId, auth()->id());
+            $asset = $this->service->create($request->all(), $companyId, $user->id);
             
             DB::commit();
             
@@ -61,11 +85,19 @@ class AssetController extends Controller
 
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
             $asset = $this->service->find($id);
-            $asset = $this->service->update($asset, $request->all(), auth()->id());
+            $asset = $this->service->update($asset, $request->all(), $user->id);
             
             DB::commit();
             
@@ -82,6 +114,14 @@ class AssetController extends Controller
 
     public function baixar(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos_delete')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para baixar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -90,7 +130,7 @@ class AssetController extends Controller
                 $asset,
                 $request->input('reason', 'Baixa de ativo'),
                 $request->input('observation'),
-                auth()->id()
+                $user->id
             );
             
             DB::commit();
