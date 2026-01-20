@@ -22,9 +22,17 @@ class StockProductController extends Controller
 
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $this->custom_log->create([
-            'user_id' => auth()->user()->id,
-            'content' => 'O usuário: ' . auth()->user()->nome_completo . ' acessou a tela de Produtos de Estoque',
+            'user_id' => $user->id,
+            'content' => 'O usuário: ' . $user->nome_completo . ' acessou a tela de Produtos de Estoque',
             'operation' => 'index'
         ]);
 
@@ -74,12 +82,28 @@ class StockProductController extends Controller
 
     public function show(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $product = $this->service->find($id);
         return new StockProductResource($product);
     }
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -89,8 +113,8 @@ class StockProductController extends Controller
             DB::commit();
             
             $this->custom_log->create([
-                'user_id' => auth()->user()->id,
-                'content' => 'O usuário: ' . auth()->user()->nome_completo . ' criou o produto de estoque: ' . $product->id,
+                'user_id' => $user->id,
+                'content' => 'O usuário: ' . $user->nome_completo . ' criou o produto de estoque: ' . $product->id,
                 'operation' => 'create'
             ]);
 
@@ -107,6 +131,14 @@ class StockProductController extends Controller
 
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -116,8 +148,8 @@ class StockProductController extends Controller
             DB::commit();
             
             $this->custom_log->create([
-                'user_id' => auth()->user()->id,
-                'content' => 'O usuário: ' . auth()->user()->nome_completo . ' atualizou o produto de estoque: ' . $id,
+                'user_id' => $user->id,
+                'content' => 'O usuário: ' . $user->nome_completo . ' atualizou o produto de estoque: ' . $id,
                 'operation' => 'update'
             ]);
 
@@ -134,6 +166,14 @@ class StockProductController extends Controller
 
     public function toggleActive(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_delete')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para alterar o status de produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -155,6 +195,14 @@ class StockProductController extends Controller
 
     public function cadastrarComProtheus(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_produtos_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar produtos de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -184,8 +232,8 @@ class StockProductController extends Controller
             DB::commit();
             
             $this->custom_log->create([
-                'user_id' => auth()->user()->id,
-                'content' => 'O usuário: ' . auth()->user()->nome_completo . ' criou o produto de estoque ' . $product->code . ' e cadastrou no Protheus',
+                'user_id' => $user->id,
+                'content' => 'O usuário: ' . $user->nome_completo . ' criou o produto de estoque ' . $product->code . ' e cadastrou no Protheus',
                 'operation' => 'create'
             ]);
 
