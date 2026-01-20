@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\CustomLog;
 use App\Models\Emprestimo;
+use App\Models\StockMovement;
 use App\Services\PurchaseQuote\PurchaseQuoteDashboardService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -146,15 +147,19 @@ class DashboardController extends Controller
         });
 
         // Buscar últimas 10 movimentações
-        $recentMovements = \App\Models\StockMovement::where('stock_movements.company_id', $companyId)
+        $recentMovements = StockMovement::where('stock_movements.company_id', $companyId)
             ->with(['product', 'location', 'user'])
             ->orderBy('stock_movements.created_at', 'desc')
             ->limit(10)
             ->get()
             ->map(function($movement) {
+                $movementDate = $movement->movement_date 
+                    ? \Carbon\Carbon::parse($movement->movement_date)->format('Y-m-d')
+                    : ($movement->created_at ? \Carbon\Carbon::parse($movement->created_at)->format('Y-m-d') : null);
+                
                 return [
                     'id' => $movement->id,
-                    'movement_date' => $movement->movement_date ? $movement->movement_date->format('Y-m-d') : ($movement->created_at ? \Carbon\Carbon::parse($movement->created_at)->format('Y-m-d') : null),
+                    'movement_date' => $movementDate,
                     'product_code' => $movement->product->code ?? null,
                     'product_description' => $movement->product->description ?? null,
                     'location_name' => $movement->location->name ?? null,
