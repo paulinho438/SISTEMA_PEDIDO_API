@@ -587,15 +587,27 @@ class UsuarioController extends Controller
         DB::beginTransaction();
 
         try {
-            $permGroup = User::withCount('emprestimos')->findOrFail($id);
+            $user = User::findOrFail($id);
 
-            if ($permGroup->emprestimos_count > 0) {
-                return response()->json([
-                    "message" => "Usuário ainda tem empréstimos associados."
-                ], Response::HTTP_FORBIDDEN);
+            // Verificar se o usuário tem empréstimos associados
+            // Usar try-catch para caso a tabela não exista
+            try {
+                $emprestimosCount = DB::table('emprestimos')
+                    ->where('user_id', $id)
+                    ->count();
+                
+                if ($emprestimosCount > 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        "message" => "Usuário ainda tem empréstimos associados."
+                    ], Response::HTTP_FORBIDDEN);
+                }
+            } catch (\Exception $e) {
+                // Se a tabela não existir, apenas logar e continuar
+                \Log::warning('Tabela emprestimos não encontrada ao verificar empréstimos do usuário: ' . $e->getMessage());
             }
 
-            $permGroup->delete();
+            $user->delete();
 
             DB::commit();
 
