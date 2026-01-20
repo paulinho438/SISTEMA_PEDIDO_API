@@ -93,6 +93,8 @@ class StockProductController extends Controller
         }
 
         $product = $this->service->find($id);
+        // Carregar estoques com relacionamento de local
+        $product->load(['stocks.location']);
         return new StockProductResource($product);
     }
 

@@ -21,11 +21,28 @@ class StockProductResource extends JsonResource
             'description' => $this->description,
             'unit' => $this->unit,
             'active' => $this->active,
+            'min_stock' => $this->min_stock,
+            'max_stock' => $this->max_stock,
+            'image_path' => $this->image_path,
             'company_id' => $this->company_id,
             'created_at' => $this->created_at ? $this->created_at->format('d/m/Y H:i:s') : null,
             'updated_at' => $this->updated_at ? $this->updated_at->format('d/m/Y H:i:s') : null,
             'locations' => $this->whenLoaded('locations', function() {
                 return $this->locations;
+            }),
+            'stocks' => $this->whenLoaded('stocks', function() {
+                return $this->stocks->map(function($stock) {
+                    return [
+                        'id' => $stock->id,
+                        'location_id' => $stock->stock_location_id,
+                        'location_name' => $stock->location->name ?? null,
+                        'location_code' => $stock->location->code ?? null,
+                        'quantity_available' => $stock->quantity_available,
+                        'quantity_reserved' => $stock->quantity_reserved,
+                        'quantity_total' => $stock->quantity_total,
+                        'last_movement_at' => $stock->last_movement_at ? $stock->last_movement_at->format('d/m/Y H:i:s') : null,
+                    ];
+                });
             }),
         ];
     }
