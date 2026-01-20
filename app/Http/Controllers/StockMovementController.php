@@ -238,10 +238,18 @@ class StockMovementController extends Controller
     {
         $user = auth()->user();
         
-        // Permitir gerar documento se tiver permissão de visualizar ou criar movimentações
-        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_movimentacoes_create'))) {
+        if (!$user) {
             return response()->json([
-                'message' => 'Você não tem permissão para gerar documentos de transferência.',
+                'message' => 'Não autorizado',
+                'error' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+        
+        // Permitir gerar documento se tiver permissão de visualizar ou criar movimentações
+        if (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'message' => 'Não autorizado',
+                'error' => 'Você não tem permissão para gerar documentos de transferência.',
             ], Response::HTTP_FORBIDDEN);
         }
 

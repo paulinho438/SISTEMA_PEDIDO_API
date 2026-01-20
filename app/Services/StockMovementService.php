@@ -262,6 +262,7 @@ class StockMovementService
         }
 
         // Verificar se o local de destino existe e está ativo (não precisa de acesso específico)
+        // NOTA: Removida a validação de acesso ao destino - usuário pode transferir para qualquer local ativo
         $toLocation = StockLocation::where('id', $toLocationId)
             ->where('company_id', $companyId)
             ->where('active', true)
