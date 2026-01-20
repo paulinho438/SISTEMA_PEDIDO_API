@@ -97,10 +97,10 @@ class StockMovementService
             $quantityBefore = $stock->quantity_available;
             $quantityAfter = $stock->quantity_available + $quantity;
 
-            $stock->update([
+            $this->updateModelWithStringTimestamps($stock, [
                 'quantity_available' => $quantityAfter,
                 'quantity_total' => $stock->quantity_total + $quantity,
-                'last_movement_at' => Carbon::now(),
+                'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
             $movement = StockMovement::create([
@@ -179,10 +179,10 @@ class StockMovementService
             $quantityBefore = $stock->quantity_available;
             $quantityAfter = $stock->quantity_available + $quantity;
 
-            $stock->update([
+            $this->updateModelWithStringTimestamps($stock, [
                 'quantity_available' => $quantityAfter,
                 'quantity_total' => $stock->quantity_total + $quantity,
-                'last_movement_at' => Carbon::now(),
+                'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
             $movement = StockMovement::create([
@@ -259,10 +259,10 @@ class StockMovementService
             $quantityBeforeFrom = $stock->quantity_available;
             $quantityAfterFrom = $stock->quantity_available - $quantity;
 
-            $stock->update([
+            $this->updateModelWithStringTimestamps($stock, [
                 'quantity_available' => $quantityAfterFrom,
                 'quantity_total' => $stock->quantity_total - $quantity,
-                'last_movement_at' => Carbon::now(),
+                'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
             // Criar movimentação de saída
@@ -299,10 +299,10 @@ class StockMovementService
             $quantityBeforeTo = $stockTo->quantity_available;
             $quantityAfterTo = $stockTo->quantity_available + $quantity;
 
-            $stockTo->update([
+            $this->updateModelWithStringTimestamps($stockTo, [
                 'quantity_available' => $quantityAfterTo,
                 'quantity_total' => $stockTo->quantity_total + $quantity,
-                'last_movement_at' => Carbon::now(),
+                'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
             ]);
 
             // Criar movimentação de entrada
@@ -333,6 +333,60 @@ class StockMovementService
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
+     */
+    private function updateModelWithStringTimestamps($model, array $data)
+    {
+        // Remover campos que não devem ser atualizados
+        unset($data['id'], $data['created_at']);
+        
+        // Adicionar updated_at como string
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+        
+        // Se não há dados para atualizar além do updated_at, apenas atualizar o timestamp
+        if (empty($data) || (count($data) === 1 && isset($data['updated_at']))) {
+            $table = $model->getTable();
+            $id = $model->getKey();
+            $idColumn = $model->getKeyName();
+            
+            $sql = "UPDATE [{$table}] SET [updated_at] = CAST(? AS DATETIME2) WHERE [{$idColumn}] = ?";
+            DB::statement($sql, [$data['updated_at'], $id]);
+            $model->refresh();
+            return $model;
+        }
+        
+        // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            // Campos de data precisam de CAST
+            if ($column === 'updated_at' || $column === 'last_movement_at') {
+                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = "[{$column}] = ?";
+            }
+            $values[] = $data[$column];
+        }
+        
+        $values[] = $id; // Para o WHERE
+        
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $placeholders) . " WHERE [{$idColumn}] = ?";
+        
+        DB::statement($sql, $values);
+        
+        // Recarregar o modelo para ter os valores atualizados
+        $model->refresh();
+        
+        return $model;
     }
 }
 
