@@ -189,10 +189,10 @@ class StockTransferController extends Controller
                 return [
                     'codigo' => $item->product->code ?? '-',
                     'referencia' => $item->product->reference ?? '-',
-                    'mercadoria' => $item->product->description ?? '-',
-                    'quantidade' => number_format($item->quantity, 2, ',', '.'),
-                    'preco_unitario' => '0,00', // Não temos preço nas transferências
-                    'preco_total' => '0,00',
+                    'descricao' => $item->product->description ?? '-',
+                    'quantidade' => (float) $item->quantity, // Passar como float para a view formatar
+                    'preco_unitario' => 0.00,
+                    'preco_total' => 0.00,
                 ];
             });
 

@@ -238,9 +238,9 @@
                     <td></td>
                     <td></td>
                     <td></td>
-                    <td class="numero">{{ number_format($item['quantidade'], 4, ',', '.') }}</td>
-                    <td class="numero">0,00</td>
-                    <td class="numero">0,00</td>
+                    <td class="numero">{{ number_format((float)($item['quantidade'] ?? 0), 2, ',', '.') }}</td>
+                    <td class="numero">{{ number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') }}</td>
+                    <td class="numero">{{ number_format((float)($item['preco_total'] ?? 0), 2, ',', '.') }}</td>
                 </tr>
                 @php
                     $itemNumero++;
