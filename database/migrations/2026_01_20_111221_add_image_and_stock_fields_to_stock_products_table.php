@@ -15,8 +15,8 @@ return new class extends Migration
     {
         Schema::table('stock_products', function (Blueprint $table) {
             $table->string('image_path', 500)->nullable()->after('active');
-            $table->decimal('min_stock', 10, 4)->nullable()->after('image_path');
-            $table->decimal('max_stock', 10, 4)->nullable()->after('min_stock');
+            $table->integer('min_stock')->nullable()->after('image_path');
+            $table->integer('max_stock')->nullable()->after('min_stock');
         });
     }
 

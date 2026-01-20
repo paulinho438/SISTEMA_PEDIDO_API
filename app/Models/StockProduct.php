@@ -25,8 +25,8 @@ class StockProduct extends Model
 
     protected $casts = [
         'active' => 'boolean',
-        'min_stock' => 'decimal:4',
-        'max_stock' => 'decimal:4',
+        'min_stock' => 'integer',
+        'max_stock' => 'integer',
     ];
 
     /**
