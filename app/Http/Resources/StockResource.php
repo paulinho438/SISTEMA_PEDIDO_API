@@ -25,7 +25,7 @@ class StockResource extends JsonResource
             'last_movement_at' => $this->last_movement_at ? $this->last_movement_at->format('d/m/Y H:i:s') : null,
             'company_id' => $this->company_id,
             'reservation_date' => isset($this->reservation_date) && $this->reservation_date
-                ? (Carbon::parse($this->reservation_date)->format('d/m/Y H:i:s'))
+                ? (Carbon::parse($this->reservation_date)->format('d/m/Y'))
                 : null,
             'reservation_user' => isset($this->reservation_user) && $this->reservation_user
                 ? [
