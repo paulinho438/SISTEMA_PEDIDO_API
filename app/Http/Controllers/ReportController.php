@@ -418,8 +418,8 @@ class ReportController extends Controller
         $start = $request->get('start_date');
         $end = $request->get('end_date');
 
-        $startDate = $start ? Carbon::parse($start)->startOfDay()->format('Y-m-d H:i:s') : null;
-        $endDate = $end ? Carbon::parse($end)->endOfDay()->format('Y-m-d H:i:s') : null;
+        $startDate = $start ? Carbon::parse($start)->startOfDay() : null;
+        $endDate = $end ? Carbon::parse($end)->endOfDay() : null;
 
         $historyRecords = PurchaseQuoteStatusHistory::query()
             ->select([
@@ -429,8 +429,8 @@ class ReportController extends Controller
             ])
             ->leftJoin('purchase_quotes', 'purchase_quotes.id', '=', 'purchase_quote_status_histories.purchase_quote_id')
             ->whereIn('purchase_quote_status_histories.status_slug', $statusFilter)
-            ->when($startDate, fn ($query) => $query->whereRaw('CAST([purchase_quote_status_histories].[acted_at] AS DATETIME2) >= CAST(? AS DATETIME2)', [$startDate]))
-            ->when($endDate, fn ($query) => $query->whereRaw('CAST([purchase_quote_status_histories].[acted_at] AS DATETIME2) <= CAST(? AS DATETIME2)', [$endDate]))
+            ->when($startDate, fn ($query) => $query->whereRaw('CAST([purchase_quote_status_histories].[acted_at] AS DATETIME2) >= CAST(? AS DATETIME2)', [$startDate->format('Y-m-d H:i:s')]))
+            ->when($endDate, fn ($query) => $query->whereRaw('CAST([purchase_quote_status_histories].[acted_at] AS DATETIME2) <= CAST(? AS DATETIME2)', [$endDate->format('Y-m-d H:i:s')]))
             ->when($companyId, function ($query) use ($companyId) {
                 $query->where(function ($builder) use ($companyId) {
                     $builder
@@ -448,8 +448,8 @@ class ReportController extends Controller
                     'statuses' => $this->statusesToMeta($this->loadStatuses($statusFilter)),
                     'serie_total' => [],
                     'periodo' => [
-                        'inicio' => $startDate?->format('Y-m-d'),
-                        'fim' => $endDate?->format('Y-m-d'),
+                        'inicio' => $startDate ? $startDate->format('Y-m-d') : null,
+                        'fim' => $endDate ? $endDate->format('Y-m-d') : null,
                     ],
                 ],
             ]);
