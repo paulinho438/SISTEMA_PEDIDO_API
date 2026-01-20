@@ -93,24 +93,13 @@ class DashboardController extends Controller
 
         $companyId = $request->header('company-id');
         
-        // Buscar produtos com estoque total calculado
-        // IMPORTANTE: O estoque mínimo/máximo é verificado pela SOMA de todos os estoques
-        // do produto em TODOS os locais. Exemplo: se min_stock = 5, a soma de todos os
-        // locais deve ser >= 5 para não estar abaixo do mínimo.
+        // Buscar produtos ativos
+        // IMPORTANTE: O estoque mínimo é verificado por LOCAL, não pela soma.
+        // Se min_stock = 5, CADA local precisa ter pelo menos 5 unidades.
+        // Se qualquer local tiver menos que o mínimo, o produto aparece como estoque baixo.
         $products = \App\Models\StockProduct::where('stock_products.company_id', $companyId)
             ->where('stock_products.active', true)
-            ->leftJoin('stocks', 'stock_products.id', '=', 'stocks.stock_product_id')
-            ->select(
-                'stock_products.id',
-                'stock_products.code',
-                'stock_products.description',
-                'stock_products.unit',
-                'stock_products.min_stock',
-                'stock_products.max_stock',
-                // Soma o estoque disponível de TODOS os locais para cada produto
-                \DB::raw('COALESCE(SUM(stocks.quantity_available), 0) as total_available')
-            )
-            ->groupBy('stock_products.id', 'stock_products.code', 'stock_products.description', 'stock_products.unit', 'stock_products.min_stock', 'stock_products.max_stock')
+            ->with(['stocks.location'])
             ->get();
 
         $totalProducts = $products->count();
@@ -119,14 +108,68 @@ class DashboardController extends Controller
         $totalValue = 0;
 
         foreach ($products as $product) {
-            // total_available já é a soma de todos os estoques em todos os locais
-            $totalAvailable = (float) $product->total_available;
-            
-            // Verificar se a SOMA de todos os estoques está abaixo do mínimo
-            // (ou se não tem mínimo definido mas está zerado)
-            if (($product->min_stock !== null && $totalAvailable <= $product->min_stock) || 
-                ($product->min_stock === null && $totalAvailable == 0)) {
-                $percentage = $product->min_stock > 0 ? ($totalAvailable / $product->min_stock) * 100 : 0;
+            // Se não tem mínimo definido, verificar apenas se está zerado em todos os locais
+            if ($product->min_stock === null) {
+                $hasAnyStock = $product->stocks->sum('quantity_available') > 0;
+                if (!$hasAnyStock) {
+                    $outOfStockProducts[] = [
+                        'id' => $product->id,
+                        'code' => $product->code,
+                        'description' => $product->description,
+                        'min_stock' => $product->min_stock,
+                        'max_stock' => $product->max_stock,
+                        'current_stock' => 0,
+                        'percentage' => 0,
+                        'unit' => $product->unit,
+                        'low_locations' => [],
+                    ];
+                }
+                continue;
+            }
+
+            // Verificar se algum local tem estoque abaixo do mínimo
+            $lowLocations = [];
+            $hasLowStock = false;
+            $hasOutOfStock = false;
+            $minCurrentStock = null; // Menor estoque encontrado entre os locais
+
+            // Se não tem nenhum estoque cadastrado, considerar como sem estoque
+            if ($product->stocks->isEmpty()) {
+                $hasOutOfStock = true;
+                $hasLowStock = true;
+                $minCurrentStock = 0;
+            } else {
+                // Verificar cada local individualmente
+                foreach ($product->stocks as $stock) {
+                    $quantityAvailable = (float) $stock->quantity_available;
+                    
+                    // Guardar o menor estoque encontrado
+                    if ($minCurrentStock === null || $quantityAvailable < $minCurrentStock) {
+                        $minCurrentStock = $quantityAvailable;
+                    }
+
+                    // Se este local está abaixo do mínimo, adicionar à lista
+                    if ($quantityAvailable < $product->min_stock) {
+                        $hasLowStock = true;
+                        $lowLocations[] = [
+                            'location_id' => $stock->stock_location_id,
+                            'location_name' => $stock->location->name ?? 'Local não encontrado',
+                            'quantity' => $quantityAvailable,
+                        ];
+
+                        // Se está zerado, marca como sem estoque
+                        if ($quantityAvailable == 0) {
+                            $hasOutOfStock = true;
+                        }
+                    }
+                }
+            }
+
+            // Se algum local está abaixo do mínimo, adicionar à lista
+            if ($hasLowStock) {
+                $percentage = $product->min_stock > 0 && $minCurrentStock !== null 
+                    ? ($minCurrentStock / $product->min_stock) * 100 
+                    : 0;
                 
                 $productData = [
                     'id' => $product->id,
@@ -134,12 +177,13 @@ class DashboardController extends Controller
                     'description' => $product->description,
                     'min_stock' => $product->min_stock,
                     'max_stock' => $product->max_stock,
-                    'current_stock' => $totalAvailable,
+                    'current_stock' => $minCurrentStock ?? 0, // Menor estoque entre os locais
                     'percentage' => round($percentage, 2),
                     'unit' => $product->unit,
+                    'low_locations' => $lowLocations, // Lista de locais abaixo do mínimo
                 ];
 
-                if ($totalAvailable == 0) {
+                if ($hasOutOfStock || ($minCurrentStock !== null && $minCurrentStock == 0)) {
                     $outOfStockProducts[] = $productData;
                 } else {
                     $lowStockProducts[] = $productData;
