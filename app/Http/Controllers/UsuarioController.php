@@ -91,7 +91,7 @@ class UsuarioController extends Controller
         
         foreach ($columns as $column) {
             // Campos de data precisam de CAST
-            if ($column === 'updated_at') {
+            if ($column === 'updated_at' || $column === 'deleted_at') {
                 $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
             } else {
                 $placeholders[] = "[{$column}] = ?";
@@ -607,7 +607,11 @@ class UsuarioController extends Controller
                 \Log::warning('Tabela emprestimos não encontrada ao verificar empréstimos do usuário: ' . $e->getMessage());
             }
 
-            $user->delete();
+            // Soft delete usando update manual para garantir compatibilidade com SQL Server
+            $now = now()->format('Y-m-d H:i:s');
+            $this->updateModelWithStringTimestamps($user, [
+                'deleted_at' => $now,
+            ]);
 
             DB::commit();
 
