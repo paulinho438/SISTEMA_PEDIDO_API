@@ -22,24 +22,48 @@ class StockLocationController extends Controller
 
     public function index(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_locais')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $this->custom_log->create([
-            'user_id' => auth()->user()->id,
-            'content' => 'O usuário: ' . auth()->user()->nome_completo . ' acessou a tela de Locais de Estoque',
+            'user_id' => $user->id,
+            'content' => 'O usuário: ' . $user->nome_completo . ' acessou a tela de Locais de Estoque',
             'operation' => 'index'
         ]);
 
-        $locations = $this->service->list($request, auth()->user());
+        $locations = $this->service->list($request, $user);
         return StockLocationResource::collection($locations);
     }
 
     public function show(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_locais')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         $location = $this->service->find($id);
         return new StockLocationResource($location);
     }
 
     public function store(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_locais_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para criar locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -61,6 +85,14 @@ class StockLocationController extends Controller
 
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_locais_edit')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para editar locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
@@ -82,6 +114,14 @@ class StockLocationController extends Controller
 
     public function toggleActive(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_locais_delete')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para alterar o status de locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
         DB::beginTransaction();
         
         try {
