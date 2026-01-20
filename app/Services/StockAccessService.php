@@ -33,13 +33,16 @@ class StockAccessService
             return true;
         }
 
-        // Se usuário é almoxarife, verifica associação
-        if ($user->hasPermission('almoxarife')) {
-            return DB::table('stock_almoxarife_locations')
-                ->where('user_id', $user->id)
-                ->where('stock_location_id', $locationId)
-                ->where('company_id', $companyId)
-                ->exists();
+        // Se usuário é almoxarife ou está associado a locais, verifica associação
+        // Verifica se está associado na tabela stock_almoxarife_locations
+        $isAssociated = DB::table('stock_almoxarife_locations')
+            ->where('user_id', $user->id)
+            ->where('stock_location_id', $locationId)
+            ->where('company_id', $companyId)
+            ->exists();
+
+        if ($user->hasPermission('almoxarife') || $isAssociated) {
+            return $isAssociated;
         }
 
         return false;
@@ -75,13 +78,16 @@ class StockAccessService
                 ->toArray();
         }
 
-        // Se usuário é almoxarife, retorna apenas locais associados
-        if ($user->hasPermission('almoxarife')) {
-            return DB::table('stock_almoxarife_locations')
-                ->where('user_id', $user->id)
-                ->where('company_id', $companyId)
-                ->pluck('stock_location_id')
-                ->toArray();
+        // Se usuário é almoxarife ou está associado a locais, retorna locais associados
+        $associatedLocations = DB::table('stock_almoxarife_locations')
+            ->where('user_id', $user->id)
+            ->where('company_id', $companyId)
+            ->pluck('stock_location_id')
+            ->toArray();
+
+        // Se tem permissão almoxarife ou está associado a locais, retorna os locais associados
+        if ($user->hasPermission('almoxarife') || !empty($associatedLocations)) {
+            return $associatedLocations;
         }
 
         return [];
