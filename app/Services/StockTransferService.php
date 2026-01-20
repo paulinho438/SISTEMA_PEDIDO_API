@@ -115,51 +115,120 @@ class StockTransferService
     }
 
     /**
-     * Marcar transferência como recebida
+     * Marcar transferência como recebida (total ou parcial)
      */
-    public function receber(int $transferId, User $user): StockTransfer
+    public function receber(int $transferId, User $user, array $dados = []): StockTransfer
     {
         $transfer = StockTransfer::with(['items.stock', 'items.product'])->findOrFail($transferId);
 
-        if ($transfer->status !== 'pendente') {
-            throw new \Exception('Apenas transferências pendentes podem ser recebidas.');
+        if ($transfer->status === 'recebido') {
+            throw new \Exception('Esta transferência já foi totalmente recebida.');
         }
+
+        $tipo = $dados['tipo'] ?? 'total';
+        $itensRecebidos = $dados['itens'] ?? [];
 
         DB::beginTransaction();
 
         try {
-            // Atualizar status
-            $this->updateTransferWithStringTimestamps($transfer, [
-                'status' => 'recebido',
-            ]);
+            $statusFinal = 'recebido';
+            $quantidadeTotalRecebida = 0;
+            $quantidadeTotalOriginal = $transfer->items->sum('quantity');
 
-            // Para cada item, adicionar ao estoque de destino
-            foreach ($transfer->items as $item) {
-                // Buscar ou criar estoque no local de destino
-                $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
-                    ->where('stock_location_id', $transfer->destination_location_id)
-                    ->where('company_id', $transfer->company_id)
-                    ->first();
+            if ($tipo === 'parcial') {
+                if (empty($itensRecebidos)) {
+                    throw new \Exception('É necessário informar os itens recebidos para recebimento parcial.');
+                }
 
-                if ($destinationStock) {
-                    // Atualizar estoque existente
-                    $this->updateStockWithStringTimestamps($destinationStock, [
-                        'quantity_available' => $destinationStock->quantity_available + $item->quantity,
-                        'quantity_total' => $destinationStock->quantity_total + $item->quantity,
-                        'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
-                    ]);
+                // Validar itens recebidos
+                foreach ($itensRecebidos as $itemRecebido) {
+                    $item = $transfer->items->firstWhere('id', $itemRecebido['item_id']);
+                    if (!$item) {
+                        throw new \Exception("Item ID {$itemRecebido['item_id']} não encontrado na transferência.");
+                    }
+
+                    $quantidadeRecebida = (float) ($itemRecebido['quantidade_recebida'] ?? 0);
+                    if ($quantidadeRecebida <= 0) {
+                        throw new \Exception("Quantidade recebida deve ser maior que zero para o item ID {$item->id}.");
+                    }
+                    if ($quantidadeRecebida > $item->quantity) {
+                        throw new \Exception("Quantidade recebida ({$quantidadeRecebida}) não pode ser maior que a quantidade original ({$item->quantity}) para o item ID {$item->id}.");
+                    }
+
+                    $quantidadeTotalRecebida += $quantidadeRecebida;
+                }
+
+                // Se recebeu tudo, marcar como recebido total
+                if ($quantidadeTotalRecebida >= $quantidadeTotalOriginal) {
+                    $statusFinal = 'recebido';
                 } else {
-                    // Criar novo estoque
-                    $this->insertStockWithStringTimestamps([
-                        'stock_product_id' => $item->stock_product_id,
-                        'stock_location_id' => $transfer->destination_location_id,
-                        'company_id' => $transfer->company_id,
-                        'quantity_available' => $item->quantity,
-                        'quantity_reserved' => 0,
-                        'quantity_total' => $item->quantity,
-                    ]);
+                    $statusFinal = 'recebido_parcial';
+                }
+
+                // Processar apenas os itens recebidos
+                foreach ($itensRecebidos as $itemRecebido) {
+                    $item = $transfer->items->firstWhere('id', $itemRecebido['item_id']);
+                    $quantidadeRecebida = (float) $itemRecebido['quantidade_recebida'];
+
+                    // Buscar ou criar estoque no local de destino
+                    $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
+                        ->where('stock_location_id', $transfer->destination_location_id)
+                        ->where('company_id', $transfer->company_id)
+                        ->first();
+
+                    if ($destinationStock) {
+                        // Atualizar estoque existente
+                        $this->updateStockWithStringTimestamps($destinationStock, [
+                            'quantity_available' => $destinationStock->quantity_available + $quantidadeRecebida,
+                            'quantity_total' => $destinationStock->quantity_total + $quantidadeRecebida,
+                            'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                        ]);
+                    } else {
+                        // Criar novo estoque
+                        $this->insertStockWithStringTimestamps([
+                            'stock_product_id' => $item->stock_product_id,
+                            'stock_location_id' => $transfer->destination_location_id,
+                            'company_id' => $transfer->company_id,
+                            'quantity_available' => $quantidadeRecebida,
+                            'quantity_reserved' => 0,
+                            'quantity_total' => $quantidadeRecebida,
+                        ]);
+                    }
+                }
+            } else {
+                // Recebimento total - processar todos os itens
+                foreach ($transfer->items as $item) {
+                    // Buscar ou criar estoque no local de destino
+                    $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
+                        ->where('stock_location_id', $transfer->destination_location_id)
+                        ->where('company_id', $transfer->company_id)
+                        ->first();
+
+                    if ($destinationStock) {
+                        // Atualizar estoque existente
+                        $this->updateStockWithStringTimestamps($destinationStock, [
+                            'quantity_available' => $destinationStock->quantity_available + $item->quantity,
+                            'quantity_total' => $destinationStock->quantity_total + $item->quantity,
+                            'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                        ]);
+                    } else {
+                        // Criar novo estoque
+                        $this->insertStockWithStringTimestamps([
+                            'stock_product_id' => $item->stock_product_id,
+                            'stock_location_id' => $transfer->destination_location_id,
+                            'company_id' => $transfer->company_id,
+                            'quantity_available' => $item->quantity,
+                            'quantity_reserved' => 0,
+                            'quantity_total' => $item->quantity,
+                        ]);
+                    }
                 }
             }
+
+            // Atualizar status
+            $this->updateTransferWithStringTimestamps($transfer, [
+                'status' => $statusFinal,
+            ]);
 
             DB::commit();
 

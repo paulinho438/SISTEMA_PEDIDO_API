@@ -6,6 +6,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class StockTransferResource extends JsonResource
 {
+    private function getStatusLabel()
+    {
+        return match($this->status) {
+            'pendente' => 'Pendente',
+            'recebido' => 'Recebido',
+            'recebido_parcial' => 'Recebido Parcial',
+            default => $this->status,
+        };
+    }
+
     public function toArray($request)
     {
         return [
@@ -24,7 +34,7 @@ class StockTransferResource extends JsonResource
             'driver_name' => $this->driver_name,
             'license_plate' => $this->license_plate,
             'status' => $this->status,
-            'status_label' => $this->status === 'pendente' ? 'Pendente' : 'Recebido',
+            'status_label' => $this->getStatusLabel(),
             'observation' => $this->observation,
             'user' => [
                 'id' => $this->user->id ?? null,
