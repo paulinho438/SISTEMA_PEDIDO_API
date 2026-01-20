@@ -142,6 +142,29 @@ class StockLocationService
         return $query->orderBy('name')->paginate($perPage);
     }
 
+    /**
+     * Listar todos os locais ativos (sem filtro de acesso) - usado para seleção de destino em transferências
+     */
+    public function listAllActive(Request $request)
+    {
+        $perPage = (int) $request->get('per_page', 100);
+        $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 100;
+        
+        $companyId = $request->header('company-id');
+        $query = StockLocation::where('company_id', $companyId)
+            ->where('active', true);
+
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        return $query->orderBy('name')->paginate($perPage);
+    }
+
     public function find($id)
     {
         return StockLocation::findOrFail($id);

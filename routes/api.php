@@ -345,6 +345,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/locais/{location_id}/almoxarifes', [StockAlmoxarifeController::class, 'listByLocation']);
         Route::post('/locais/{location_id}/almoxarifes', [StockAlmoxarifeController::class, 'associate']);
         Route::delete('/locais/{location_id}/almoxarifes/{user_id}', [StockAlmoxarifeController::class, 'disassociate']);
+        Route::get('/locais/all-active', [StockLocationController::class, 'listAllActive']); // Todos os locais ativos (sem filtro de acesso)
         Route::get('/locais', [StockLocationController::class, 'index']);
         Route::get('/locais/{id}', [StockLocationController::class, 'show']);
         Route::post('/locais', [StockLocationController::class, 'store']);

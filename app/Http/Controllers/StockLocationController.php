@@ -140,5 +140,22 @@ class StockLocationController extends Controller
             ], Response::HTTP_BAD_REQUEST);
         }
     }
+
+    /**
+     * Listar todos os locais ativos (sem filtro de acesso) - usado para seleção de destino
+     */
+    public function listAllActive(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar locais de estoque.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $locations = $this->service->listAllActive($request);
+        return StockLocationResource::collection($locations);
+    }
 }
 
