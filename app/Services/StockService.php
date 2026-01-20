@@ -36,8 +36,22 @@ class StockService
         // Aplicar filtro de acesso
         $this->accessService->applyLocationFilter($query, $user, $companyId, 'stock_location_id');
 
+        // Filtro de busca por produto (código, referência ou descrição)
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->whereHas('product', function ($q) use ($search) {
+                $q->where('description', 'like', "%{$search}%")
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('reference', 'like', "%{$search}%");
+            });
+        }
+
         if ($request->filled('product_id')) {
             $query->where('stock_product_id', $request->get('product_id'));
+        }
+
+        if ($request->filled('stock_product_id')) {
+            $query->where('stock_product_id', $request->get('stock_product_id'));
         }
 
         if ($request->filled('location_id')) {
@@ -45,7 +59,9 @@ class StockService
         }
 
         if ($request->filled('has_available')) {
-            if ($request->boolean('has_available')) {
+            $hasAvailable = $request->get('has_available');
+            // Aceitar boolean, string 'true'/'false', ou '1'/'0'
+            if ($hasAvailable === true || $hasAvailable === 'true' || $hasAvailable === '1' || $hasAvailable === 1) {
                 $query->where('quantity_available', '>', 0);
             }
         }
