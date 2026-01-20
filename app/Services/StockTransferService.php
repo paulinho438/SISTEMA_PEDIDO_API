@@ -30,10 +30,16 @@ class StockTransferService
             'driver_name' => 'nullable|string|max:255',
             'license_plate' => 'nullable|string|max:20',
             'observation' => 'nullable|string',
+            'observacao' => 'nullable|string', // Aceitar também em português
             'itens' => 'required|array|min:1',
             'itens.*.stock_id' => 'required|exists:stocks,id',
             'itens.*.quantidade' => 'required|numeric|min:0.0001',
         ]);
+        
+        // Mapear observacao para observation se necessário
+        if (isset($validated['observacao']) && !isset($validated['observation'])) {
+            $validated['observation'] = $validated['observacao'];
+        }
 
         DB::beginTransaction();
 
