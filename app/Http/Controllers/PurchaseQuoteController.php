@@ -3516,6 +3516,14 @@ class PurchaseQuoteController extends Controller
      */
     public function acompanhamento(Request $request)
     {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_acompanhamento_cotacoes')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar o acompanhamento de cotações.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+        
         $companyId = $request->header('company-id');
         
         $quotes = PurchaseQuote::with([
