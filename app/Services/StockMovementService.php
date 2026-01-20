@@ -165,18 +165,22 @@ class StockMovementService
             $cost = $request->input('cost');
 
             // Buscar ou criar estoque
-            $stock = Stock::firstOrCreate(
-                [
+            $stock = Stock::where('stock_product_id', $productId)
+                ->where('stock_location_id', $locationId)
+                ->where('company_id', $companyId)
+                ->first();
+            
+            if (!$stock) {
+                $stockId = $this->insertStockWithStringTimestamps([
                     'stock_product_id' => $productId,
                     'stock_location_id' => $locationId,
                     'company_id' => $companyId,
-                ],
-                [
                     'quantity_available' => 0,
                     'quantity_reserved' => 0,
                     'quantity_total' => 0,
-                ]
-            );
+                ]);
+                $stock = Stock::find($stockId);
+            }
 
             $quantityBefore = $stock->quantity_available;
             $quantityAfter = $stock->quantity_available + $quantity;
@@ -288,18 +292,22 @@ class StockMovementService
             $movementFrom = StockMovement::find($movementFromId);
 
             // Buscar ou criar estoque de destino
-            $stockTo = Stock::firstOrCreate(
-                [
+            $stockTo = Stock::where('stock_product_id', $stock->stock_product_id)
+                ->where('stock_location_id', $toLocationId)
+                ->where('company_id', $companyId)
+                ->first();
+            
+            if (!$stockTo) {
+                $stockToId = $this->insertStockWithStringTimestamps([
                     'stock_product_id' => $stock->stock_product_id,
                     'stock_location_id' => $toLocationId,
                     'company_id' => $companyId,
-                ],
-                [
                     'quantity_available' => 0,
                     'quantity_reserved' => 0,
                     'quantity_total' => 0,
-                ]
-            );
+                ]);
+                $stockTo = Stock::find($stockToId);
+            }
 
             // Atualizar estoque de destino (entrada)
             $quantityBeforeTo = $stockTo->quantity_available;
@@ -432,6 +440,43 @@ class StockMovementService
         $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
         
         $sql = "INSERT INTO [{$table}] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        
+        DB::statement($sql, $values);
+        
+        // Retornar o ID do último registro inserido
+        return DB::getPdo()->lastInsertId();
+    }
+
+    /**
+     * Helper para inserir estoque com timestamps como strings (compatível com SQL Server)
+     */
+    private function insertStockWithStringTimestamps($data)
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            $placeholders[] = "?";
+            $values[] = $data[$column];
+        }
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stocks] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
         
         DB::statement($sql, $values);
         
