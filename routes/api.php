@@ -38,6 +38,7 @@ use App\Http\Controllers\{
     StockController,
     StockMovementController,
     StockAlmoxarifeController,
+    StockTransferController,
     PurchaseInvoiceController,
     PurchaseOrderController,
     AssetController,
@@ -330,6 +331,14 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/movimentacoes/transferir', [StockMovementController::class, 'transferir']);
         Route::post('/movimentacoes/transferir-lote', [StockMovementController::class, 'transferirLote']);
         Route::post('/transferencias/gerar-documento', [StockMovementController::class, 'gerarDocumentoTransferencia']);
+        
+        // Transferências (controle)
+        Route::get('/transferencias', [StockTransferController::class, 'index']);
+        Route::get('/transferencias/{id}', [StockTransferController::class, 'show']);
+        Route::post('/transferencias', [StockTransferController::class, 'store']);
+        Route::post('/transferencias/{id}/receber', [StockTransferController::class, 'receber']);
+        Route::delete('/transferencias/{id}', [StockTransferController::class, 'destroy']);
+        Route::get('/transferencias/{id}/documento', [StockTransferController::class, 'gerarDocumento']);
         
         // Produtos
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);

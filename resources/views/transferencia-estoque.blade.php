@@ -204,11 +204,11 @@
         </div>
         <div class="info-row">
             <span class="info-label">MOTORISTA:</span>
-            <span class="info-value"></span>
+            <span class="info-value">{{ $driver_name ?? 'N/A' }}</span>
         </div>
         <div class="info-row">
             <span class="info-label">PLACA:</span>
-            <span class="info-value"></span>
+            <span class="info-value">{{ $license_plate ?? 'N/A' }}</span>
         </div>
     </div>
 
