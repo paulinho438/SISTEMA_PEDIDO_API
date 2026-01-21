@@ -225,6 +225,8 @@ class StockController extends Controller
 
     /**
      * Gerar termo de responsabilidade PDF
+     * Este método apenas gera o PDF usando os dados já processados
+     * As saídas devem ser processadas antes via darSaidaMultipla
      */
     public function gerarTermoResponsabilidade(Request $request)
     {
@@ -237,7 +239,8 @@ class StockController extends Controller
                 ], Response::HTTP_BAD_REQUEST);
             }
 
-            $result = $this->service->darSaidaMultipla($items);
+            // Buscar dados para PDF sem processar saídas novamente
+            $result = $this->service->buscarDadosTermoResponsabilidade($items);
             
             // Gerar PDF
             $options = new \Dompdf\Options();

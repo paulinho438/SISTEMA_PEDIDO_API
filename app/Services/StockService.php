@@ -344,6 +344,70 @@ class StockService
         }
     }
 
+    /**
+     * Buscar dados para gerar termo de responsabilidade (sem processar saídas)
+     * @param array $items Array de items com stock_id e quantity
+     * @return array Dados para geração do PDF
+     */
+    public function buscarDadosTermoResponsabilidade(array $items): array
+    {
+        $validator = Validator::make(['items' => $items], [
+            'items' => 'required|array|min:1',
+            'items.*.stock_id' => 'required|integer|exists:stocks,id',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        $dados = [];
+        $solicitante = null;
+        $company = null;
+        
+        foreach ($items as $itemData) {
+            $stock = Stock::with(['product', 'location', 'company'])->findOrFail($itemData['stock_id']);
+            
+            if (!$solicitante) {
+                // Buscar informações do solicitante da primeira reserva
+                $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                    ->where('movement_type', 'ajuste')
+                    ->where('quantity', '<', 0)
+                    ->whereNotNull('user_id')
+                    ->with('user')
+                    ->orderByDesc('created_at')
+                    ->first();
+                
+                if ($lastReservationMovement && $lastReservationMovement->user) {
+                    $solicitante = $lastReservationMovement->user;
+                }
+            }
+            
+            if (!$company) {
+                $company = $stock->company;
+            }
+
+            $quantity = (float) $itemData['quantity'];
+
+            $dados[] = [
+                'stock_id' => $stock->id,
+                'product' => $stock->product,
+                'location' => $stock->location,
+                'quantity' => $quantity,
+                'unit' => $stock->product->unit ?? 'UN',
+                'observation' => $itemData['observation'] ?? null,
+            ];
+        }
+
+        return [
+            'solicitante' => $solicitante,
+            'company' => $company,
+            'items' => $dados,
+            'data_saida' => Carbon::now()->format('d/m/Y'),
+            'hora_saida' => Carbon::now()->format('H:i:s'),
+        ];
+    }
+
     public function find($id)
     {
         return Stock::with(['product', 'location', 'movements'])->findOrFail($id);
