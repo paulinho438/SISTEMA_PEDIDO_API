@@ -63,9 +63,21 @@ class PurchaseInvoiceService
         $createdAt = now()->format('Y-m-d H:i:s');
         $updatedAt = now()->format('Y-m-d H:i:s');
         
-        $columns = array_keys($data);
-        $placeholders = array_fill(0, count($data), '?');
-        $values = array_values($data);
+        // Filtrar valores null e remover do array (ou tratar como NULL explícito)
+        $columns = [];
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($data as $column => $value) {
+            // Pular campos null se necessário, ou incluir como NULL explícito
+            $columns[] = $column;
+            if ($value === null) {
+                $placeholders[] = "NULL";
+            } else {
+                $placeholders[] = "?";
+                $values[] = $value;
+            }
+        }
         
         // Adicionar campos de data com CAST
         $columns[] = 'created_at';
@@ -215,18 +227,31 @@ class PurchaseInvoiceService
         ?PurchaseOrder $order = null
     ): void {
         // 1. Verificar/criar produto no estoque
-        $product = StockProduct::firstOrCreate(
-            [
-                'code' => $itemData['product_code'] ?? $itemData['product_description'],
+        $productCode = $itemData['product_code'] ?? $itemData['product_description'];
+        
+        // Verificar se o produto já existe (usar where para evitar problemas com firstOrCreate)
+        $product = StockProduct::where('code', $productCode)
+            ->where('company_id', $companyId)
+            ->first();
+        
+        // Se não existe, criar usando helper para timestamps como strings
+        if (!$product) {
+            $productData = [
+                'code' => $productCode,
                 'company_id' => $companyId,
-            ],
-            [
                 'description' => $itemData['product_description'],
-                'reference' => null,
                 'unit' => $itemData['unit'] ?? 'UN',
-                'active' => true,
-            ]
-        );
+                'active' => 1, // Usar 1 em vez de true para SQL Server
+            ];
+            
+            // Adicionar reference apenas se não for null/vazio
+            if (!empty($itemData['product_code']) && $itemData['product_code'] !== $itemData['product_description']) {
+                $productData['reference'] = $itemData['product_code'];
+            }
+            
+            $productId = $this->insertWithStringTimestamps('stock_products', $productData);
+            $product = StockProduct::findOrFail($productId);
+        }
 
         // 2. Criar item da nota fiscal
         // Se tiver pedido, buscar purchase_order_item_id
