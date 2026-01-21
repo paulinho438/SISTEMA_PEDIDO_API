@@ -224,6 +224,8 @@ class StockProductController extends Controller
                 'description' => 'required|string|max:255',
                 'reference' => 'nullable|string|max:100',
                 'unit' => 'required|string|max:20',
+                'min_stock' => 'nullable|integer|min:0',
+                'max_stock' => 'nullable|integer|min:0',
             ]);
             
             // Remover código se estiver vazio para garantir geração automática
