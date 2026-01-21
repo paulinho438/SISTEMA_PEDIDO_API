@@ -125,23 +125,44 @@
 
         .signature-section {
             margin-top: 60px;
-            display: flex;
-            justify-content: space-between;
-            gap: 20px;
+            width: 100%;
+        }
+
+        .signature-row {
+            display: table;
+            width: 100%;
+            margin-bottom: 30px;
         }
 
         .signature-box {
-            flex: 1;
-            text-align: center;
-            padding-top: 60px;
-            border-top: 1px solid #000;
+            display: table-cell;
+            text-align: left;
+            width: 50%;
+            vertical-align: top;
+            padding-right: 20px;
         }
 
-        .signature-box label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
+        .signature-box:last-child {
+            padding-right: 0;
+        }
+
+        .signature-label {
             font-size: 9pt;
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .signature-line {
+            border-bottom: 1px solid #000;
+            min-height: 30px;
+            width: 100%;
+            margin-top: 5px;
+        }
+
+        .signature-line.date {
+            width: 200px;
+            text-align: center;
         }
     </style>
 </head>
@@ -213,17 +234,25 @@
     </div>
 
     <div class="signature-section">
-        <div class="signature-box">
-            <label>Local</label>
+        <div class="signature-row">
+            <div class="signature-box">
+                <div class="signature-label">Local</div>
+                <div class="signature-line"></div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-label">Data</div>
+                <div class="signature-line date"></div>
+            </div>
         </div>
-        <div class="signature-box">
-            <label>Data</label>
-        </div>
-        <div class="signature-box">
-            <label>Assinatura do Responsável</label>
-        </div>
-        <div class="signature-box">
-            <label>Depto./Setor Patrimônio</label>
+        <div class="signature-row">
+            <div class="signature-box">
+                <div class="signature-label">Assinatura do Responsável</div>
+                <div class="signature-line"></div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-label">Depto./Setor Patrimônio</div>
+                <div class="signature-line"></div>
+            </div>
         </div>
     </div>
 </body>
