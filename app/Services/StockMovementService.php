@@ -285,6 +285,9 @@ class StockMovementService
         DB::beginTransaction();
 
         try {
+            // Gerar número de transferência único
+            $transferNumber = $this->generateTransferNumber($companyId);
+
             // Atualizar estoque de origem (saída)
             $quantityBeforeFrom = $stock->quantity_available;
             $quantityAfterFrom = $stock->quantity_available - $quantity;
@@ -305,6 +308,7 @@ class StockMovementService
                 'quantity_before' => $quantityBeforeFrom,
                 'quantity_after' => $quantityAfterFrom,
                 'reference_type' => 'transferencia',
+                'transfer_number' => $transferNumber,
                 'observation' => $request->input('observation') . ' (Transferência: Origem)',
                 'user_id' => $user->id,
                 'company_id' => $companyId,
@@ -351,6 +355,7 @@ class StockMovementService
                 'quantity_before' => $quantityBeforeTo,
                 'quantity_after' => $quantityAfterTo,
                 'reference_type' => 'transferencia',
+                'transfer_number' => $transferNumber,
                 'observation' => $request->input('observation') . ' (Transferência: Destino)',
                 'user_id' => $user->id,
                 'company_id' => $companyId,
@@ -504,6 +509,56 @@ class StockMovementService
         
         // Retornar o ID do último registro inserido
         return DB::getPdo()->lastInsertId();
+    }
+
+    /**
+     * Gerar número único de transferência manual
+     * Verifica tanto stock_transfers quanto stock_movements para garantir sequência única
+     */
+    private function generateTransferNumber($companyId)
+    {
+        $year = date('Y');
+        
+        // Buscar último número de transferência em lote (stock_transfers)
+        $lastBatchTransfer = DB::table('stock_transfers')
+            ->where('company_id', $companyId)
+            ->whereYear('created_at', $year)
+            ->whereNotNull('transfer_number')
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        // Buscar último número de transferência manual (stock_movements)
+        $lastManualTransfer = DB::table('stock_movements')
+            ->where('company_id', $companyId)
+            ->whereYear('created_at', $year)
+            ->where('movement_type', 'transferencia')
+            ->whereNotNull('transfer_number')
+            ->orderBy('id', 'desc')
+            ->first();
+        
+        // Determinar o maior número de sequência
+        $maxSequence = 0;
+        
+        if ($lastBatchTransfer && $lastBatchTransfer->transfer_number) {
+            // Extrair sequência do formato TRF-YYYY-000001 ou TRANS-X
+            $batchNumber = $lastBatchTransfer->transfer_number;
+            if (preg_match('/-(\d+)$/', $batchNumber, $matches)) {
+                $maxSequence = max($maxSequence, (int) $matches[1]);
+            }
+        }
+        
+        if ($lastManualTransfer && $lastManualTransfer->transfer_number) {
+            // Extrair sequência do formato TRANS-X
+            $manualNumber = $lastManualTransfer->transfer_number;
+            if (preg_match('/-(\d+)$/', $manualNumber, $matches)) {
+                $maxSequence = max($maxSequence, (int) $matches[1]);
+            }
+        }
+        
+        // Gerar próximo número no formato TRANS-X
+        $nextSequence = $maxSequence + 1;
+        
+        return sprintf('TRANS-%d', $nextSequence);
     }
 }
 

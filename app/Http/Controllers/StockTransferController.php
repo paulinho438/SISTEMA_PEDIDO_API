@@ -220,7 +220,7 @@ class StockTransferController extends Controller
             $options->set('isPhpEnabled', true);
             
             $pdf->getDomPDF()->setOptions($options);
-            $pdf->setPaper('A4', 'portrait');
+            $pdf->setPaper('A4', 'landscape');
 
             return $pdf->download("transferencia-{$transfer->transfer_number}.pdf");
         } catch (\Exception $e) {

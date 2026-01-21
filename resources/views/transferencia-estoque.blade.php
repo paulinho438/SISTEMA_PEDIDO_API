@@ -7,7 +7,7 @@
     <style>
         @page {
             margin: 0.5cm;
-            size: A4 portrait;
+            size: A4 landscape;
         }
         
         * {

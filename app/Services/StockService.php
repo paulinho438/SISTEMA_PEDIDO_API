@@ -405,6 +405,9 @@ class StockService
             'items' => $dados,
             'data_saida' => Carbon::now()->format('d/m/Y'),
             'hora_saida' => Carbon::now()->format('H:i:s'),
+            'local_emissao' => ($company->cidade ?? '') . ($company->cidade && $company->uf ? ' - ' : '') . ($company->uf ?? ''),
+            'data_emissao' => Carbon::now()->format('d/m/Y'),
+            'hora_emissao' => Carbon::now()->format('H:i'),
         ];
     }
 

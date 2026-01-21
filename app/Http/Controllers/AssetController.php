@@ -345,6 +345,9 @@ class AssetController extends Controller
             'assets' => $assets,
             'responsible' => $responsible,
             'company' => $company,
+            'local_emissao' => ($company->cidade ?? '') . ($company->cidade && $company->uf ? ' - ' : '') . ($company->uf ?? ''),
+            'data_emissao' => now()->format('d/m/Y'),
+            'hora_emissao' => now()->format('H:i'),
         ];
 
         // Gerar PDF com opções para suportar imagens base64

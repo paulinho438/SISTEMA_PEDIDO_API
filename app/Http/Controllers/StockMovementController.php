@@ -301,7 +301,7 @@ class StockMovementController extends Controller
             
             $pdf = Pdf::loadView('transferencia-estoque', $dados);
             $pdf->getDomPDF()->setOptions($options);
-            $pdf->setPaper('A4', 'portrait');
+            $pdf->setPaper('A4', 'landscape');
             
             return $pdf->stream('transferencia-' . $localOrigem->code . '-' . $localDestino->code . '.pdf');
         } catch (\Exception $e) {

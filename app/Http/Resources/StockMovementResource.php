@@ -19,6 +19,7 @@ class StockMovementResource extends JsonResource
             'reference_type' => $this->reference_type,
             'reference_id' => $this->reference_id,
             'reference_number' => $this->reference_number,
+            'transfer_number' => $this->transfer_number,
             'cost' => $this->cost ? (float) $this->cost : null,
             'total_cost' => $this->total_cost ? (float) $this->total_cost : null,
             'observation' => $this->observation,

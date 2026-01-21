@@ -21,6 +21,7 @@ class StockMovement extends Model
         'reference_type',
         'reference_id',
         'reference_number',
+        'transfer_number',
         'purchase_invoice_item_id',
         'cost',
         'total_cost',

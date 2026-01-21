@@ -66,6 +66,13 @@
             font-size: 9pt;
         }
 
+        .header-emission-info {
+            margin-top: 10px;
+            font-size: 9pt;
+            text-align: right;
+            color: #666;
+        }
+
         .company-info {
             margin-bottom: 20px;
             font-size: 10pt;
@@ -176,6 +183,17 @@
         </div>
         <div class="header-right">
             Página 1 de 1
+            <div class="header-emission-info">
+                @if(isset($local_emissao) && $local_emissao)
+                    <strong>Local:</strong> {{ $local_emissao }}<br>
+                @endif
+                @if(isset($data_emissao) && $data_emissao)
+                    <strong>Data:</strong> {{ $data_emissao }}
+                @endif
+                @if(isset($hora_emissao) && $hora_emissao)
+                    <strong>Hora:</strong> {{ $hora_emissao }}
+                @endif
+            </div>
         </div>
     </div>
 
