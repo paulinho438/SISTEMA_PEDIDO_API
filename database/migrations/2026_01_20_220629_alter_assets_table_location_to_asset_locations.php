@@ -27,6 +27,15 @@ return new class extends Migration
             END
         ');
 
+        // Limpar location_id inválidos (que não existem na nova tabela asset_locations)
+        // Definir como NULL para todos os registros que não têm correspondência
+        DB::statement('
+            UPDATE [assets]
+            SET [location_id] = NULL
+            WHERE [location_id] IS NOT NULL
+            AND [location_id] NOT IN (SELECT [id] FROM [asset_locations])
+        ');
+
         // Alterar a foreign key para apontar para asset_locations
         DB::statement('
             IF NOT EXISTS (
