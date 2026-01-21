@@ -219,8 +219,10 @@
 
     <div class="statement">
         <strong>TERMO DE RESPONSABILIDADE</strong><br><br>
-        Eu, {{ strtoupper($responsible->nome_completo ?? $responsible->name ?? '') }}, responsabilizo-me pela conservação e controle dos bens patrimoniais constantes da relação anexa, relatório de Inventário de Patrimônio emitido em ____________________.
+        Eu, {{ strtoupper($responsible->nome_completo ?? $responsible->name ?? '') }}, responsabilizo-me pela conservação e controle dos bens patrimoniais constantes da relação anexa, relatório de Inventário de Patrimônio emitido em ________________ através de processamento de dados, comprometendo-me, ao mesmo tempo a prestar esclarecimentos ao setor de patrimônio, sobre possíveis mudanças, desaparecimentos ou quaisquer danos que venham ocorrer sobre esses bens.
     </div>
+
+    <div style="margin-top: 20px; margin-bottom: 10px; width: 100%; border-bottom: 1px solid #000; min-height: 30px;"></div>
 
     <div class="signature-section">
         <div class="signature-row">
