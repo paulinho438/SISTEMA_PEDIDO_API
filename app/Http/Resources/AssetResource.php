@@ -21,30 +21,36 @@ class AssetResource extends JsonResource
             'tag' => $this->tag,
             'value_brl' => (float) $this->value_brl,
             'value_usd' => $this->value_usd ? (float) $this->value_usd : null,
+            'branch_id' => $this->branch_id,
             'branch' => $this->whenLoaded('branch', function() {
                 return [
                     'id' => $this->branch->id,
                     'name' => $this->branch->name,
                 ];
             }),
+            'location_id' => $this->location_id,
             'location' => $this->whenLoaded('location', function() {
                 return [
                     'id' => $this->location->id,
                     'name' => $this->location->name,
                 ];
             }),
+            'responsible_id' => $this->responsible_id,
             'responsible' => $this->whenLoaded('responsible', function() {
                 return [
                     'id' => $this->responsible->id,
                     'nome_completo' => $this->responsible->nome_completo,
                 ];
             }),
+            'cost_center_id' => $this->cost_center_id,
             'cost_center' => $this->whenLoaded('costCenter', function() {
                 return [
                     'id' => $this->costCenter->id,
                     'name' => $this->costCenter->name ?? $this->costCenter->description ?? '-',
                 ];
             }),
+            'account_id' => $this->account_id,
+            'project_id' => $this->project_id,
             'supplier' => $this->whenLoaded('supplier', function() {
                 return [
                     'id' => $this->supplier->id,
