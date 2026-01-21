@@ -386,15 +386,31 @@ class StockTransferService
 
     private function insertStockWithStringTimestamps(array $data): int
     {
-        $now = Carbon::now()->format('Y-m-d H:i:s');
-        $data['created_at'] = $now;
-        $data['updated_at'] = $now;
-
+        $createdAt = Carbon::now()->format('Y-m-d H:i:s');
+        $updatedAt = Carbon::now()->format('Y-m-d H:i:s');
+        
         $columns = array_keys($data);
-        $placeholders = array_fill(0, count($columns), '?');
-        $values = array_values($data);
-
-        $sql = "INSERT INTO [stocks] ([" . implode('], [', $columns) . "]) OUTPUT INSERTED.[id] VALUES (" . implode(', ', $placeholders) . ")";
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($columns as $column) {
+            $placeholders[] = "?";
+            $values[] = $data[$column];
+        }
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stocks] (" . implode(', ', $columnsBracketed) . ") OUTPUT INSERTED.[id] VALUES (" . implode(', ', $placeholders) . ")";
         
         $result = DB::select($sql, $values);
         return $result[0]->id;
