@@ -319,6 +319,7 @@ class StockService
                     'location' => $stock->location,
                     'quantity' => $quantity,
                     'unit' => $stock->product->unit ?? 'UN',
+                    'observation' => $itemData['observation'] ?? null,
                 ];
             }
 
