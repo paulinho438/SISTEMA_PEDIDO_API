@@ -138,12 +138,33 @@ class PurchaseQuote extends Model
 
     /**
      * Accessor para converter string Y-m-d de volta para Carbon quando ler do banco
+     * IMPORTANTE: Usar createFromFormat para evitar problemas de timezone
+     * Quando parseamos uma data sem hora, o Carbon pode interpretar como UTC
+     * e converter para o timezone local, resultando em um dia anterior
      */
     public function getRequestedAtAttribute($value)
     {
         if ($value) {
             try {
-                return \Carbon\Carbon::parse($value);
+                // Se já é Carbon, retornar como está
+                if ($value instanceof \Carbon\Carbon) {
+                    return $value->copy()->startOfDay();
+                }
+                
+                // Se é string no formato Y-m-d, criar diretamente no timezone local
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                    return \Carbon\Carbon::createFromFormat('Y-m-d', $value)
+                        ->setTimezone(config('app.timezone'))
+                        ->startOfDay();
+                }
+                
+                // Para outros formatos, usar parse mas garantir timezone local
+                $carbon = \Carbon\Carbon::parse($value);
+                // Se a data não tem hora, garantir que seja meia-noite no timezone local
+                if ($carbon->format('H:i:s') === '00:00:00') {
+                    return $carbon->setTimezone(config('app.timezone'))->startOfDay();
+                }
+                return $carbon->setTimezone(config('app.timezone'));
             } catch (\Exception $e) {
                 return $value;
             }
