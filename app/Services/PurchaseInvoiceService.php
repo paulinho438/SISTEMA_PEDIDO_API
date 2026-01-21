@@ -98,6 +98,45 @@ class PurchaseInvoiceService
         // Retornar o ID do último registro inserido
         return DB::getPdo()->lastInsertId();
     }
+
+    /**
+     * Helper para inserir registros na tabela stocks com timestamps como strings (compatível com SQL Server)
+     */
+    private function insertStockWithStringTimestamps($data)
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+        
+        $columns = [];
+        $placeholders = [];
+        $values = [];
+        
+        foreach ($data as $column => $value) {
+            $columns[] = $column;
+            $placeholders[] = "?";
+            $values[] = $value;
+        }
+        
+        // Adicionar campos de data com CAST
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+        
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+        
+        // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        
+        $sql = "INSERT INTO [stocks] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+        
+        DB::statement($sql, $values);
+        
+        // Retornar o ID do último registro inserido
+        return DB::getPdo()->lastInsertId();
+    }
+
     /**
      * Criar nota fiscal e dar entrada no estoque
      */
@@ -311,18 +350,24 @@ class PurchaseInvoiceService
         }
 
         // 4. Criar/atualizar estoque
-        $stock = Stock::firstOrCreate(
-            [
+        // Verificar se o estoque já existe
+        $stock = Stock::where('stock_product_id', $product->id)
+            ->where('stock_location_id', $location->id)
+            ->where('company_id', $companyId)
+            ->first();
+        
+        // Se não existe, criar usando helper para timestamps como strings
+        if (!$stock) {
+            $stockId = $this->insertStockWithStringTimestamps([
                 'stock_product_id' => $product->id,
                 'stock_location_id' => $location->id,
                 'company_id' => $companyId,
-            ],
-            [
                 'quantity_available' => 0,
                 'quantity_reserved' => 0,
                 'quantity_total' => 0,
-            ]
-        );
+            ]);
+            $stock = Stock::findOrFail($stockId);
+        }
 
         // 5. Atualizar estoque
         $quantity = (float) $itemData['quantity'];
