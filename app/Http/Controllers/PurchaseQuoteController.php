@@ -212,6 +212,12 @@ class PurchaseQuoteController extends Controller
             $query->where('current_status_slug', $request->get('status'));
         }
 
+        // Filtro para mostrar apenas solicitações do usuário logado (requester)
+        if ($request->filled('my_requests') && $request->get('my_requests') === 'true') {
+            $requesterId = auth()->id();
+            $query->where('requester_id', $requesterId);
+        }
+
         // Filtro para mostrar apenas cotações do comprador logado
         if ($request->filled('my_quotes') && $request->get('my_quotes') === 'true') {
             $buyerId = auth()->id();

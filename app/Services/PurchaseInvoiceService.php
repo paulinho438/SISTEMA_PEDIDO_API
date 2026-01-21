@@ -470,7 +470,7 @@ class PurchaseInvoiceService
      */
     public function list(array $filters = [], int $perPage = 15)
     {
-        $query = PurchaseInvoice::with(['quote', 'company', 'items.product', 'items.stockLocation', 'createdBy']);
+        $query = PurchaseInvoice::with(['quote', 'order', 'company', 'items.product', 'items.stockLocation', 'createdBy']);
 
         if (isset($filters['company_id'])) {
             $query->where('company_id', $filters['company_id']);
