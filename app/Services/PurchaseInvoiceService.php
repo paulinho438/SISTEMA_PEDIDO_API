@@ -126,9 +126,16 @@ class PurchaseInvoiceService
             // Se tiver pedido de compra, buscar dados do pedido
             $purchaseOrder = null;
             if (!empty($data['purchase_order_id'])) {
-                $purchaseOrder = PurchaseOrder::with(['items.quoteItem', 'quoteSupplier'])->find($data['purchase_order_id']);
+                $purchaseOrder = PurchaseOrder::with(['items.quoteItem', 'quoteSupplier'])
+                    ->where('id', $data['purchase_order_id'])
+                    ->where('company_id', $companyId)
+                    ->first();
                 if (!$purchaseOrder) {
-                    throw new \Exception('Pedido de compra não encontrado.');
+                    throw new \Exception('Pedido de compra não encontrado ou não pertence à empresa.');
+                }
+                // Verificar se o pedido pertence à empresa
+                if ((int) $purchaseOrder->company_id !== $companyId) {
+                    throw new \Exception('Pedido de compra não pertence à empresa.');
                 }
                 // Preencher dados do fornecedor do pedido se não informados
                 if (empty($data['supplier_name'])) {
@@ -161,7 +168,15 @@ class PurchaseInvoiceService
             
             $invoice = PurchaseInvoice::findOrFail($invoiceId);
 
-            $purchaseQuote = $data['purchase_quote_id'] ? PurchaseQuote::find($data['purchase_quote_id']) : null;
+            $purchaseQuote = null;
+            if (!empty($data['purchase_quote_id'])) {
+                $purchaseQuote = PurchaseQuote::where('id', $data['purchase_quote_id'])
+                    ->where('company_id', $companyId)
+                    ->first();
+                if (!$purchaseQuote) {
+                    throw new \Exception('Cotação não encontrada ou não pertence à empresa.');
+                }
+            }
 
             // 2. Processar cada item da nota fiscal
             foreach ($data['items'] as $itemData) {
@@ -321,14 +336,23 @@ class PurchaseInvoiceService
     /**
      * Buscar pedido de compra com itens para pré-preencher nota fiscal
      */
-    public function buscarPedidoParaNota(int $orderId): PurchaseOrder
+    public function buscarPedidoParaNota(int $orderId, int $companyId): PurchaseOrder
     {
-        return PurchaseOrder::with([
+        $order = PurchaseOrder::with([
             'items.quoteItem',
             'items.quoteSupplierItem',
             'quote',
             'quoteSupplier'
-        ])->findOrFail($orderId);
+        ])
+            ->where('id', $orderId)
+            ->where('company_id', $companyId)
+            ->first();
+
+        if (!$order) {
+            throw new \Exception("Pedido de compra não encontrado ou não pertence à empresa.");
+        }
+
+        return $order;
     }
 
     /**

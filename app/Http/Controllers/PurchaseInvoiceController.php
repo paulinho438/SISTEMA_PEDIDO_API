@@ -49,7 +49,16 @@ class PurchaseInvoiceController extends Controller
     public function buscarPedido(Request $request, $orderId)
     {
         try {
-            $order = $this->service->buscarPedidoParaNota($orderId);
+            $companyId = $request->header('company-id');
+            
+            if (!$companyId) {
+                return response()->json([
+                    'message' => 'Company ID é obrigatório.'
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $companyId = (int) $companyId;
+            $order = $this->service->buscarPedidoParaNota($orderId, $companyId);
             
             return response()->json([
                 'data' => $order
@@ -64,6 +73,17 @@ class PurchaseInvoiceController extends Controller
 
     public function store(Request $request)
     {
+        $companyId = $request->header('company-id');
+
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Company ID é obrigatório.'
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Converter para inteiro
+        $companyId = (int) $companyId;
+
         // Normalizar purchase_order_id: se for 0 ou string vazia, definir como null
         $data = $request->all();
         if (isset($data['purchase_order_id']) && (empty($data['purchase_order_id']) || $data['purchase_order_id'] == '0')) {
@@ -81,8 +101,16 @@ class PurchaseInvoiceController extends Controller
             'invoice_series' => 'nullable|string|max:10',
             'invoice_date' => 'required|date',
             'received_date' => 'nullable|date',
-            'purchase_quote_id' => 'nullable|exists:purchase_quotes,id',
-            'purchase_order_id' => 'nullable|exists:purchase_orders,id',
+            'purchase_quote_id' => ['nullable', function ($attribute, $value, $fail) use ($companyId) {
+                if ($value && !\App\Models\PurchaseQuote::where('id', $value)->where('company_id', $companyId)->exists()) {
+                    $fail('O purchase quote id selecionado é inválido.');
+                }
+            }],
+            'purchase_order_id' => ['nullable', function ($attribute, $value, $fail) use ($companyId) {
+                if ($value && !\App\Models\PurchaseOrder::where('id', $value)->where('company_id', $companyId)->exists()) {
+                    $fail('O purchase order id selecionado é inválido.');
+                }
+            }],
             'supplier_name' => 'nullable|string|max:255',
             'supplier_document' => 'nullable|string|max:20',
             'total_amount' => 'nullable|numeric|min:0',
@@ -99,17 +127,6 @@ class PurchaseInvoiceController extends Controller
             'items.*.stock_location_id' => 'required|exists:stock_locations,id',
             'items.*.observation' => 'nullable|string',
         ]);
-
-        $companyId = $request->header('company-id');
-
-        if (!$companyId) {
-            return response()->json([
-                'message' => 'Company ID é obrigatório.'
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        // Converter para inteiro
-        $companyId = (int) $companyId;
 
         DB::beginTransaction();
 
