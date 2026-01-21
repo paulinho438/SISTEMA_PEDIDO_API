@@ -22,10 +22,13 @@ class PurchaseInvoiceService
      */
     private function updateModelWithStringTimestamps($model, array $data)
     {
+        // Remover campos que não devem ser atualizados
+        unset($data['id'], $data['created_at']);
+        
         // Adicionar updated_at como string
         $data['updated_at'] = now()->format('Y-m-d H:i:s');
         
-        // Usar DB::statement() para garantir que updated_at seja string
+        // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
         $table = $model->getTable();
         $id = $model->getKey();
         $idColumn = $model->getKeyName();
@@ -34,8 +37,11 @@ class PurchaseInvoiceService
         $placeholders = [];
         $values = [];
         
+        // Campos de data que precisam de CAST
+        $dateFields = ['updated_at', 'created_at', 'last_movement_at', 'deleted_at'];
+        
         foreach ($columns as $column) {
-            if ($column === 'updated_at') {
+            if (in_array($column, $dateFields)) {
                 $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
             } else {
                 $placeholders[] = "[{$column}] = ?";
