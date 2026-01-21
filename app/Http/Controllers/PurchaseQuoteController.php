@@ -1073,8 +1073,6 @@ class PurchaseQuoteController extends Controller
         try {
             // Atualizar dados principais da cotação
             $updateData = [
-                'requester_id' => data_get($validated, 'solicitante.id'),
-                'requester_name' => data_get($validated, 'solicitante.label'),
                 'company_id' => data_get($validated, 'empresa.id'),
                 'company_name' => data_get($validated, 'empresa.label'),
                 'location' => $validated['local'] ?? null,
@@ -1082,6 +1080,19 @@ class PurchaseQuoteController extends Controller
                 'observation' => $validated['observacao'] ?? null,
                 'updated_by' => auth()->id(),
             ];
+
+            // Atualizar requester_id apenas se fornecido, caso contrário preservar o original
+            if (isset($validated['solicitante']) && !empty(data_get($validated, 'solicitante.id'))) {
+                $updateData['requester_id'] = data_get($validated, 'solicitante.id');
+                $updateData['requester_name'] = data_get($validated, 'solicitante.label');
+            } else {
+                // Preservar o requester_id original se não for fornecido
+                // Se não há requester_id, usar o usuário logado como fallback
+                if (!$quote->requester_id) {
+                    $updateData['requester_id'] = auth()->id();
+                    $updateData['requester_name'] = auth()->user()->nome_completo ?? auth()->user()->name;
+                }
+            }
 
             if (!empty($validated['numero'])) {
                 $updateData['quote_number'] = $validated['numero'];
@@ -1204,6 +1215,14 @@ class PurchaseQuoteController extends Controller
         if (isset($validated['solicitante'])) {
             $updateData['requester_id'] = data_get($validated, 'solicitante.id');
             $updateData['requester_name'] = data_get($validated, 'solicitante.label');
+        } else {
+            // Garantir que o requester_id não seja perdido se não for fornecido
+            // Preservar o requester_id original se não estiver sendo atualizado
+            if (!$quote->requester_id) {
+                // Se não há requester_id, usar o usuário logado como fallback
+                $updateData['requester_id'] = auth()->id();
+                $updateData['requester_name'] = auth()->user()->nome_completo ?? auth()->user()->name;
+            }
         }
         
         if (isset($validated['empresa'])) {
