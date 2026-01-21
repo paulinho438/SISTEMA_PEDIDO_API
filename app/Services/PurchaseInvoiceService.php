@@ -338,6 +338,23 @@ class PurchaseInvoiceService
      */
     public function buscarPedidoParaNota(int $orderId, int $companyId): PurchaseOrder
     {
+        // Primeiro, tentar buscar o pedido sem filtro de empresa para verificar se existe
+        $orderExists = PurchaseOrder::where('id', $orderId)->first();
+        
+        if (!$orderExists) {
+            throw new \Exception("Pedido de compra ID {$orderId} não encontrado.");
+        }
+        
+        // Converter company_id para int para comparação correta
+        $orderCompanyId = (int) ($orderExists->company_id ?? 0);
+        $requestCompanyId = (int) $companyId;
+        
+        // Verificar se o pedido pertence à empresa
+        if ($orderCompanyId !== $requestCompanyId) {
+            throw new \Exception("Pedido de compra ID {$orderId} pertence à empresa ID {$orderCompanyId}, mas a requisição é para empresa ID {$requestCompanyId}.");
+        }
+        
+        // Buscar o pedido com todos os relacionamentos
         $order = PurchaseOrder::with([
             'items.quoteItem',
             'items.quoteSupplierItem',
@@ -349,7 +366,7 @@ class PurchaseInvoiceService
             ->first();
         
         if (!$order) {
-            throw new \Exception("Pedido de compra ID {$orderId} não encontrado ou não pertence à empresa ID {$companyId}.");
+            throw new \Exception("Erro ao carregar pedido de compra ID {$orderId}.");
         }
 
         return $order;
