@@ -289,10 +289,11 @@ class PurchaseInvoiceService
         $quantityBefore = $stock->quantity_available;
         $quantityAfter = $quantityBefore + $quantity;
 
-        $stock->update([
+        // Usar helper para atualizar com timestamps como strings (compatível com SQL Server)
+        $this->updateModelWithStringTimestamps($stock, [
             'quantity_available' => $quantityAfter,
             'quantity_total' => $stock->quantity_total + $quantity,
-            'last_movement_at' => Carbon::now(),
+            'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
         ]);
 
         // 6. Criar movimentação de entrada associada à nota fiscal usando helper para timestamps como strings

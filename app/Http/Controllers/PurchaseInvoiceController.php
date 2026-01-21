@@ -64,6 +64,18 @@ class PurchaseInvoiceController extends Controller
 
     public function store(Request $request)
     {
+        // Normalizar purchase_order_id: se for 0 ou string vazia, definir como null
+        $data = $request->all();
+        if (isset($data['purchase_order_id']) && (empty($data['purchase_order_id']) || $data['purchase_order_id'] == '0')) {
+            $data['purchase_order_id'] = null;
+        }
+        if (isset($data['purchase_quote_id']) && (empty($data['purchase_quote_id']) || $data['purchase_quote_id'] == '0')) {
+            $data['purchase_quote_id'] = null;
+        }
+        
+        // Criar nova request com dados normalizados
+        $request->merge($data);
+        
         $validated = $request->validate([
             'invoice_number' => 'required|string|max:50',
             'invoice_series' => 'nullable|string|max:10',
