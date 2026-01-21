@@ -111,7 +111,7 @@ class Asset extends Model
 
     public function location()
     {
-        return $this->belongsTo(StockLocation::class, 'location_id');
+        return $this->belongsTo(AssetLocation::class, 'location_id');
     }
 
     public function responsible()

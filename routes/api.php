@@ -51,7 +51,8 @@ use App\Http\Controllers\{
     AssetGroupingController,
     AssetAccountController,
     AssetProjectController,
-    AssetBusinessUnitController
+    AssetBusinessUnitController,
+    AssetLocationController
 };
 use App\Models\BotaoCobranca;
 use Illuminate\Http\Request;
@@ -404,6 +405,13 @@ Route::middleware('auth:api')->group(function () {
             Route::post('/', [AssetBranchController::class, 'store']);
             Route::put('/{id}', [AssetBranchController::class, 'update']);
             Route::delete('/{id}', [AssetBranchController::class, 'destroy']);
+        });
+        Route::prefix('locais')->group(function () {
+            Route::get('/', [AssetLocationController::class, 'index']);
+            Route::get('/{id}', [AssetLocationController::class, 'show']);
+            Route::post('/', [AssetLocationController::class, 'store']);
+            Route::put('/{id}', [AssetLocationController::class, 'update']);
+            Route::delete('/{id}', [AssetLocationController::class, 'destroy']);
         });
         Route::prefix('sub-tipos-1')->group(function () {
             Route::get('/', [AssetSubType1Controller::class, 'index']);
