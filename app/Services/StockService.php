@@ -258,6 +258,7 @@ class StockService
             $company = null;
             
             foreach ($items as $itemData) {
+                // Buscar stock fresco para garantir dados atualizados
                 $stock = Stock::with(['product', 'location', 'company'])->findOrFail($itemData['stock_id']);
                 
                 if (!$solicitante) {
@@ -281,8 +282,13 @@ class StockService
 
                 $quantity = (float) $itemData['quantity'];
                 
+                // Validar quantidade antes de processar
+                if ($quantity <= 0) {
+                    throw new \Exception("Quantidade inválida para o produto {$stock->product->description}.");
+                }
+                
                 if ($stock->quantity_reserved < $quantity) {
-                    throw new \Exception("Quantidade reservada insuficiente para o produto {$stock->product->description}.");
+                    throw new \Exception("Quantidade reservada insuficiente para o produto {$stock->product->description}. Quantidade disponível: {$stock->quantity_reserved}, Solicitada: {$quantity}.");
                 }
 
                 // Dar saída
