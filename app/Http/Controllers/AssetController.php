@@ -291,6 +291,78 @@ class AssetController extends Controller
     }
 
     /**
+     * Gerar termo de responsabilidade de ativos
+     */
+    public function gerarTermoResponsabilidade(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('view_ativos')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para visualizar ativos.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $responsibleId = $request->get('responsible_id');
+        
+        if (!$responsibleId) {
+            return response()->json([
+                'message' => 'ID do responsável é obrigatório.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $companyId = $request->header('company-id');
+        
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Company ID é obrigatório.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        // Buscar todos os ativos do responsável
+        $assets = $this->service->listByResponsible($responsibleId, $companyId);
+        
+        if ($assets->isEmpty()) {
+            return response()->json([
+                'message' => 'Nenhum ativo encontrado para este responsável.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Buscar dados do responsável
+        $responsible = \App\Models\User::find($responsibleId);
+        
+        if (!$responsible) {
+            return response()->json([
+                'message' => 'Responsável não encontrado.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
+        // Buscar dados da empresa
+        $company = \App\Models\Company::find($companyId);
+        
+        // Preparar dados para a view
+        $dados = [
+            'assets' => $assets,
+            'responsible' => $responsible,
+            'company' => $company,
+        ];
+
+        // Gerar PDF com opções para suportar imagens base64
+        $options = new \Dompdf\Options();
+        $options->set('isRemoteEnabled', true);
+        $options->set('isHtml5ParserEnabled', true);
+        $options->set('isPhpEnabled', true);
+        
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('termo-responsabilidade-ativos', $dados);
+        $pdf->getDomPDF()->setOptions($options);
+        $pdf->setPaper('A4', 'portrait');
+        
+        $fileName = 'termo-responsabilidade-' . preg_replace('/[^a-zA-Z0-9]/', '-', strtolower($responsible->nome_completo ?? $responsible->name ?? 'termo')) . '-' . date('Y-m-d') . '.pdf';
+        
+        return $pdf->download($fileName);
+    }
+
+    /**
      * Método privado para fazer upload do arquivo de imagem
      */
     private function uploadImageFile($file, $assetNumber)

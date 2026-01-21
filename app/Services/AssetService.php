@@ -77,6 +77,16 @@ class AssetService
         return $query->orderByDesc('created_at')->paginate($perPage);
     }
 
+    public function listByResponsible($responsibleId, $companyId)
+    {
+        return Asset::where('company_id', $companyId)
+            ->where('responsible_id', $responsibleId)
+            ->where('status', '!=', 'baixado')
+            ->with(['branch', 'location', 'responsible'])
+            ->orderBy('asset_number')
+            ->get();
+    }
+
     public function find($id)
     {
         return Asset::with([

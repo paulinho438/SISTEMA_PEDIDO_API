@@ -442,6 +442,9 @@ Route::middleware('auth:api')->group(function () {
             Route::delete('/{id}', [AssetBusinessUnitController::class, 'destroy']);
         });
         
+        // Rotas específicas de Ativos (devem vir ANTES das rotas genéricas)
+        Route::get('/gerar-termo-responsabilidade', [AssetController::class, 'gerarTermoResponsabilidade']);
+        
         // Rotas genéricas de Ativos (devem vir DEPOIS das rotas específicas)
         Route::get('/{id}', [AssetController::class, 'show']);
         Route::put('/{id}', [AssetController::class, 'update']);
