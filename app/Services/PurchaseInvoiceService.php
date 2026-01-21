@@ -347,9 +347,9 @@ class PurchaseInvoiceService
             ->where('id', $orderId)
             ->where('company_id', $companyId)
             ->first();
-
+        
         if (!$order) {
-            throw new \Exception("Pedido de compra não encontrado ou não pertence à empresa.");
+            throw new \Exception("Pedido de compra ID {$orderId} não encontrado ou não pertence à empresa ID {$companyId}.");
         }
 
         return $order;

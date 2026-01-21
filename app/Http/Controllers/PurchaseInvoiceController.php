@@ -108,7 +108,7 @@ class PurchaseInvoiceController extends Controller
             }],
             'purchase_order_id' => ['nullable', function ($attribute, $value, $fail) use ($companyId) {
                 if ($value && !\App\Models\PurchaseOrder::where('id', $value)->where('company_id', $companyId)->exists()) {
-                    $fail('O purchase order id selecionado é inválido.');
+                    $fail('O pedido de compra não foi encontrado ou não pertence à empresa selecionada.');
                 }
             }],
             'supplier_name' => 'nullable|string|max:255',
