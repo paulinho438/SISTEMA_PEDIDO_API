@@ -455,6 +455,7 @@ class PurchaseInvoiceService
     {
         return PurchaseInvoice::with([
             'items.product',
+            'items.stockLocation',
             'items.quoteItem',
             'quote',
             'order',
@@ -469,7 +470,7 @@ class PurchaseInvoiceService
      */
     public function list(array $filters = [], int $perPage = 15)
     {
-        $query = PurchaseInvoice::with(['quote', 'company']);
+        $query = PurchaseInvoice::with(['quote', 'company', 'items.product', 'items.stockLocation', 'createdBy']);
 
         if (isset($filters['company_id'])) {
             $query->where('company_id', $filters['company_id']);
@@ -495,7 +496,7 @@ class PurchaseInvoiceService
             $query->where('invoice_date', '<=', $filters['date_to']);
         }
 
-        return $query->orderByDesc('invoice_date')->paginate($perPage);
+        return $query->orderByDesc('invoice_date')->orderByDesc('id')->paginate($perPage);
     }
 
     /**

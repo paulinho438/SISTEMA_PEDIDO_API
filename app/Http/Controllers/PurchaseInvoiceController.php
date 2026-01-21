@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\PurchaseInvoiceService;
+use App\Http\Resources\PurchaseInvoiceResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,6 +19,11 @@ class PurchaseInvoiceController extends Controller
 
     public function index(Request $request)
     {
+        $user = $request->user();
+        if (!$user || !$user->hasPermission('view_controle_notas_fiscais')) {
+            return response()->json(['message' => 'Acesso negado.'], Response::HTTP_FORBIDDEN);
+        }
+
         $companyId = $request->header('company-id');
         
         $filters = [
@@ -32,9 +38,13 @@ class PurchaseInvoiceController extends Controller
         $perPage = (int) $request->get('per_page', 15);
         $invoices = $this->service->list($filters, $perPage);
 
-        return response()->json([
-            'data' => $invoices
-        ]);
+        return PurchaseInvoiceResource::collection($invoices->items())
+            ->additional([
+                'current_page' => $invoices->currentPage(),
+                'last_page' => $invoices->lastPage(),
+                'per_page' => $invoices->perPage(),
+                'total' => $invoices->total(),
+            ]);
     }
 
     public function show(Request $request, $id)
@@ -42,7 +52,7 @@ class PurchaseInvoiceController extends Controller
         $invoice = $this->service->find($id);
         
         return response()->json([
-            'data' => $invoice
+            'data' => new PurchaseInvoiceResource($invoice)
         ]);
     }
 
