@@ -364,6 +364,9 @@ Route::middleware('auth:api')->group(function () {
         Route::patch('/locais/{id}/toggle-active', [StockLocationController::class, 'toggleActive']);
         
         // Estoque (rotas genéricas por último)
+        Route::get('/reservas-por-solicitante', [StockController::class, 'reservasPorSolicitante']);
+        Route::post('/dar-saida-multipla', [StockController::class, 'darSaidaMultipla']);
+        Route::post('/gerar-termo-responsabilidade', [StockController::class, 'gerarTermoResponsabilidade']);
         Route::get('/', [StockController::class, 'index']);
         Route::post('/{id}/reservar', [StockController::class, 'reservar']);
         Route::post('/{id}/liberar', [StockController::class, 'liberar']);

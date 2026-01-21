@@ -135,6 +135,208 @@ class StockService
         return $stocks;
     }
 
+    /**
+     * Buscar reservas agrupadas por solicitante
+     */
+    public function listReservasPorSolicitante(Request $request, $user)
+    {
+        $companyId = (int) $request->header('company-id');
+        
+        if (!$companyId) {
+            throw new \Exception('Company ID é obrigatório.');
+        }
+
+        $query = Stock::where('stocks.company_id', $companyId)
+            ->where('quantity_reserved', '>', 0)
+            ->with(['product', 'location']);
+
+        // Aplicar filtro de acesso
+        $this->accessService->applyLocationFilter($query, $user, $companyId, 'stock_location_id');
+
+        $stocks = $query->get();
+
+        // Buscar informações de reserva para cada estoque
+        $reservasPorSolicitante = [];
+        
+        foreach ($stocks as $stock) {
+            // Buscar a última movimentação de reserva
+            $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                ->where('movement_type', 'ajuste')
+                ->where('quantity', '<', 0)
+                ->whereNotNull('user_id')
+                ->where(function($q) {
+                    $q->where('observation', 'like', '%Reserva%')
+                      ->orWhere('observation', 'like', '%reserva%');
+                })
+                ->with('user')
+                ->orderByDesc('created_at')
+                ->first();
+
+            // Se não encontrou com "Reserva" na observação, buscar qualquer movimentação de ajuste recente
+            if (!$lastReservationMovement) {
+                $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                    ->where('movement_type', 'ajuste')
+                    ->where('quantity', '<', 0)
+                    ->whereNotNull('user_id')
+                    ->where(function($q) {
+                        $q->where(function($subQ) {
+                            $subQ->where('observation', 'not like', '%Cancelamento%')
+                                 ->where('observation', 'not like', '%cancelamento%')
+                                 ->where('observation', 'not like', '%Saída%')
+                                 ->where('observation', 'not like', '%saída%')
+                                 ->where('observation', 'not like', '%Transferência%')
+                                 ->where('observation', 'not like', '%transferência%');
+                        })
+                        ->orWhereNull('observation');
+                    })
+                    ->with('user')
+                    ->orderByDesc('created_at')
+                    ->first();
+            }
+
+            if ($lastReservationMovement && $lastReservationMovement->user) {
+                $userId = $lastReservationMovement->user->id;
+                $userName = $lastReservationMovement->user->nome_completo ?? $lastReservationMovement->user->name ?? 'N/A';
+                
+                if (!isset($reservasPorSolicitante[$userId])) {
+                    $reservasPorSolicitante[$userId] = [
+                        'user_id' => $userId,
+                        'user_name' => $userName,
+                        'reservas' => []
+                    ];
+                }
+
+                $reservationDate = $lastReservationMovement->movement_date 
+                    ? \Carbon\Carbon::parse($lastReservationMovement->movement_date)
+                    : \Carbon\Carbon::parse($lastReservationMovement->created_at);
+
+                $reservasPorSolicitante[$userId]['reservas'][] = [
+                    'id' => $stock->id,
+                    'product' => [
+                        'id' => $stock->product->id ?? null,
+                        'code' => $stock->product->code ?? null,
+                        'description' => $stock->product->description ?? null,
+                        'reference' => $stock->product->reference ?? null,
+                        'unit' => $stock->product->unit ?? null,
+                    ],
+                    'location' => [
+                        'id' => $stock->location->id ?? null,
+                        'name' => $stock->location->name ?? null,
+                        'code' => $stock->location->code ?? null,
+                    ],
+                    'quantity_reserved' => (float) $stock->quantity_reserved,
+                    'reservation_date' => $reservationDate->format('d/m/Y'),
+                ];
+            }
+        }
+
+        return array_values($reservasPorSolicitante);
+    }
+
+    /**
+     * Dar saída múltipla de reservas
+     * @param array $items Array de items com stock_id e quantity
+     * @return array Dados para geração do PDF
+     */
+    public function darSaidaMultipla(array $items): array
+    {
+        $validator = Validator::make(['items' => $items], [
+            'items' => 'required|array|min:1',
+            'items.*.stock_id' => 'required|integer|exists:stocks,id',
+            'items.*.quantity' => 'required|numeric|min:0.0001',
+        ]);
+
+        if ($validator->fails()) {
+            throw new \Exception($validator->errors()->first());
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $saidas = [];
+            $solicitante = null;
+            $company = null;
+            
+            foreach ($items as $itemData) {
+                $stock = Stock::with(['product', 'location', 'company'])->findOrFail($itemData['stock_id']);
+                
+                if (!$solicitante) {
+                    // Buscar informações do solicitante da primeira reserva
+                    $lastReservationMovement = StockMovement::where('stock_id', $stock->id)
+                        ->where('movement_type', 'ajuste')
+                        ->where('quantity', '<', 0)
+                        ->whereNotNull('user_id')
+                        ->with('user')
+                        ->orderByDesc('created_at')
+                        ->first();
+                    
+                    if ($lastReservationMovement && $lastReservationMovement->user) {
+                        $solicitante = $lastReservationMovement->user;
+                    }
+                }
+                
+                if (!$company) {
+                    $company = $stock->company;
+                }
+
+                $quantity = (float) $itemData['quantity'];
+                
+                if ($stock->quantity_reserved < $quantity) {
+                    throw new \Exception("Quantidade reservada insuficiente para o produto {$stock->product->description}.");
+                }
+
+                // Dar saída
+                $reservedBefore = $stock->quantity_reserved;
+                $reservedAfter = $stock->quantity_reserved - $quantity;
+                $totalBefore = $stock->quantity_total;
+                $totalAfter = $stock->quantity_total - $quantity;
+
+                $this->updateModelWithStringTimestamps($stock, [
+                    'quantity_reserved' => $reservedAfter,
+                    'quantity_total' => $totalAfter,
+                    'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
+                ]);
+
+                // Criar movimentação
+                $this->insertMovementWithStringTimestamps([
+                    'stock_id' => $stock->id,
+                    'stock_product_id' => $stock->stock_product_id,
+                    'stock_location_id' => $stock->stock_location_id,
+                    'movement_type' => 'ajuste',
+                    'quantity' => -$quantity,
+                    'quantity_before' => $reservedBefore,
+                    'quantity_after' => $reservedAfter,
+                    'reference_type' => 'ajuste_manual',
+                    'observation' => $itemData['observation'] ?? 'Saída de produto reservado',
+                    'user_id' => auth()->id(),
+                    'company_id' => $stock->company_id,
+                    'movement_date' => Carbon::now()->toDateString(),
+                ]);
+
+                $saidas[] = [
+                    'stock_id' => $stock->id,
+                    'product' => $stock->product,
+                    'location' => $stock->location,
+                    'quantity' => $quantity,
+                    'unit' => $stock->product->unit ?? 'UN',
+                ];
+            }
+
+            DB::commit();
+
+            return [
+                'solicitante' => $solicitante,
+                'company' => $company,
+                'items' => $saidas,
+                'data_saida' => Carbon::now()->format('d/m/Y'),
+                'hora_saida' => Carbon::now()->format('H:i:s'),
+            ];
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
+
     public function find($id)
     {
         return Stock::with(['product', 'location', 'movements'])->findOrFail($id);

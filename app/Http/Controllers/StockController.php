@@ -7,6 +7,7 @@ use App\Services\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class StockController extends Controller
 {
@@ -170,6 +171,91 @@ class StockController extends Controller
             
             return response()->json([
                 'message' => 'Erro ao cancelar reserva.',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Buscar reservas agrupadas por solicitante
+     */
+    public function reservasPorSolicitante(Request $request)
+    {
+        try {
+            $reservas = $this->service->listReservasPorSolicitante($request, auth()->user());
+            
+            return response()->json([
+                'data' => $reservas
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao buscar reservas por solicitante.',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Dar saída múltipla e gerar termo de responsabilidade
+     */
+    public function darSaidaMultipla(Request $request)
+    {
+        try {
+            $items = $request->input('items', []);
+            
+            if (empty($items)) {
+                return response()->json([
+                    'message' => 'Nenhum item selecionado para dar saída.',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $result = $this->service->darSaidaMultipla($items);
+            
+            return response()->json([
+                'message' => 'Saídas realizadas com sucesso.',
+                'data' => $result
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao dar saída múltipla.',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Gerar termo de responsabilidade PDF
+     */
+    public function gerarTermoResponsabilidade(Request $request)
+    {
+        try {
+            $items = $request->input('items', []);
+            
+            if (empty($items)) {
+                return response()->json([
+                    'message' => 'Nenhum item selecionado.',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+
+            $result = $this->service->darSaidaMultipla($items);
+            
+            // Gerar PDF
+            $options = new \Dompdf\Options();
+            $options->set('isRemoteEnabled', true);
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isPhpEnabled', true);
+            
+            $pdf = Pdf::loadView('termo-responsabilidade-estoque', $result);
+            $pdf->getDomPDF()->setOptions($options);
+            $pdf->setPaper('A4', 'portrait');
+            
+            $nomeSolicitante = str_replace(' ', '_', $result['solicitante']->nome_completo ?? $result['solicitante']->name ?? 'termo');
+            $nomeArquivo = "termo-responsabilidade-{$nomeSolicitante}-" . date('Y-m-d') . '.pdf';
+            
+            return $pdf->download($nomeArquivo);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao gerar termo de responsabilidade.',
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
         }
