@@ -305,42 +305,13 @@ class StockProductService
 
     /**
      * Criar produto no sistema (código gerado automaticamente)
-     * Opcionalmente tenta inserir no Protheus se houver associação
+     * NÃO insere no Protheus - apenas cria no sistema interno
      */
     public function createWithProtheus(array $data, int $companyId): StockProduct
     {
-        DB::beginTransaction();
-
-        try {
-            // 1. Criar produto no sistema (código será gerado automaticamente se não fornecido)
-            // O método create() já gera automaticamente se code estiver vazio
-            $product = $this->create($data, $companyId);
-
-            // 2. Tentar inserir produto no Protheus (opcional, não falha se não conseguir)
-            try {
-                $company = Company::find($companyId);
-                if ($company) {
-                    $association = $company->getProtheusAssociationByDescricao('Produto');
-
-                    if ($association && !empty($association->tabela_protheus)) {
-                        $this->insertProductInProtheus($product, $association->tabela_protheus);
-                    }
-                }
-            } catch (\Exception $e) {
-                // Não falha o cadastro se não conseguir inserir no Protheus
-                Log::warning('Não foi possível inserir produto no Protheus (continuando sem erro)', [
-                    'company_id' => $companyId,
-                    'product_id' => $product->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-
-            DB::commit();
-            return $product;
-        } catch (\Exception $e) {
-            DB::rollBack();
-            throw $e;
-        }
+        // Criar produto apenas no sistema interno
+        // Não insere no Protheus conforme solicitado
+        return $this->create($data, $companyId);
     }
 
     /**
@@ -470,20 +441,51 @@ class StockProductService
         // 2. Buscar produtos do Protheus (se houver associação) - buscar diretamente da conexão
         try {
             $company = Company::find($companyId);
-            if ($company) {
+            if (!$company) {
+                Log::warning('Empresa não encontrada ao buscar produtos do Protheus', [
+                    'company_id' => $companyId,
+                ]);
+            } else {
                 $association = $company->getProtheusAssociationByDescricao('Produto');
                 
-                if ($association && !empty($association->tabela_protheus)) {
+                if (!$association) {
+                    Log::info('Associação Protheus não encontrada para produtos', [
+                        'company_id' => $companyId,
+                        'descricao_buscada' => 'Produto',
+                    ]);
+                } elseif (empty($association->tabela_protheus)) {
+                    Log::warning('Associação Protheus encontrada mas sem tabela_protheus', [
+                        'company_id' => $companyId,
+                        'association_id' => $association->id,
+                        'descricao' => $association->descricao,
+                    ]);
+                } else {
                     $connection = DB::connection('protheus');
                     $databaseName = $connection->getDatabaseName();
                     
-                    if (!empty($databaseName)) {
+                    if (empty($databaseName)) {
+                        Log::warning('Database Protheus não configurado', [
+                            'company_id' => $companyId,
+                        ]);
+                    } else {
                         $tableIdentifier = preg_replace('/[^a-zA-Z0-9_]/', '', $association->tabela_protheus);
                         
-                        if (!empty($tableIdentifier)) {
+                        if (empty($tableIdentifier)) {
+                            Log::warning('Tabela Protheus inválida após sanitização', [
+                                'company_id' => $companyId,
+                                'tabela_original' => $association->tabela_protheus,
+                            ]);
+                        } else {
+                            Log::info('Buscando produtos do Protheus', [
+                                'company_id' => $companyId,
+                                'database' => $databaseName,
+                                'tabela' => $tableIdentifier,
+                                'search' => $search,
+                            ]);
+                            
                             $query = $connection->table(DB::raw("[$databaseName].[dbo].[$tableIdentifier]"))
                                 ->where('D_E_L_E_T_', '<>', '*')
-                                ->select('B1_COD', 'B1_DESC', 'B1_UM', 'B1_REF');
+                                ->select('B1_COD', 'B1_DESC', 'B1_UM');
                             
                             if (!empty($search)) {
                                 $searchUpper = mb_strtoupper(trim($search));
@@ -501,7 +503,7 @@ class StockProductService
                                         'B1_COD' => trim($item->B1_COD ?? ''),
                                         'B1_DESC' => trim($item->B1_DESC ?? ''),
                                         'B1_UM' => trim($item->B1_UM ?? 'UN'),
-                                        'B1_REF' => trim($item->B1_REF ?? '') ?: null, // Adicionar referência do Protheus
+                                        'B1_REF' => null, // Campo não existe na tabela SB1010
                                         'source' => 'protheus', // Identificar como produto do Protheus
                                         'internal_id' => null,
                                     ];
@@ -510,6 +512,11 @@ class StockProductService
                                     // Filtrar apenas produtos válidos
                                     return !empty($item['B1_COD']) && !empty($item['B1_DESC']);
                                 });
+                            
+                            Log::info('Produtos encontrados no Protheus', [
+                                'company_id' => $companyId,
+                                'total' => $protheusProducts->count(),
+                            ]);
                             
                             // Mesclar produtos, removendo duplicados por código
                             $existingCodes = $allProducts->pluck('B1_COD')->map(function($code) {
@@ -521,15 +528,21 @@ class StockProductService
                                 return !empty($code) && !in_array($code, $existingCodes);
                             });
                             
+                            Log::info('Produtos únicos do Protheus (após remover duplicados)', [
+                                'company_id' => $companyId,
+                                'total' => $protheusProductsUnique->count(),
+                            ]);
+                            
                             $allProducts = $allProducts->merge($protheusProductsUnique);
                         }
                     }
                 }
             }
         } catch (\Exception $e) {
-            Log::warning('Erro ao buscar produtos do Protheus', [
+            Log::error('Erro ao buscar produtos do Protheus', [
                 'company_id' => $companyId,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
             // Continua com apenas produtos internos em caso de erro
         }

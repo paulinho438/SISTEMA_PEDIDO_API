@@ -239,12 +239,12 @@ class StockProductController extends Controller
             
             $this->custom_log->create([
                 'user_id' => $user->id,
-                'content' => 'O usuário: ' . $user->nome_completo . ' criou o produto de estoque ' . $product->code . ' e cadastrou no Protheus',
+                'content' => 'O usuário: ' . $user->nome_completo . ' criou o produto de estoque ' . $product->code,
                 'operation' => 'create'
             ]);
 
             return response()->json([
-                'message' => 'Produto cadastrado com sucesso no sistema e no Protheus.',
+                'message' => 'Produto cadastrado com sucesso no sistema.',
                 'data' => new StockProductResource($product)
             ], Response::HTTP_CREATED);
         } catch (\Exception $e) {
