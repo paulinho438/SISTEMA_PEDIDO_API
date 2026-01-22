@@ -140,6 +140,73 @@ class PurchaseQuoteController extends Controller
         ]);
     }
 
+    /**
+     * Constrói um histórico completo combinando status history, aprovações e mensagens
+     */
+    protected function buildCompleteHistory(PurchaseQuote $quote): array
+    {
+        $history = collect();
+
+        // Adicionar histórico de mudanças de status
+        foreach ($quote->statusHistory as $statusHistory) {
+            $history->push([
+                'tipo' => 'status',
+                'acao' => 'Mudança de Status',
+                'status' => $statusHistory->status_label,
+                'status_slug' => $statusHistory->status_slug,
+                'usuario' => $statusHistory->acted_by_name,
+                'observacao' => $statusHistory->notes,
+                'data' => optional($statusHistory->acted_at)->format('d/m/Y H:i'),
+                'data_iso' => optional($statusHistory->acted_at)->toIso8601String(),
+                'timestamp' => optional($statusHistory->acted_at)->timestamp ?? 0,
+            ]);
+        }
+
+        // Adicionar aprovações
+        foreach ($quote->approvals as $approval) {
+            if ($approval->approved && $approval->approved_at) {
+                $levelLabels = [
+                    'COMPRADOR' => 'Comprador',
+                    'ENGENHEIRO' => 'Engenheiro',
+                    'GERENTE_LOCAL' => 'Gerente Local',
+                    'GERENTE_GERAL' => 'Gerente Geral',
+                    'DIRETOR' => 'Diretor',
+                    'PRESIDENTE' => 'Presidente',
+                ];
+
+                $history->push([
+                    'tipo' => 'aprovacao',
+                    'acao' => 'Aprovação',
+                    'nivel' => $approval->approval_level,
+                    'nivel_label' => $levelLabels[$approval->approval_level] ?? $approval->approval_level,
+                    'usuario' => $approval->approved_by_name,
+                    'observacao' => $approval->notes,
+                    'data' => optional($approval->approved_at)->format('d/m/Y H:i'),
+                    'data_iso' => optional($approval->approved_at)->toIso8601String(),
+                    'timestamp' => optional($approval->approved_at)->timestamp ?? 0,
+                ]);
+            }
+        }
+
+        // Adicionar mensagens de reprovação
+        foreach ($quote->messages as $message) {
+            if ($message->type === 'reprova') {
+                $history->push([
+                    'tipo' => 'reprovacao',
+                    'acao' => 'Reprovação',
+                    'usuario' => optional($message->user)->nome_completo ?? optional($message->user)->name ?? 'Sistema',
+                    'observacao' => $message->message,
+                    'data' => optional($message->created_at)->format('d/m/Y H:i'),
+                    'data_iso' => optional($message->created_at)->toIso8601String(),
+                    'timestamp' => optional($message->created_at)->timestamp ?? 0,
+                ]);
+            }
+        }
+
+        // Ordenar por timestamp (mais recente primeiro)
+        return $history->sortByDesc('timestamp')->values()->toArray();
+    }
+
     public function index(Request $request)
     {
         $perPage = (int) $request->get('per_page', 10);
@@ -716,13 +783,7 @@ class PurchaseQuoteController extends Controller
                         ] : null,
                     ];
                 }),
-                'historico' => $quote->statusHistory->map(fn (PurchaseQuoteStatusHistory $history) => [
-                    'status' => $history->status_label,
-                    'perfil' => optional($history->status)->required_profile,
-                    'usuario' => $history->acted_by_name,
-                    'observacao' => $history->notes,
-                    'data' => optional($history->acted_at)->format('d/m/Y H:i'),
-                ]),
+                'historico' => $this->buildCompleteHistory($quote),
                 'aprovacoes' => $quote->approvals->map(fn ($approval) => [
                     'level' => $approval->approval_level,
                     'required' => $approval->required,
