@@ -10,6 +10,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\StockTransfer;
 use App\Models\Company;
 use App\Models\StockLocation;
+use App\Models\Stock;
 use App\Models\User;
 
 class StockTransferController extends Controller
@@ -226,6 +227,97 @@ class StockTransferController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'error' => 'Erro ao gerar documento: ' . $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Visualizar documento PDF da transferência sem salvar
+     */
+    public function visualizarDocumento(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'error' => 'Não autorizado'
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_movimentacoes_create')) {
+            return response()->json([
+                'error' => 'Não autorizado'
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            $validated = $request->validate([
+                'local_origem_id' => 'required|exists:stock_locations,id',
+                'local_destino_id' => 'required|exists:stock_locations,id',
+                'driver_name' => 'nullable|string|max:255',
+                'license_plate' => 'nullable|string|max:20',
+                'observacao' => 'nullable|string',
+                'itens' => 'required|array|min:1',
+                'itens.*.stock_id' => 'required|exists:stocks,id',
+                'itens.*.quantidade' => 'required|numeric|min:0.0001',
+            ]);
+
+            $companyId = (int) $request->header('company-id');
+            if (!$companyId) {
+                throw new \Exception('Company ID é obrigatório.');
+            }
+
+            $company = Company::findOrFail($companyId);
+            $originLocation = StockLocation::findOrFail($validated['local_origem_id']);
+            $destinationLocation = StockLocation::findOrFail($validated['local_destino_id']);
+
+            // Buscar dados dos produtos dos itens
+            $itens = [];
+            foreach ($validated['itens'] as $itemData) {
+                $stock = Stock::with(['product'])->findOrFail($itemData['stock_id']);
+                $itens[] = [
+                    'codigo' => $stock->product->code ?? '-',
+                    'referencia' => $stock->product->reference ?? '-',
+                    'descricao' => $stock->product->description ?? '-',
+                    'quantidade' => (float) $itemData['quantidade'],
+                    'preco_unitario' => 0.00,
+                    'preco_total' => 0.00,
+                ];
+            }
+
+            $dataTransferencia = now()->format('d/m/Y');
+            $horaTransferencia = now()->format('H:i:s');
+            
+            // Gerar número temporário para visualização
+            $numeroDocumento = 'PREVIEW-' . date('YmdHis');
+
+            $pdf = Pdf::loadView('transferencia-estoque', [
+                'company' => $company,
+                'user' => $user,
+                'local_origem' => $originLocation,
+                'local_destino' => $destinationLocation,
+                'itens' => $itens,
+                'observacao' => $validated['observacao'] ?? null,
+                'data_transferencia' => $dataTransferencia,
+                'hora_transferencia' => $horaTransferencia,
+                'numero_documento' => $numeroDocumento,
+                'driver_name' => $validated['driver_name'] ?? null,
+                'license_plate' => $validated['license_plate'] ?? null,
+            ]);
+
+            $options = new \Dompdf\Options();
+            $options->set('isRemoteEnabled', true);
+            $options->set('isHtml5ParserEnabled', true);
+            $options->set('isPhpEnabled', true);
+            
+            $pdf->getDomPDF()->setOptions($options);
+            $pdf->setPaper('A4', 'landscape');
+
+            // Retornar como stream para visualização (não download)
+            return $pdf->stream("transferencia-preview.pdf");
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Erro ao visualizar documento: ' . $e->getMessage()
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }

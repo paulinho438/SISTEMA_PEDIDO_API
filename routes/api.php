@@ -340,6 +340,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/transferencias/{id}/receber', [StockTransferController::class, 'receber']);
         Route::delete('/transferencias/{id}', [StockTransferController::class, 'destroy']);
         Route::get('/transferencias/{id}/documento', [StockTransferController::class, 'gerarDocumento']);
+        Route::post('/transferencias/visualizar-documento', [StockTransferController::class, 'visualizarDocumento']);
         
         // Produtos
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);
