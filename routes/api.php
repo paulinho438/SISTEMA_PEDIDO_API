@@ -349,6 +349,8 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/produtos/{id}', [StockProductController::class, 'show']);
         Route::post('/produtos', [StockProductController::class, 'store']);
         Route::post('/produtos/cadastrar-com-protheus', [StockProductController::class, 'cadastrarComProtheus']);
+        Route::post('/produtos/importar-excel', [StockProductController::class, 'importarExcel']);
+        Route::get('/produtos/template-excel', [StockProductController::class, 'baixarTemplate']);
         Route::put('/produtos/{id}', [StockProductController::class, 'update']);
         Route::patch('/produtos/{id}/toggle-active', [StockProductController::class, 'toggleActive']);
         Route::post('/produtos/{id}/upload-image', [StockProductController::class, 'uploadImage']);

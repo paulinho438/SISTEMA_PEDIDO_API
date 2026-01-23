@@ -5,10 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\CustomLog;
 use App\Http\Resources\StockProductResource;
 use App\Services\StockProductService;
+use App\Imports\StockProductsImport;
+use App\Exports\StockProductsTemplateExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\Response;
 
 class StockProductController extends Controller
@@ -339,6 +342,95 @@ class StockProductController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Erro ao remover imagem',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Importar produtos em massa via Excel
+     */
+    public function importarExcel(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('import_estoque_produtos_excel')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para importar produtos via Excel.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|mimes:xlsx,xls|max:10240', // Máximo 10MB
+        ], [
+            'file.required' => 'Arquivo Excel é obrigatório',
+            'file.mimes' => 'O arquivo deve ser do tipo Excel (.xlsx ou .xls)',
+            'file.max' => 'O arquivo não pode ser maior que 10MB',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $companyId = (int) $request->header('company-id');
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Company ID é obrigatório',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $file = $request->file('file');
+            
+            $import = new StockProductsImport($companyId, $user->id);
+            Excel::import($import, $file);
+
+            $successCount = $import->getSuccessCount();
+            $skipCount = $import->getSkipCount();
+            $errors = $import->getErrors();
+
+            return response()->json([
+                'message' => 'Importação concluída',
+                'data' => [
+                    'sucesso' => $successCount,
+                    'ignorados' => $skipCount,
+                    'total_processado' => $successCount + $skipCount,
+                    'erros' => $errors,
+                ]
+            ], Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao importar arquivo Excel',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
+     * Baixar template Excel para importação
+     */
+    public function baixarTemplate(Request $request)
+    {
+        $user = auth()->user();
+        
+        if (!$user || !$user->hasPermission('import_estoque_produtos_excel')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para importar produtos via Excel.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        try {
+            return Excel::download(
+                new StockProductsTemplateExport(),
+                'template_importacao_produtos.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao gerar template',
                 'error' => $e->getMessage()
             ], Response::HTTP_BAD_REQUEST);
         }
