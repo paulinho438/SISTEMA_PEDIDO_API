@@ -64,20 +64,6 @@ class StockTransferController extends Controller
         $transfer = StockTransfer::with(['items.product', 'items.stock', 'originLocation', 'destinationLocation', 'user'])
             ->findOrFail($id);
         
-        // Para transferências parciais, buscar estoque atual no destino para cada item
-        if ($transfer->status === 'recebido_parcial') {
-            $companyId = (int) $request->header('company-id');
-            foreach ($transfer->items as $item) {
-                $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
-                    ->where('stock_location_id', $transfer->destination_location_id)
-                    ->where('company_id', $companyId)
-                    ->first();
-                
-                // Adicionar informação de estoque atual ao item (via atributo dinâmico)
-                $item->destination_stock_available = $destinationStock ? (float) $destinationStock->quantity_available : 0;
-            }
-        }
-        
         return response()->json([
             'data' => new StockTransferResource($transfer),
         ]);

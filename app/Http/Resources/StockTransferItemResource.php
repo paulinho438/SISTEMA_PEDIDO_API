@@ -18,7 +18,7 @@ class StockTransferItemResource extends JsonResource
             ],
             'quantity' => (float) $this->quantity,
             'quantity_available_before' => (float) $this->quantity_available_before,
-            'destination_stock_available' => isset($this->destination_stock_available) ? (float) $this->destination_stock_available : null,
+            'quantity_received' => $this->quantity_received !== null ? (float) $this->quantity_received : null,
         ];
     }
 }

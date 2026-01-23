@@ -181,6 +181,11 @@ class StockTransferService
                     $item = $transfer->items->firstWhere('id', $itemRecebido['item_id']);
                     $quantidadeRecebida = (float) $itemRecebido['quantidade_recebida'];
 
+                    // Atualizar quantidade recebida no item da transferência
+                    $this->updateModelWithStringTimestamps($item, [
+                        'quantity_received' => $quantidadeRecebida,
+                    ]);
+
                     // Buscar ou criar estoque no local de destino
                     $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
                         ->where('stock_location_id', $transfer->destination_location_id)
@@ -209,6 +214,11 @@ class StockTransferService
             } else {
                 // Recebimento total - processar todos os itens
                 foreach ($transfer->items as $item) {
+                    // Atualizar quantidade recebida no item da transferência (igual à quantidade enviada)
+                    $this->updateModelWithStringTimestamps($item, [
+                        'quantity_received' => $item->quantity,
+                    ]);
+
                     // Buscar ou criar estoque no local de destino
                     $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
                         ->where('stock_location_id', $transfer->destination_location_id)

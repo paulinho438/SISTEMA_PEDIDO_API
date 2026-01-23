@@ -16,11 +16,13 @@ class StockTransferItem extends Model
         'stock_product_id',
         'quantity',
         'quantity_available_before',
+        'quantity_received',
     ];
 
     protected $casts = [
-        'quantity' => 'decimal:2',
-        'quantity_available_before' => 'decimal:2',
+        'quantity' => 'decimal:4',
+        'quantity_available_before' => 'decimal:4',
+        'quantity_received' => 'decimal:4',
         'stock_transfer_id' => 'integer',
         'stock_id' => 'integer',
         'stock_product_id' => 'integer',
