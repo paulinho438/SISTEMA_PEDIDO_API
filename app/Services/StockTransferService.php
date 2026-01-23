@@ -125,6 +125,17 @@ class StockTransferService
             throw new \Exception('Esta transferência já foi totalmente recebida.');
         }
 
+        // Verificar se o usuário é dono do almoxarifado de destino
+        $isOwner = DB::table('stock_almoxarife_locations')
+            ->where('user_id', $user->id)
+            ->where('stock_location_id', $transfer->destination_location_id)
+            ->where('company_id', $transfer->company_id)
+            ->exists();
+
+        if (!$isOwner) {
+            throw new \Exception('Apenas o dono do almoxarifado de destino pode receber a transferência.');
+        }
+
         $tipo = $dados['tipo'] ?? 'total';
         $itensRecebidos = $dados['itens'] ?? [];
 
