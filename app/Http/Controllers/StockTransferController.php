@@ -51,7 +51,7 @@ class StockTransferController extends Controller
     /**
      * Buscar transferência específica
      */
-    public function show($id)
+    public function show(Request $request, $id)
     {
         $user = auth()->user();
         
@@ -68,7 +68,7 @@ class StockTransferController extends Controller
         if ($transfer->status === 'recebido_parcial') {
             $companyId = (int) $request->header('company-id');
             foreach ($transfer->items as $item) {
-                $destinationStock = \App\Models\Stock::where('stock_product_id', $item->stock_product_id)
+                $destinationStock = Stock::where('stock_product_id', $item->stock_product_id)
                     ->where('stock_location_id', $transfer->destination_location_id)
                     ->where('company_id', $companyId)
                     ->first();
