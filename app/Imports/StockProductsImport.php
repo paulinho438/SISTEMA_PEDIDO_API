@@ -108,46 +108,37 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
     protected function findOrCreateProduct($row, StockProductService $productService)
     {
-        $code = isset($row['codigo']) && !empty(trim($row['codigo'] ?? '')) 
-            ? trim($row['codigo']) 
-            : null;
-
+        // Código sempre será gerado automaticamente pelo sistema
+        // Ignorar se vier no Excel
+        
         $description = trim($row['descricao']);
         $reference = isset($row['referencia']) && !empty(trim($row['referencia'] ?? '')) 
             ? trim($row['referencia']) 
             : null;
         $unit = trim($row['unidade']);
 
-        // Se código foi fornecido, buscar produto existente
-        if ($code) {
-            $product = StockProduct::where('code', $code)
-                ->where('company_id', $this->companyId)
-                ->first();
+        // Buscar produto existente por descrição e unidade (não por código)
+        // Isso permite atualizar produtos existentes se necessário
+        $product = StockProduct::where('description', $description)
+            ->where('unit', $unit)
+            ->where('company_id', $this->companyId)
+            ->first();
 
-            if ($product) {
-                // Atualizar descrição e unidade se necessário
-                if ($product->description !== $description || $product->unit !== $unit) {
-                    $product->description = $description;
-                    $product->unit = $unit;
-                    if ($reference) {
-                        $product->reference = $reference;
-                    }
-                    $product->save();
-                }
-                return $product;
+        if ($product) {
+            // Atualizar referência se necessário
+            if ($reference && $product->reference !== $reference) {
+                $product->reference = $reference;
+                $product->save();
             }
+            return $product;
         }
 
-        // Criar novo produto
+        // Criar novo produto (código será gerado automaticamente)
         $productData = [
             'description' => $description,
             'unit' => $unit,
             'active' => true,
         ];
-
-        if ($code) {
-            $productData['code'] = $code;
-        }
 
         if ($reference) {
             $productData['reference'] = $reference;

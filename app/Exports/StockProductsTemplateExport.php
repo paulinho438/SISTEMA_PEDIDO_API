@@ -12,16 +12,15 @@ class StockProductsTemplateExport implements FromArray, WithHeadings, WithStyles
     public function array(): array
     {
         return [
-            ['PROD-001', 'REF-001', 'Produto Exemplo 1', 'UN', 'ALMOXARIFADO JAÍBA-MG', '10.00', '25.50', 'Importação em massa'],
-            ['PROD-002', 'REF-002', 'Produto Exemplo 2', 'UN', 'ALMOXARIFADO JAÍBA-MG', '5.00', '15.75', ''],
-            ['', 'REF-003', 'Produto Exemplo 3 (código será gerado automaticamente)', 'KG', 'ALMOXARIFADO ESPRAIADO-BA', '2.50', '', 'Sem custo unitário'],
+            ['REF-001', 'Produto Exemplo 1', 'UN', 'ALMOXARIFADO JAÍBA-MG', '10.00', '25.50', 'Importação em massa'],
+            ['REF-002', 'Produto Exemplo 2', 'UN', 'ALMOXARIFADO JAÍBA-MG', '5.00', '15.75', ''],
+            ['REF-003', 'Produto Exemplo 3', 'KG', 'ALMOXARIFADO ESPRAIADO-BA', '2.50', '', 'Sem custo unitário'],
         ];
     }
 
     public function headings(): array
     {
         return [
-            'Código',
             'Referência',
             'Descrição',
             'Unidade',
