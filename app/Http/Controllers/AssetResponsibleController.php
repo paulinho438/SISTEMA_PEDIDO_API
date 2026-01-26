@@ -116,10 +116,47 @@ class AssetResponsibleController extends Controller
         return new AssetResponsibleResource($item);
     }
 
+    /**
+     * Gera código sequencial para responsável
+     */
+    private function generateNextCode(int $companyId): string
+    {
+        $prefix = 'RESP-';
+        
+        // Buscar todos os responsáveis da empresa com o prefixo
+        $responsibles = AssetResponsible::where('company_id', $companyId)
+            ->where('code', 'like', $prefix . '%')
+            ->get();
+
+        $maxNumber = 0;
+        
+        foreach ($responsibles as $responsible) {
+            // Extrair o número do código (remover o prefixo)
+            $numberStr = str_replace($prefix, '', $responsible->code);
+            $number = (int) $numberStr;
+            
+            if ($number > $maxNumber) {
+                $maxNumber = $number;
+            }
+        }
+
+        $newNumber = $maxNumber + 1;
+
+        return $prefix . str_pad((string) $newNumber, 6, '0', STR_PAD_LEFT);
+    }
+
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:50',
+        $companyId = $request->header('company-id');
+        $data = $request->all();
+
+        // Se o código não foi fornecido ou está vazio, gerar automaticamente
+        if (!isset($data['code']) || empty($data['code']) || trim($data['code']) === '') {
+            $data['code'] = $this->generateNextCode($companyId);
+        }
+
+        $validator = Validator::make($data, [
+            'code' => 'required|string|max:50|unique:asset_responsibles,code,NULL,id,company_id,' . $companyId,
             'name' => 'required|string|max:255',
         ]);
 
@@ -127,10 +164,7 @@ class AssetResponsibleController extends Controller
             return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
         }
 
-        $data = [
-            ...$request->all(),
-            'company_id' => $request->header('company-id'),
-        ];
+        $data['company_id'] = $companyId;
 
         // Usar helper para inserir com timestamps como strings (compatível com SQL Server)
         $id = $this->insertWithStringTimestamps('asset_responsibles', $data);
