@@ -329,7 +329,7 @@ class AssetController extends Controller
         }
 
         // Buscar dados do responsável
-        $responsible = \App\Models\User::find($responsibleId);
+        $responsible = \App\Models\AssetResponsible::find($responsibleId);
         
         if (!$responsible) {
             return response()->json([
@@ -360,7 +360,7 @@ class AssetController extends Controller
         $pdf->getDomPDF()->setOptions($options);
         $pdf->setPaper('A4', 'portrait');
         
-        $fileName = 'termo-responsabilidade-' . preg_replace('/[^a-zA-Z0-9]/', '-', strtolower($responsible->nome_completo ?? $responsible->name ?? 'termo')) . '-' . date('Y-m-d') . '.pdf';
+        $fileName = 'termo-responsabilidade-' . preg_replace('/[^a-zA-Z0-9]/', '-', strtolower($responsible->name ?? 'termo')) . '-' . date('Y-m-d') . '.pdf';
         
         return $pdf->download($fileName);
     }

@@ -88,12 +88,12 @@ class AssetMovement extends Model
 
     public function fromResponsible()
     {
-        return $this->belongsTo(User::class, 'from_responsible_id');
+        return $this->belongsTo(AssetResponsible::class, 'from_responsible_id');
     }
 
     public function toResponsible()
     {
-        return $this->belongsTo(User::class, 'to_responsible_id');
+        return $this->belongsTo(AssetResponsible::class, 'to_responsible_id');
     }
 
     public function fromCostCenter()

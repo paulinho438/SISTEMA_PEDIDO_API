@@ -26,7 +26,7 @@ class AssetMovementResource extends JsonResource
                 return ['id' => $this->toLocation->id, 'name' => $this->toLocation->name];
             }),
             'to_responsible' => $this->whenLoaded('toResponsible', function() {
-                return ['id' => $this->toResponsible->id, 'nome_completo' => $this->toResponsible->nome_completo];
+                return ['id' => $this->toResponsible->id, 'name' => $this->toResponsible->name];
             }),
             'created_at' => $this->created_at ? $this->created_at->format('d/m/Y H:i:s') : null,
         ];

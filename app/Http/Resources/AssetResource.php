@@ -39,7 +39,7 @@ class AssetResource extends JsonResource
             'responsible' => $this->whenLoaded('responsible', function() {
                 return [
                     'id' => $this->responsible->id,
-                    'nome_completo' => $this->responsible->nome_completo,
+                    'name' => $this->responsible->name,
                 ];
             }),
             'cost_center_id' => $this->cost_center_id,

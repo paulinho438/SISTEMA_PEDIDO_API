@@ -46,6 +46,8 @@ use App\Http\Controllers\{
     AssetUseConditionController,
     AssetStandardDescriptionController,
     AssetBranchController,
+    AssetLocationController,
+    AssetResponsibleController,
     AssetSubType1Controller,
     AssetSubType2Controller,
     AssetGroupingController,
@@ -417,6 +419,13 @@ Route::middleware('auth:api')->group(function () {
             Route::post('/', [AssetLocationController::class, 'store']);
             Route::put('/{id}', [AssetLocationController::class, 'update']);
             Route::delete('/{id}', [AssetLocationController::class, 'destroy']);
+        });
+        Route::prefix('responsaveis')->group(function () {
+            Route::get('/', [AssetResponsibleController::class, 'index']);
+            Route::get('/{id}', [AssetResponsibleController::class, 'show']);
+            Route::post('/', [AssetResponsibleController::class, 'store']);
+            Route::put('/{id}', [AssetResponsibleController::class, 'update']);
+            Route::delete('/{id}', [AssetResponsibleController::class, 'destroy']);
         });
         Route::prefix('sub-tipos-1')->group(function () {
             Route::get('/', [AssetSubType1Controller::class, 'index']);
