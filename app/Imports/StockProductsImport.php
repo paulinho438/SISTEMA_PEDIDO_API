@@ -80,7 +80,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow
                     $cost = ($custoValue !== null && $custoValue !== '') ? (float) $custoValue : null;
 
                     if ($quantity > 0) {
-                        $this->addStockQuantity($stock, $quantity, $cost, $row);
+                        $this->addStockQuantity($stock, $product, $location, $quantity, $cost, $row);
                         $this->successCount++;
                     } else {
                         $this->errors[] = "Linha {$rowNumber}: Quantidade deve ser maior que zero";
@@ -469,25 +469,31 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         return $stock;
     }
 
-    protected function addStockQuantity($stock, $quantity, $cost, $row)
+    protected function addStockQuantity($stock, $product, $location, $quantity, $cost, $row)
     {
-        // Recarregar o stock para garantir que temos os valores mais recentes
-        $stock->refresh();
+        // Buscar valores atuais diretamente do banco com lock para evitar problemas de concorrência
+        // Usar WITH (UPDLOCK, ROWLOCK) para garantir que lemos os valores mais recentes e bloqueamos a linha
+        $currentStock = DB::selectOne(
+            "SELECT [quantity_available], [quantity_total] FROM [stocks] WITH (UPDLOCK, ROWLOCK) WHERE [id] = ?",
+            [$stock->id]
+        );
         
-        $quantityBefore = $stock->quantity_available;
+        if (!$currentStock) {
+            throw new \Exception("Estoque não encontrado no banco de dados");
+        }
+        
+        $quantityBefore = (float) $currentStock->quantity_available;
         $quantityAfter = $quantityBefore + $quantity;
+        $quantityTotalAfter = (float) $currentStock->quantity_total + $quantity;
 
-        // Atualizar estoque
+        // Atualizar estoque usando valores do banco
         $now = now()->format('Y-m-d H:i:s');
         DB::statement(
             "UPDATE [stocks] SET [quantity_available] = ?, [quantity_total] = ?, [last_movement_at] = CAST(? AS DATETIME2), [updated_at] = CAST(? AS DATETIME2) WHERE [id] = ?",
-            [$quantityAfter, $stock->quantity_total + $quantity, $now, $now, $stock->id]
+            [$quantityAfter, $quantityTotalAfter, $now, $now, $stock->id]
         );
-        
-        // Recarregar novamente após atualização para garantir que temos os valores corretos
-        $stock->refresh();
 
-        // Criar movimentação
+        // Criar movimentação usando os IDs do produto e local passados como parâmetros
         $observacaoValue = $this->normalizeColumnName($row, ['observacao', 'observação', 'Observação']);
         $observation = ($observacaoValue !== null && !empty(trim((string) $observacaoValue))) 
             ? trim((string) $observacaoValue) 
@@ -498,8 +504,8 @@ class StockProductsImport implements ToCollection, WithHeadingRow
              VALUES (?, ?, ?, 'entrada', ?, ?, ?, 'outro', ?, ?, ?, ?, ?, CAST(? AS DATE), CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
             [
                 $stock->id,
-                $stock->stock_product_id,
-                $stock->stock_location_id,
+                $product->id,
+                $location->id,
                 $quantity,
                 $quantityBefore,
                 $quantityAfter,
