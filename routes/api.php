@@ -53,8 +53,7 @@ use App\Http\Controllers\{
     AssetGroupingController,
     AssetAccountController,
     AssetProjectController,
-    AssetBusinessUnitController,
-    AssetLocationController
+    AssetBusinessUnitController
 };
 use App\Models\BotaoCobranca;
 use Illuminate\Http\Request;
