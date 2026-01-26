@@ -48,6 +48,8 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
                     }
 
                     // Validar linha (validação manual com normalização de colunas)
+                    // Esta validação é feita manualmente porque o WithValidation pode não
+                    // encontrar as colunas corretamente devido às variações de nomes
                     $this->validateRow($row, $rowNumber);
 
                     // Buscar ou criar produto
@@ -91,6 +93,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
     /**
      * Verifica se uma linha está completamente vazia
      * Uma linha é considerada vazia se TODOS os campos obrigatórios estiverem vazios
+     * Verifica diretamente as chaves do array para ser mais eficiente
      */
     protected function isRowEmpty($row): bool
     {
@@ -102,29 +105,25 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
             return true;
         }
         
-        // Verificar se pelo menos um campo obrigatório tem valor
-        $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
-        $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
-        $localEstoque = $this->normalizeColumnName($row, [
-            'local de estoque',  // lowercase com espaços (mais comum)
-            'local_de_estoque',  // lowercase com underscores
-            'Local de Estoque',  // original
-            'Local de estoque',  // primeira maiúscula
-            'LOCAL DE ESTOQUE',  // uppercase
-            'local_estoque',     // sem "de"
-            'localestoque',      // sem espaços
-        ]);
-        $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
-        
-        // Verificar se algum campo obrigatório tem valor não vazio
-        $hasDescricao = $descricao !== null && trim((string) $descricao) !== '';
-        $hasUnidade = $unidade !== null && trim((string) $unidade) !== '';
-        $hasLocalEstoque = $localEstoque !== null && trim((string) $localEstoque) !== '';
-        $hasQuantidade = $quantidade !== null && trim((string) $quantidade) !== '' && (float) $quantidade > 0;
-        
-        // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
-        if ($hasDescricao || $hasUnidade || $hasLocalEstoque || $hasQuantidade) {
-            return false;
+        // Verificar diretamente nas chaves do array se algum campo obrigatório tem valor
+        // Isso é mais eficiente e não depende do normalizeColumnName que pode falhar
+        foreach ($rowArray as $key => $value) {
+            $keyStr = strtolower(trim((string) $key));
+            $valueStr = trim((string) $value);
+            
+            // Verificar se é um campo obrigatório e se tem valor
+            if ($valueStr !== '' && $valueStr !== null) {
+                // Verificar se a chave corresponde a algum campo obrigatório
+                $normalizedKey = preg_replace('/[\s_\-]/', '', $keyStr);
+                
+                // Campos obrigatórios: descricao, unidade, local de estoque, quantidade
+                if (strpos($normalizedKey, 'descricao') !== false ||
+                    strpos($normalizedKey, 'unidade') !== false ||
+                    strpos($normalizedKey, 'local') !== false && strpos($normalizedKey, 'estoque') !== false ||
+                    strpos($normalizedKey, 'quantidade') !== false) {
+                    return false; // Linha não está vazia
+                }
+            }
         }
         
         // Se nenhum campo obrigatório tem valor, a linha está vazia
@@ -227,6 +226,30 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
             }
         }
         
+        // Última tentativa: buscar diretamente nas chaves do array usando comparação parcial
+        // Isso ajuda quando há pequenas diferenças que não foram capturadas acima
+        $searchTerms = [];
+        foreach ($possibleNames as $name) {
+            $nameStr = trim((string) $name);
+            if ($nameStr === '') {
+                continue;
+            }
+            $normalized = $this->normalizeKey($nameStr);
+            $searchTerms[] = $normalized;
+        }
+        
+        foreach ($rowArray as $key => $value) {
+            $keyNormalized = $this->normalizeKey((string) $key);
+            foreach ($searchTerms as $searchTerm) {
+                // Comparação parcial: se a chave normalizada contém o termo de busca
+                if ($keyNormalized === $searchTerm || 
+                    (strlen($searchTerm) > 5 && strpos($keyNormalized, $searchTerm) !== false) ||
+                    (strlen($keyNormalized) > 5 && strpos($searchTerm, $keyNormalized) !== false)) {
+                    return $value;
+                }
+            }
+        }
+        
         return null;
     }
     
@@ -272,10 +295,12 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         // Se localEstoque está vazio, tentar listar as chaves disponíveis para debug
         if (empty($localEstoque)) {
             $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
-            $availableKeys = implode(', ', array_map(function($key) {
-                return "'{$key}'";
-            }, array_keys($rowArray)));
-            throw new \Exception("O campo 'Local de Estoque' é obrigatório. Colunas disponíveis na linha {$rowNumber}: [{$availableKeys}]. Verifique se o cabeçalho 'Local de Estoque' está correto na primeira linha do Excel.");
+            $availableKeys = [];
+            foreach ($rowArray as $key => $value) {
+                $availableKeys[] = "'{$key}' => '{$value}'";
+            }
+            $keysList = implode(', ', $availableKeys);
+            throw new \Exception("O campo 'Local de Estoque' é obrigatório na linha {$rowNumber}. Colunas disponíveis: [{$keysList}]. Verifique se o cabeçalho 'Local de Estoque' está correto na primeira linha do Excel e se o valor está preenchido nesta linha.");
         }
 
         $validator = Validator::make([
