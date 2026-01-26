@@ -346,9 +346,13 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);
         Route::get('/produtos/buscar-combinado', [StockProductController::class, 'buscarCombinado']);
         Route::get('/produtos', [StockProductController::class, 'index']);
-        Route::get('/produtos/{id}', [StockProductController::class, 'show']);
+        Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);
+        Route::get('/produtos/buscar-combinado', [StockProductController::class, 'buscarCombinado']);
+        Route::get('/produtos/template-excel', [StockProductController::class, 'baixarTemplate']);
+        Route::post('/produtos/importar-excel', [StockProductController::class, 'importarExcel']);
         Route::post('/produtos', [StockProductController::class, 'store']);
         Route::post('/produtos/cadastrar-com-protheus', [StockProductController::class, 'cadastrarComProtheus']);
+        Route::get('/produtos/{id}', [StockProductController::class, 'show']);
         Route::put('/produtos/{id}', [StockProductController::class, 'update']);
         Route::patch('/produtos/{id}/toggle-active', [StockProductController::class, 'toggleActive']);
         Route::post('/produtos/{id}/upload-image', [StockProductController::class, 'uploadImage']);
