@@ -53,12 +53,24 @@ class StockProductsImport implements ToCollection, WithHeadingRow
 
                     // Buscar ou criar produto
                     $product = $this->findOrCreateProduct($row, $productService);
+                    
+                    if (!$product || !$product->id) {
+                        throw new \Exception("Erro ao criar/buscar produto na linha {$rowNumber}");
+                    }
 
                     // Buscar local de estoque
                     $location = $this->findLocation($row);
+                    
+                    if (!$location || !$location->id) {
+                        throw new \Exception("Erro ao buscar local de estoque na linha {$rowNumber}");
+                    }
 
                     // Criar ou atualizar estoque
                     $stock = $this->findOrCreateStock($product, $location);
+                    
+                    if (!$stock || !$stock->id) {
+                        throw new \Exception("Erro ao criar/buscar estoque na linha {$rowNumber}");
+                    }
 
                     // Adicionar quantidade ao estoque
                     $quantidadeValue = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
@@ -78,6 +90,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow
                 } catch (\Exception $e) {
                     $this->errors[] = "Linha {$rowNumber}: " . $e->getMessage();
                     $this->skipCount++;
+                    // Continuar processando as próximas linhas mesmo se esta falhar
                     continue;
                 }
             }
@@ -92,7 +105,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow
     /**
      * Verifica se uma linha está completamente vazia
      * Uma linha é considerada vazia se TODOS os campos obrigatórios estiverem vazios
-     * Usa normalizeColumnName para garantir que encontra os campos corretamente
+     * Verifica diretamente nas chaves do array para ser mais eficiente e confiável
      */
     protected function isRowEmpty($row): bool
     {
@@ -104,34 +117,31 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             return true;
         }
         
-        // Verificar se pelo menos um campo obrigatório tem valor usando normalizeColumnName
-        // Isso garante que encontra os campos mesmo com variações de nomes
-        $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
-        $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
-        $localEstoque = $this->normalizeColumnName($row, [
-            'local de estoque',
-            'local_de_estoque',
-            'Local de Estoque',
-            'Local de estoque',
-            'LOCAL DE ESTOQUE',
-            'local_estoque',
-            'localestoque',
-        ]);
-        $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
-        
-        // Verificar se algum campo obrigatório tem valor não vazio
-        $hasDescricao = $descricao !== null && trim((string) $descricao) !== '';
-        $hasUnidade = $unidade !== null && trim((string) $unidade) !== '';
-        $hasLocalEstoque = $localEstoque !== null && trim((string) $localEstoque) !== '';
-        $hasQuantidade = $quantidade !== null && trim((string) $quantidade) !== '' && (float) $quantidade > 0;
-        
-        // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
-        if ($hasDescricao || $hasUnidade || $hasLocalEstoque || $hasQuantidade) {
-            return false;
+        // Verificar diretamente nas chaves do array se algum campo obrigatório tem valor
+        // Isso é mais eficiente e não depende do normalizeColumnName que pode falhar
+        $hasContent = false;
+        foreach ($rowArray as $key => $value) {
+            $keyStr = strtolower(trim((string) $key));
+            $valueStr = trim((string) $value);
+            
+            // Se o valor não está vazio, verificar se a chave corresponde a algum campo obrigatório
+            if ($valueStr !== '' && $valueStr !== null) {
+                // Normalizar a chave para comparação (remover espaços, underscores, etc)
+                $normalizedKey = preg_replace('/[\s_\-]/', '', $keyStr);
+                
+                // Campos obrigatórios: descricao, unidade, local de estoque, quantidade
+                if (strpos($normalizedKey, 'descricao') !== false ||
+                    strpos($normalizedKey, 'unidade') !== false ||
+                    (strpos($normalizedKey, 'local') !== false && strpos($normalizedKey, 'estoque') !== false) ||
+                    strpos($normalizedKey, 'quantidade') !== false) {
+                    $hasContent = true;
+                    break;
+                }
+            }
         }
         
-        // Se nenhum campo obrigatório tem valor, a linha está vazia
-        return true;
+        // Se não encontrou nenhum campo obrigatório com valor, a linha está vazia
+        return !$hasContent;
     }
 
     /**
@@ -149,10 +159,19 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             return null;
         }
         
-        // Primeiro, tentar encontrar exatamente como está no array
+        // Primeiro, tentar encontrar exatamente como está no array (case-sensitive)
         foreach ($possibleNames as $name) {
             if (isset($rowArray[$name])) {
                 return $rowArray[$name];
+            }
+        }
+        
+        // Segundo, tentar case-insensitive direto no array
+        foreach ($rowArray as $key => $value) {
+            foreach ($possibleNames as $name) {
+                if (strcasecmp((string) $key, (string) $name) === 0) {
+                    return $value;
+                }
             }
         }
         
@@ -435,13 +454,15 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         if (!$stock) {
             $now = now()->format('Y-m-d H:i:s');
             
-            DB::statement(
+            // Usar OUTPUT INSERTED.id para garantir que funciona corretamente no SQL Server
+            $result = DB::select(
                 "INSERT INTO [stocks] ([stock_product_id], [stock_location_id], [company_id], [quantity_available], [quantity_reserved], [quantity_total], [created_at], [updated_at]) 
+                 OUTPUT INSERTED.[id]
                  VALUES (?, ?, ?, 0, 0, 0, CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
                 [$product->id, $location->id, $this->companyId, $now, $now]
             );
 
-            $stockId = DB::getPdo()->lastInsertId();
+            $stockId = $result[0]->id;
             $stock = Stock::find($stockId);
         }
 
@@ -450,6 +471,9 @@ class StockProductsImport implements ToCollection, WithHeadingRow
 
     protected function addStockQuantity($stock, $quantity, $cost, $row)
     {
+        // Recarregar o stock para garantir que temos os valores mais recentes
+        $stock->refresh();
+        
         $quantityBefore = $stock->quantity_available;
         $quantityAfter = $quantityBefore + $quantity;
 
@@ -459,6 +483,9 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             "UPDATE [stocks] SET [quantity_available] = ?, [quantity_total] = ?, [last_movement_at] = CAST(? AS DATETIME2), [updated_at] = CAST(? AS DATETIME2) WHERE [id] = ?",
             [$quantityAfter, $stock->quantity_total + $quantity, $now, $now, $stock->id]
         );
+        
+        // Recarregar novamente após atualização para garantir que temos os valores corretos
+        $stock->refresh();
 
         // Criar movimentação
         $observacaoValue = $this->normalizeColumnName($row, ['observacao', 'observação', 'Observação']);
