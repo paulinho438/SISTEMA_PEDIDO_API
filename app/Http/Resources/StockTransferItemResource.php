@@ -11,11 +11,15 @@ class StockTransferItemResource extends JsonResource
         return [
             'id' => $this->id,
             'stock_id' => $this->stock_id,
-            'product' => [
+            'product' => $this->when($this->relationLoaded('product') && $this->product, [
                 'id' => $this->product->id ?? null,
                 'code' => $this->product->code ?? null,
                 'description' => $this->product->description ?? null,
-            ],
+            ], [
+                'id' => null,
+                'code' => null,
+                'description' => null,
+            ]),
             'quantity' => (float) $this->quantity,
             'quantity_available_before' => (float) $this->quantity_available_before,
             'quantity_received' => $this->quantity_received !== null ? (float) $this->quantity_received : null,
