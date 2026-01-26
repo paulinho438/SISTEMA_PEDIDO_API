@@ -408,6 +408,19 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         // Código sempre será gerado automaticamente pelo sistema
         // Ignorar se vier no Excel
         
+        Log::info("findOrCreateProduct - Buscando referência");
+        $reference = $this->normalizeColumnName($row, ['referencia', 'referência', 'Referência']);
+        $reference = ($reference !== null && !empty(trim((string) $reference))) ? trim((string) $reference) : null;
+        Log::info("findOrCreateProduct - Referência encontrada: " . ($reference ?? 'null'));
+        
+        if (empty($reference)) {
+            // Debug: listar chaves disponíveis se referência estiver vazia
+            $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
+            $availableKeys = array_keys($rowArray);
+            Log::error("findOrCreateProduct - Referência vazia! Chaves disponíveis: " . implode(', ', $availableKeys));
+            throw new \Exception("Referência do produto não encontrada. Chaves disponíveis na linha: " . implode(', ', $availableKeys));
+        }
+        
         Log::info("findOrCreateProduct - Buscando descrição");
         $description = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
         $description = $description !== null ? trim((string) $description) : '';
@@ -421,11 +434,6 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             throw new \Exception("Descrição do produto não encontrada. Chaves disponíveis na linha: " . implode(', ', $availableKeys));
         }
         
-        Log::info("findOrCreateProduct - Buscando referência");
-        $reference = $this->normalizeColumnName($row, ['referencia', 'referência', 'Referência']);
-        $reference = ($reference !== null && !empty(trim((string) $reference))) ? trim((string) $reference) : null;
-        Log::info("findOrCreateProduct - Referência encontrada: " . ($reference ?? 'null'));
-        
         Log::info("findOrCreateProduct - Buscando unidade");
         $unit = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
         $unit = $unit !== null ? trim((string) $unit) : '';
@@ -436,21 +444,29 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             throw new \Exception("Unidade do produto não encontrada");
         }
 
-        // Buscar produto existente por descrição e unidade (não por código)
-        // Isso permite atualizar produtos existentes se necessário
-        Log::info("findOrCreateProduct - Buscando produto existente: description='{$description}', unit='{$unit}', company_id={$this->companyId}");
-        $product = StockProduct::where('description', $description)
-            ->where('unit', $unit)
+        // Buscar produto existente APENAS por referência
+        Log::info("findOrCreateProduct - Buscando produto existente por referência: reference='{$reference}', company_id={$this->companyId}");
+        $product = StockProduct::where('reference', $reference)
             ->where('company_id', $this->companyId)
             ->first();
 
         if ($product) {
-            Log::info("findOrCreateProduct - Produto existente encontrado: ID={$product->id}");
-            // Atualizar referência se necessário
-            if ($reference && $product->reference !== $reference) {
-                Log::info("findOrCreateProduct - Atualizando referência de '{$product->reference}' para '{$reference}'");
-                $product->reference = $reference;
+            Log::info("findOrCreateProduct - Produto existente encontrado: ID={$product->id}, Reference='{$product->reference}', Description='{$product->description}'");
+            // Atualizar descrição e unidade se necessário
+            $updated = false;
+            if ($product->description !== $description) {
+                Log::info("findOrCreateProduct - Atualizando descrição de '{$product->description}' para '{$description}'");
+                $product->description = $description;
+                $updated = true;
+            }
+            if ($product->unit !== $unit) {
+                Log::info("findOrCreateProduct - Atualizando unidade de '{$product->unit}' para '{$unit}'");
+                $product->unit = $unit;
+                $updated = true;
+            }
+            if ($updated) {
                 $product->save();
+                Log::info("findOrCreateProduct - Produto atualizado");
             }
             return $product;
         }
@@ -458,19 +474,16 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         // Criar novo produto (código será gerado automaticamente)
         Log::info("findOrCreateProduct - Criando novo produto");
         $productData = [
+            'reference' => $reference,
             'description' => $description,
             'unit' => $unit,
             'active' => true,
         ];
-
-        if ($reference) {
-            $productData['reference'] = $reference;
-        }
         
         Log::info("findOrCreateProduct - Dados do produto: " . json_encode($productData));
 
         $newProduct = $productService->create($productData, $this->companyId);
-        Log::info("findOrCreateProduct - Novo produto criado: ID={$newProduct->id}, Code={$newProduct->code}");
+        Log::info("findOrCreateProduct - Novo produto criado: ID={$newProduct->id}, Code={$newProduct->code}, Reference='{$newProduct->reference}'");
         return $newProduct;
     }
 
