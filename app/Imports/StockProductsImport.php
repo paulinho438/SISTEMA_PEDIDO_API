@@ -12,6 +12,7 @@ use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class StockProductsImport implements ToCollection, WithHeadingRow
@@ -35,13 +36,28 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         DB::beginTransaction();
 
         try {
+            Log::info("=== INÍCIO DA IMPORTAÇÃO ===");
+            Log::info("Total de linhas a processar: " . count($rows));
+            Log::info("Company ID: {$this->companyId}, User ID: {$this->userId}");
+            
             foreach ($rows as $index => $row) {
                 $rowNumber = $index + 2; // +2 porque linha 1 é cabeçalho e index começa em 0
+                
+                Log::info("--- PROCESSANDO LINHA {$rowNumber} ---");
 
                 try {
+                    // Debug: mostrar todas as chaves disponíveis na linha
+                    $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
+                    $availableKeys = array_keys($rowArray);
+                    Log::info("Linha {$rowNumber} - Chaves disponíveis: " . implode(', ', $availableKeys));
+                    foreach ($rowArray as $key => $value) {
+                        Log::info("Linha {$rowNumber} - '{$key}' => '{$value}'");
+                    }
+                    
                     // Verificar se a linha está vazia (ignorar linhas completamente vazias)
                     // IMPORTANTE: Verificar ANTES de validar para evitar erros em linhas vazias
                     if ($this->isRowEmpty($row)) {
+                        Log::info("Linha {$rowNumber} - Linha vazia, pulando");
                         $this->skipCount++;
                         continue; // Pular linha vazia sem gerar erro
                     }
@@ -49,28 +65,44 @@ class StockProductsImport implements ToCollection, WithHeadingRow
                     // Validar linha (validação manual com normalização de colunas)
                     // A validação é feita manualmente para garantir que encontra as colunas
                     // corretamente mesmo com variações de nomes do Maatwebsite/Excel
+                    Log::info("Linha {$rowNumber} - Iniciando validação");
                     $this->validateRow($row, $rowNumber);
+                    Log::info("Linha {$rowNumber} - Validação OK");
 
                     // Buscar ou criar produto
+                    Log::info("Linha {$rowNumber} - Buscando/criando produto");
                     $product = $this->findOrCreateProduct($row, $productService);
                     
                     if (!$product || !$product->id) {
-                        throw new \Exception("Erro ao criar/buscar produto na linha {$rowNumber}");
+                        // Debug: listar chaves disponíveis
+                        $availableKeys = array_keys($rowArray);
+                        Log::error("Linha {$rowNumber} - Erro ao criar/buscar produto. Chaves disponíveis: " . implode(', ', $availableKeys));
+                        throw new \Exception("Erro ao criar/buscar produto na linha {$rowNumber}. Chaves disponíveis: " . implode(', ', $availableKeys));
                     }
+                    
+                    Log::info("Linha {$rowNumber} - Produto encontrado/criado: ID={$product->id}, Descrição='{$product->description}', Unidade='{$product->unit}'");
 
                     // Buscar local de estoque
+                    Log::info("Linha {$rowNumber} - Buscando local de estoque");
                     $location = $this->findLocation($row);
                     
                     if (!$location || !$location->id) {
+                        Log::error("Linha {$rowNumber} - Erro ao buscar local de estoque");
                         throw new \Exception("Erro ao buscar local de estoque na linha {$rowNumber}");
                     }
+                    
+                    Log::info("Linha {$rowNumber} - Local encontrado: ID={$location->id}, Nome='{$location->name}'");
 
                     // Criar ou atualizar estoque
+                    Log::info("Linha {$rowNumber} - Buscando/criando estoque (Produto ID: {$product->id}, Local ID: {$location->id})");
                     $stock = $this->findOrCreateStock($product, $location);
                     
                     if (!$stock || !$stock->id) {
-                        throw new \Exception("Erro ao criar/buscar estoque na linha {$rowNumber}");
+                        Log::error("Linha {$rowNumber} - Erro ao criar/buscar estoque. Produto ID: {$product->id}, Local ID: {$location->id}");
+                        throw new \Exception("Erro ao criar/buscar estoque na linha {$rowNumber}. Produto ID: {$product->id}, Local ID: {$location->id}");
                     }
+                    
+                    Log::info("Linha {$rowNumber} - Estoque encontrado/criado: ID={$stock->id}, Quantidade Disponível={$stock->quantity_available}, Quantidade Total={$stock->quantity_total}");
 
                     // Adicionar quantidade ao estoque
                     $quantidadeValue = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
@@ -78,22 +110,32 @@ class StockProductsImport implements ToCollection, WithHeadingRow
                     
                     $custoValue = $this->normalizeColumnName($row, ['custo_unitario', 'custo unitário', 'Custo Unitário', 'custo_unitário']);
                     $cost = ($custoValue !== null && $custoValue !== '') ? (float) $custoValue : null;
+                    
+                    Log::info("Linha {$rowNumber} - Valores extraídos: Quantidade={$quantity}, Custo=" . ($cost ?? 'null'));
 
                     if ($quantity > 0) {
+                        Log::info("Linha {$rowNumber} - Adicionando quantidade ao estoque");
                         $this->addStockQuantity($stock, $product, $location, $quantity, $cost, $row);
+                        Log::info("Linha {$rowNumber} - Quantidade adicionada com sucesso!");
                         $this->successCount++;
                     } else {
+                        Log::warning("Linha {$rowNumber} - Quantidade deve ser maior que zero");
                         $this->errors[] = "Linha {$rowNumber}: Quantidade deve ser maior que zero";
                         $this->skipCount++;
                     }
 
                 } catch (\Exception $e) {
+                    Log::error("Linha {$rowNumber} - ERRO: " . $e->getMessage());
+                    Log::error("Linha {$rowNumber} - Stack trace: " . $e->getTraceAsString());
                     $this->errors[] = "Linha {$rowNumber}: " . $e->getMessage();
                     $this->skipCount++;
                     // Continuar processando as próximas linhas mesmo se esta falhar
                     continue;
                 }
             }
+            
+            Log::info("=== FIM DA IMPORTAÇÃO ===");
+            Log::info("Sucessos: {$this->successCount}, Ignorados: {$this->skipCount}, Erros: " . count($this->errors));
 
             DB::commit();
         } catch (\Exception $e) {
@@ -366,25 +408,47 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         // Código sempre será gerado automaticamente pelo sistema
         // Ignorar se vier no Excel
         
+        Log::info("findOrCreateProduct - Buscando descrição");
         $description = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
         $description = $description !== null ? trim((string) $description) : '';
+        Log::info("findOrCreateProduct - Descrição encontrada: '{$description}'");
         
+        if (empty($description)) {
+            // Debug: listar chaves disponíveis se descrição estiver vazia
+            $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
+            $availableKeys = array_keys($rowArray);
+            Log::error("findOrCreateProduct - Descrição vazia! Chaves disponíveis: " . implode(', ', $availableKeys));
+            throw new \Exception("Descrição do produto não encontrada. Chaves disponíveis na linha: " . implode(', ', $availableKeys));
+        }
+        
+        Log::info("findOrCreateProduct - Buscando referência");
         $reference = $this->normalizeColumnName($row, ['referencia', 'referência', 'Referência']);
         $reference = ($reference !== null && !empty(trim((string) $reference))) ? trim((string) $reference) : null;
+        Log::info("findOrCreateProduct - Referência encontrada: " . ($reference ?? 'null'));
         
+        Log::info("findOrCreateProduct - Buscando unidade");
         $unit = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
         $unit = $unit !== null ? trim((string) $unit) : '';
+        Log::info("findOrCreateProduct - Unidade encontrada: '{$unit}'");
+        
+        if (empty($unit)) {
+            Log::error("findOrCreateProduct - Unidade vazia!");
+            throw new \Exception("Unidade do produto não encontrada");
+        }
 
         // Buscar produto existente por descrição e unidade (não por código)
         // Isso permite atualizar produtos existentes se necessário
+        Log::info("findOrCreateProduct - Buscando produto existente: description='{$description}', unit='{$unit}', company_id={$this->companyId}");
         $product = StockProduct::where('description', $description)
             ->where('unit', $unit)
             ->where('company_id', $this->companyId)
             ->first();
 
         if ($product) {
+            Log::info("findOrCreateProduct - Produto existente encontrado: ID={$product->id}");
             // Atualizar referência se necessário
             if ($reference && $product->reference !== $reference) {
+                Log::info("findOrCreateProduct - Atualizando referência de '{$product->reference}' para '{$reference}'");
                 $product->reference = $reference;
                 $product->save();
             }
@@ -392,6 +456,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         }
 
         // Criar novo produto (código será gerado automaticamente)
+        Log::info("findOrCreateProduct - Criando novo produto");
         $productData = [
             'description' => $description,
             'unit' => $unit,
@@ -401,13 +466,18 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         if ($reference) {
             $productData['reference'] = $reference;
         }
+        
+        Log::info("findOrCreateProduct - Dados do produto: " . json_encode($productData));
 
-        return $productService->create($productData, $this->companyId);
+        $newProduct = $productService->create($productData, $this->companyId);
+        Log::info("findOrCreateProduct - Novo produto criado: ID={$newProduct->id}, Code={$newProduct->code}");
+        return $newProduct;
     }
 
     protected function findLocation($row)
     {
         // Tentar todas as variações possíveis do nome "Local de Estoque"
+        Log::info("findLocation - Buscando local de estoque");
         $locationIdentifier = $this->normalizeColumnName($row, [
             'local de estoque',  // lowercase com espaços (mais comum)
             'local_de_estoque',  // lowercase com underscores
@@ -418,12 +488,15 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             'localestoque',      // sem espaços
         ]);
         $locationIdentifier = $locationIdentifier !== null ? trim((string) $locationIdentifier) : '';
+        Log::info("findLocation - Identificador encontrado: '{$locationIdentifier}'");
 
         if (empty($locationIdentifier)) {
+            Log::error("findLocation - Identificador vazio!");
             throw new \Exception('O campo "Local de Estoque" é obrigatório');
         }
 
         // Tentar buscar por código
+        Log::info("findLocation - Buscando por código: '{$locationIdentifier}', company_id={$this->companyId}");
         $location = StockLocation::where('code', $locationIdentifier)
             ->where('company_id', $this->companyId)
             ->where('active', true)
@@ -431,6 +504,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow
 
         // Se não encontrou por código, tentar por nome
         if (!$location) {
+            Log::info("findLocation - Não encontrado por código, tentando por nome: '{$locationIdentifier}'");
             $location = StockLocation::where('name', $locationIdentifier)
                 ->where('company_id', $this->companyId)
                 ->where('active', true)
@@ -438,20 +512,24 @@ class StockProductsImport implements ToCollection, WithHeadingRow
         }
 
         if (!$location) {
+            Log::error("findLocation - Local não encontrado: '{$locationIdentifier}'");
             throw new \Exception("Local de estoque '{$locationIdentifier}' não encontrado ou inativo. Verifique se o local existe e está ativo no cadastro de locais de estoque.");
         }
 
+        Log::info("findLocation - Local encontrado: ID={$location->id}, Code='{$location->code}', Name='{$location->name}'");
         return $location;
     }
 
     protected function findOrCreateStock($product, $location)
     {
+        Log::info("findOrCreateStock - Buscando estoque: product_id={$product->id}, location_id={$location->id}, company_id={$this->companyId}");
         $stock = Stock::where('stock_product_id', $product->id)
             ->where('stock_location_id', $location->id)
             ->where('company_id', $this->companyId)
             ->first();
 
         if (!$stock) {
+            Log::info("findOrCreateStock - Estoque não encontrado, criando novo");
             $now = now()->format('Y-m-d H:i:s');
             
             // Usar OUTPUT INSERTED.id para garantir que funciona corretamente no SQL Server
@@ -463,7 +541,10 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             );
 
             $stockId = $result[0]->id;
+            Log::info("findOrCreateStock - Novo estoque criado: ID={$stockId}");
             $stock = Stock::find($stockId);
+        } else {
+            Log::info("findOrCreateStock - Estoque existente encontrado: ID={$stock->id}, quantity_available={$stock->quantity_available}, quantity_total={$stock->quantity_total}");
         }
 
         return $stock;
@@ -471,33 +552,64 @@ class StockProductsImport implements ToCollection, WithHeadingRow
 
     protected function addStockQuantity($stock, $product, $location, $quantity, $cost, $row)
     {
-        // Buscar valores atuais diretamente do banco com lock para evitar problemas de concorrência
-        // Usar WITH (UPDLOCK, ROWLOCK) para garantir que lemos os valores mais recentes e bloqueamos a linha
+        Log::info("addStockQuantity - INÍCIO: stock_id={$stock->id}, product_id={$product->id}, location_id={$location->id}, quantity={$quantity}, cost=" . ($cost ?? 'null'));
+        
+        // Usar UPDATE com cálculo direto no banco para evitar problemas de concorrência
+        // Isso garante que cada atualização seja feita corretamente, mesmo em transações
+        $now = now()->format('Y-m-d H:i:s');
+        
+        // Buscar quantidade antes para a movimentação
+        Log::info("addStockQuantity - Buscando valores atuais do estoque ID={$stock->id}");
         $currentStock = DB::selectOne(
-            "SELECT [quantity_available], [quantity_total] FROM [stocks] WITH (UPDLOCK, ROWLOCK) WHERE [id] = ?",
+            "SELECT [quantity_available], [quantity_total] FROM [stocks] WHERE [id] = ?",
             [$stock->id]
         );
         
         if (!$currentStock) {
-            throw new \Exception("Estoque não encontrado no banco de dados");
+            Log::error("addStockQuantity - Estoque não encontrado no banco! Stock ID: {$stock->id}");
+            throw new \Exception("Estoque não encontrado no banco de dados. Stock ID: {$stock->id}");
         }
         
         $quantityBefore = (float) $currentStock->quantity_available;
-        $quantityAfter = $quantityBefore + $quantity;
-        $quantityTotalAfter = (float) $currentStock->quantity_total + $quantity;
-
-        // Atualizar estoque usando valores do banco
-        $now = now()->format('Y-m-d H:i:s');
+        $quantityTotalBefore = (float) $currentStock->quantity_total;
+        Log::info("addStockQuantity - Valores ANTES: quantity_available={$quantityBefore}, quantity_total={$quantityTotalBefore}");
+        
+        // Atualizar estoque usando cálculo direto no banco (mais seguro para concorrência)
+        Log::info("addStockQuantity - Executando UPDATE no estoque ID={$stock->id}, adicionando quantity={$quantity}");
         DB::statement(
-            "UPDATE [stocks] SET [quantity_available] = ?, [quantity_total] = ?, [last_movement_at] = CAST(? AS DATETIME2), [updated_at] = CAST(? AS DATETIME2) WHERE [id] = ?",
-            [$quantityAfter, $quantityTotalAfter, $now, $now, $stock->id]
+            "UPDATE [stocks] 
+             SET [quantity_available] = [quantity_available] + ?, 
+                 [quantity_total] = [quantity_total] + ?, 
+                 [last_movement_at] = CAST(? AS DATETIME2), 
+                 [updated_at] = CAST(? AS DATETIME2) 
+             WHERE [id] = ?",
+            [$quantity, $quantity, $now, $now, $stock->id]
         );
+        Log::info("addStockQuantity - UPDATE executado com sucesso");
+        
+        // Buscar quantidade depois para a movimentação
+        $updatedStock = DB::selectOne(
+            "SELECT [quantity_available], [quantity_total] FROM [stocks] WHERE [id] = ?",
+            [$stock->id]
+        );
+        
+        if (!$updatedStock) {
+            Log::error("addStockQuantity - Erro ao buscar estoque após UPDATE! Stock ID: {$stock->id}");
+            $quantityAfter = $quantityBefore + $quantity;
+        } else {
+            $quantityAfter = (float) $updatedStock->quantity_available;
+            $quantityTotalAfter = (float) $updatedStock->quantity_total;
+            Log::info("addStockQuantity - Valores DEPOIS: quantity_available={$quantityAfter}, quantity_total={$quantityTotalAfter}");
+        }
 
         // Criar movimentação usando os IDs do produto e local passados como parâmetros
+        Log::info("addStockQuantity - Criando movimentação de estoque");
         $observacaoValue = $this->normalizeColumnName($row, ['observacao', 'observação', 'Observação']);
         $observation = ($observacaoValue !== null && !empty(trim((string) $observacaoValue))) 
             ? trim((string) $observacaoValue) 
             : 'Importação em massa via Excel';
+        
+        Log::info("addStockQuantity - Dados da movimentação: stock_id={$stock->id}, product_id={$product->id}, location_id={$location->id}, quantity={$quantity}, quantity_before={$quantityBefore}, quantity_after={$quantityAfter}, cost=" . ($cost ?? 'null'));
         
         DB::statement(
             "INSERT INTO [stock_movements] ([stock_id], [stock_product_id], [stock_location_id], [movement_type], [quantity], [quantity_before], [quantity_after], [reference_type], [cost], [total_cost], [observation], [user_id], [company_id], [movement_date], [created_at], [updated_at]) 
@@ -519,6 +631,9 @@ class StockProductsImport implements ToCollection, WithHeadingRow
                 $now
             ]
         );
+        
+        Log::info("addStockQuantity - Movimentação criada com sucesso!");
+        Log::info("addStockQuantity - FIM: Processamento completo para stock_id={$stock->id}");
     }
 
 
