@@ -94,7 +94,15 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         // Verificar se pelo menos um campo obrigatório tem valor
         $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
         $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
-        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
+        $localEstoque = $this->normalizeColumnName($row, [
+            'local de estoque',  // lowercase com espaços (mais comum)
+            'local_de_estoque',  // lowercase com underscores
+            'Local de Estoque',  // original
+            'Local de estoque',  // primeira maiúscula
+            'LOCAL DE ESTOQUE',  // uppercase
+            'local_estoque',     // sem "de"
+            'localestoque',      // sem espaços
+        ]);
         $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
         
         // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
@@ -110,6 +118,8 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
     /**
      * Normaliza o nome da coluna do Excel (pode vir com espaços, underscores, etc)
+     * O Maatwebsite/Excel com WithHeadingRow converte cabeçalhos para chaves de array
+     * Ex: "Local de Estoque" pode vir como "local_de_estoque" ou "local de estoque"
      */
     protected function normalizeColumnName($row, $possibleNames)
     {
@@ -123,20 +133,49 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
             }
         }
         
+        // O WithHeadingRow do Maatwebsite/Excel pode converter "Local de Estoque" para:
+        // - "local de estoque" (lowercase com espaços)
+        // - "local_de_estoque" (lowercase com underscores)
+        // - "localdeestoque" (lowercase sem espaços)
+        // Vamos tentar todas essas variações
+        
         // Normalizar todas as chaves do array para comparação
         $normalizedKeys = [];
         foreach ($rowArray as $key => $value) {
-            $normalizedKey = $this->normalizeKey((string) $key);
-            $normalizedKeys[$normalizedKey] = $key; // Guardar a chave original
+            $keyStr = (string) $key;
+            // Guardar a chave original
+            $normalizedKeys[$this->normalizeKey($keyStr)] = $key;
+            // Também guardar a chave em lowercase com espaços preservados
+            $normalizedKeys[strtolower(trim($keyStr))] = $key;
         }
         
         // Tentar diferentes variações do nome
         foreach ($possibleNames as $name) {
-            $normalizedName = $this->normalizeKey($name);
+            $nameStr = (string) $name;
             
-            // Verificar se a chave normalizada existe
+            // Tentar exatamente como está
+            if (isset($rowArray[$nameStr])) {
+                return $rowArray[$nameStr];
+            }
+            
+            // Tentar lowercase
+            $lowerName = strtolower(trim($nameStr));
+            if (isset($normalizedKeys[$lowerName])) {
+                $originalKey = $normalizedKeys[$lowerName];
+                return $rowArray[$originalKey];
+            }
+            
+            // Tentar normalizado (sem espaços, underscores, etc)
+            $normalizedName = $this->normalizeKey($nameStr);
             if (isset($normalizedKeys[$normalizedName])) {
                 $originalKey = $normalizedKeys[$normalizedName];
+                return $rowArray[$originalKey];
+            }
+            
+            // Tentar com underscores substituindo espaços
+            $underscoreName = str_replace(' ', '_', $lowerName);
+            if (isset($normalizedKeys[$underscoreName])) {
+                $originalKey = $normalizedKeys[$underscoreName];
                 return $rowArray[$originalKey];
             }
         }
@@ -165,7 +204,17 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
         $unidade = $unidade !== null ? trim((string) $unidade) : null;
         
-        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
+        // Tentar todas as variações possíveis do nome "Local de Estoque"
+        // O Maatwebsite/Excel pode converter de várias formas
+        $localEstoque = $this->normalizeColumnName($row, [
+            'local de estoque',  // lowercase com espaços (mais comum)
+            'local_de_estoque',  // lowercase com underscores
+            'Local de Estoque',  // original
+            'Local de estoque',  // primeira maiúscula
+            'LOCAL DE ESTOQUE',  // uppercase
+            'local_estoque',     // sem "de"
+            'localestoque',      // sem espaços
+        ]);
         $localEstoque = $localEstoque !== null ? trim((string) $localEstoque) : null;
         
         $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
@@ -173,8 +222,11 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
         // Se localEstoque está vazio, tentar listar as chaves disponíveis para debug
         if (empty($localEstoque)) {
-            $availableKeys = implode(', ', array_keys($row->toArray()));
-            throw new \Exception("O campo 'Local de Estoque' é obrigatório. Colunas disponíveis na linha: {$availableKeys}");
+            $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
+            $availableKeys = implode(', ', array_map(function($key) {
+                return "'{$key}'";
+            }, array_keys($rowArray)));
+            throw new \Exception("O campo 'Local de Estoque' é obrigatório. Colunas disponíveis na linha {$rowNumber}: [{$availableKeys}]. Verifique se o cabeçalho 'Local de Estoque' está correto na primeira linha do Excel.");
         }
 
         $validator = Validator::make([
@@ -247,7 +299,16 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
     protected function findLocation($row)
     {
-        $locationIdentifier = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
+        // Tentar todas as variações possíveis do nome "Local de Estoque"
+        $locationIdentifier = $this->normalizeColumnName($row, [
+            'local de estoque',  // lowercase com espaços (mais comum)
+            'local_de_estoque',  // lowercase com underscores
+            'Local de Estoque',  // original
+            'Local de estoque',  // primeira maiúscula
+            'LOCAL DE ESTOQUE',  // uppercase
+            'local_estoque',     // sem "de"
+            'localestoque',      // sem espaços
+        ]);
         $locationIdentifier = $locationIdentifier !== null ? trim((string) $locationIdentifier) : '';
 
         if (empty($locationIdentifier)) {
