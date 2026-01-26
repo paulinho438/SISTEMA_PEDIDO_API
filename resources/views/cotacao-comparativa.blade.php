@@ -224,7 +224,7 @@
                 $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $item->id);
                 if ($supplierItem) {
                     $precoSemDifal = $supplierItem->unit_cost ?? 0;
-                    $precoComDifal = $supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity;
+                    $precoComDifal = ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0)) * $item->quantity;
                     
                     if (!$menorPrecoSemDifal || ($precoSemDifal > 0 && $precoSemDifal < $menorPrecoSemDifal)) {
                         $menorPrecoSemDifal = $precoSemDifal;
@@ -326,7 +326,7 @@
                             $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                             $icmsPercent = $supplierItem ? ($supplierItem->icms ?? 0) : 0;
                             $icmsTotal = $supplierItem ? ($supplierItem->icms_total ?? 0) : 0;
-                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
+                            $totalWithDifal = $supplierItem ? (($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0)) * $item->quantity) : 0;
                             
                             // Verificar se deve destacar (menor preço ou selecionado)
                             $highlight = false;
@@ -403,7 +403,7 @@
                                                     foreach ($items as $it) {
                                                         $si = $supplier->items->firstWhere('purchase_quote_item_id', $it->id);
                                                         if ($si) {
-                                                            $totalComDifal += $si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $it->quantity;
+                                                            $totalComDifal += ($si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0)) * $it->quantity;
                                                         }
                                                     }
                                                 @endphp
@@ -443,7 +443,7 @@
                     $supplierItem = $selectedSupplier->items->firstWhere('purchase_quote_item_id', $item->id);
                     if ($supplierItem) {
                         $totalSemDifalGeral += ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity;
-                        $totalComDifalGeral += $supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity;
+                        $totalComDifalGeral += ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0)) * $item->quantity;
                     }
                 }
             }
@@ -533,7 +533,7 @@
                                             $totalWithIpi = $supplierItem ? (($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
                                             $icmsPercent = $supplierItem ? ($supplierItem->icms ?? 0) : 0;
                                             $icmsTotal = $supplierItem ? ($supplierItem->icms_total ?? 0) : 0;
-                                            $totalWithDifal = $supplierItem ? ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity) : 0;
+                                            $totalWithDifal = $supplierItem ? (($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0)) * $item->quantity) : 0;
                                             
                                             $highlight = false;
                                             $highlightClass = '';
@@ -598,7 +598,7 @@
                                                 foreach ($items as $item) {
                                                     $si = $supplier->items->firstWhere('purchase_quote_item_id', $item->id);
                                                     if ($si) {
-                                                        $totalComDifal += $si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0) * $item->quantity;
+                                                        $totalComDifal += ($si->final_cost ?? ($si->unit_cost_with_ipi ?? $si->unit_cost ?? 0)) * $item->quantity;
                                                     }
                                                 }
                                             @endphp
@@ -693,7 +693,7 @@
                         $supplierItem = $supplier->items->firstWhere('purchase_quote_item_id', $item->id);
                         if ($supplierItem) {
                             $precoSemDifal = $supplierItem->unit_cost ?? 0;
-                            $precoComDifal = $supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0) * $item->quantity;
+                            $precoComDifal = ($supplierItem->final_cost ?? ($supplierItem->unit_cost_with_ipi ?? $supplierItem->unit_cost ?? 0)) * $item->quantity;
                             
                             // Menor preço sem DIFAL
                             if (!$menorPrecoSemDifal || ($precoSemDifal > 0 && $precoSemDifal < $menorPrecoSemDifal)) {
