@@ -448,40 +448,47 @@ class PurchaseQuoteController extends Controller
             $valorTotal = 0;
 
             $itemsData = $quote->items->map(function (PurchaseQuoteItem $item) use ($quote, &$valorTotal) {
-                $selectedTotal = $item->selected_total_cost;
+                $selectedTotal = null;
+                $quantity = $item->quantity ?? 0;
+                
+                // Priorizar buscar o final_cost do supplierItem (que já inclui DIFAL e IPI)
+                $supplierItem = null;
 
-                if ($selectedTotal === null && $item->selected_unit_cost !== null) {
-                    $selectedTotal = $item->selected_unit_cost * ($item->quantity ?? 0);
+                if ($item->selectedSupplier && $item->selectedSupplier->items) {
+                    $supplierItem = $item->selectedSupplier->items->firstWhere('purchase_quote_item_id', $item->id);
                 }
 
+                if (!$supplierItem && $quote->suppliers) {
+                    $supplierItem = $quote->suppliers
+                        ->map(fn ($supplier) => $supplier->items->firstWhere('purchase_quote_item_id', $item->id))
+                        ->filter()
+                        ->sortBy(function ($supplierItem) {
+                            if ($supplierItem?->final_cost !== null) {
+                                return $supplierItem->final_cost;
+                            }
+
+                            return $supplierItem?->unit_cost ?? PHP_FLOAT_MAX;
+                        })
+                        ->first();
+                }
+
+                // Se encontrou supplierItem, usar final_cost (com DIFAL) multiplicado pela quantidade
+                if ($supplierItem) {
+                    if ($supplierItem->final_cost !== null) {
+                        // final_cost é unitário e já inclui DIFAL e IPI
+                        $selectedTotal = $supplierItem->final_cost * $quantity;
+                    } elseif ($supplierItem->unit_cost !== null) {
+                        $selectedTotal = $supplierItem->unit_cost * $quantity;
+                    }
+                }
+
+                // Fallback: usar selected_total_cost ou selected_unit_cost se não encontrou supplierItem
                 if ($selectedTotal === null) {
-                    $supplierItem = null;
+                    $selectedTotal = $item->selected_total_cost;
+                }
 
-                    if ($item->selectedSupplier && $item->selectedSupplier->items) {
-                        $supplierItem = $item->selectedSupplier->items->firstWhere('purchase_quote_item_id', $item->id);
-                    }
-
-                    if (!$supplierItem) {
-                        $supplierItem = $quote->suppliers
-                            ->map(fn ($supplier) => $supplier->items->firstWhere('purchase_quote_item_id', $item->id))
-                            ->filter()
-                            ->sortBy(function ($supplierItem) {
-                                if ($supplierItem?->final_cost !== null) {
-                                    return $supplierItem->final_cost;
-                                }
-
-                                return $supplierItem?->unit_cost ?? PHP_FLOAT_MAX;
-                            })
-                            ->first();
-                    }
-
-                    if ($supplierItem) {
-                        if ($supplierItem->final_cost !== null) {
-                            $selectedTotal = $supplierItem->final_cost;
-                        } elseif ($supplierItem->unit_cost !== null) {
-                            $selectedTotal = $supplierItem->unit_cost * ($item->quantity ?? 0);
-                        }
-                    }
+                if ($selectedTotal === null && $item->selected_unit_cost !== null) {
+                    $selectedTotal = $item->selected_unit_cost * $quantity;
                 }
 
                 if ($selectedTotal === null) {
