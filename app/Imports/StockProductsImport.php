@@ -94,7 +94,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         // Verificar se pelo menos um campo obrigatório tem valor
         $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
         $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
-        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
         $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
         
         // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
@@ -113,24 +113,46 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
      */
     protected function normalizeColumnName($row, $possibleNames)
     {
+        // Converter row para array se for Collection
+        $rowArray = $row instanceof \Illuminate\Support\Collection ? $row->toArray() : (array) $row;
+        
+        // Primeiro, tentar encontrar exatamente como está no array
         foreach ($possibleNames as $name) {
-            // Tentar diferentes variações do nome
-            $variations = [
-                $name,
-                strtolower($name),
-                str_replace(' ', '_', strtolower($name)),
-                str_replace('_', ' ', strtolower($name)),
-                str_replace(' ', '', strtolower($name)),
-            ];
+            if (isset($rowArray[$name])) {
+                return $rowArray[$name];
+            }
+        }
+        
+        // Normalizar todas as chaves do array para comparação
+        $normalizedKeys = [];
+        foreach ($rowArray as $key => $value) {
+            $normalizedKey = $this->normalizeKey((string) $key);
+            $normalizedKeys[$normalizedKey] = $key; // Guardar a chave original
+        }
+        
+        // Tentar diferentes variações do nome
+        foreach ($possibleNames as $name) {
+            $normalizedName = $this->normalizeKey($name);
             
-            foreach ($variations as $variation) {
-                if (isset($row[$variation])) {
-                    return $row[$variation];
-                }
+            // Verificar se a chave normalizada existe
+            if (isset($normalizedKeys[$normalizedName])) {
+                $originalKey = $normalizedKeys[$normalizedName];
+                return $rowArray[$originalKey];
             }
         }
         
         return null;
+    }
+    
+    /**
+     * Normaliza uma chave para comparação (remove espaços, underscores, converte para lowercase)
+     */
+    protected function normalizeKey($key)
+    {
+        // Remover espaços, underscores, hífens e converter para lowercase
+        $normalized = strtolower(trim((string) $key));
+        $normalized = str_replace([' ', '_', '-'], '', $normalized);
+        return $normalized;
     }
 
     protected function validateRow($row, $rowNumber)
@@ -143,11 +165,17 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
         $unidade = $unidade !== null ? trim((string) $unidade) : null;
         
-        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
         $localEstoque = $localEstoque !== null ? trim((string) $localEstoque) : null;
         
         $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
         $quantidade = $quantidade !== null ? trim((string) $quantidade) : null;
+
+        // Se localEstoque está vazio, tentar listar as chaves disponíveis para debug
+        if (empty($localEstoque)) {
+            $availableKeys = implode(', ', array_keys($row->toArray()));
+            throw new \Exception("O campo 'Local de Estoque' é obrigatório. Colunas disponíveis na linha: {$availableKeys}");
+        }
 
         $validator = Validator::make([
             'descricao' => $descricao,
@@ -219,7 +247,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
     protected function findLocation($row)
     {
-        $locationIdentifier = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $locationIdentifier = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque', 'LOCAL DE ESTOQUE']);
         $locationIdentifier = $locationIdentifier !== null ? trim((string) $locationIdentifier) : '';
 
         if (empty($locationIdentifier)) {
