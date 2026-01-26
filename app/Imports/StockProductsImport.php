@@ -10,12 +10,11 @@ use App\Services\StockProductService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
 
-class StockProductsImport implements ToCollection, WithHeadingRow, WithValidation
+class StockProductsImport implements ToCollection, WithHeadingRow
 {
     protected $companyId;
     protected $userId;
@@ -48,8 +47,8 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
                     }
 
                     // Validar linha (validação manual com normalização de colunas)
-                    // Esta validação é feita manualmente porque o WithValidation pode não
-                    // encontrar as colunas corretamente devido às variações de nomes
+                    // A validação é feita manualmente para garantir que encontra as colunas
+                    // corretamente mesmo com variações de nomes do Maatwebsite/Excel
                     $this->validateRow($row, $rowNumber);
 
                     // Buscar ou criar produto
@@ -93,7 +92,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
     /**
      * Verifica se uma linha está completamente vazia
      * Uma linha é considerada vazia se TODOS os campos obrigatórios estiverem vazios
-     * Verifica diretamente as chaves do array para ser mais eficiente
+     * Usa normalizeColumnName para garantir que encontra os campos corretamente
      */
     protected function isRowEmpty($row): bool
     {
@@ -105,25 +104,30 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
             return true;
         }
         
-        // Verificar diretamente nas chaves do array se algum campo obrigatório tem valor
-        // Isso é mais eficiente e não depende do normalizeColumnName que pode falhar
-        foreach ($rowArray as $key => $value) {
-            $keyStr = strtolower(trim((string) $key));
-            $valueStr = trim((string) $value);
-            
-            // Verificar se é um campo obrigatório e se tem valor
-            if ($valueStr !== '' && $valueStr !== null) {
-                // Verificar se a chave corresponde a algum campo obrigatório
-                $normalizedKey = preg_replace('/[\s_\-]/', '', $keyStr);
-                
-                // Campos obrigatórios: descricao, unidade, local de estoque, quantidade
-                if (strpos($normalizedKey, 'descricao') !== false ||
-                    strpos($normalizedKey, 'unidade') !== false ||
-                    strpos($normalizedKey, 'local') !== false && strpos($normalizedKey, 'estoque') !== false ||
-                    strpos($normalizedKey, 'quantidade') !== false) {
-                    return false; // Linha não está vazia
-                }
-            }
+        // Verificar se pelo menos um campo obrigatório tem valor usando normalizeColumnName
+        // Isso garante que encontra os campos mesmo com variações de nomes
+        $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
+        $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
+        $localEstoque = $this->normalizeColumnName($row, [
+            'local de estoque',
+            'local_de_estoque',
+            'Local de Estoque',
+            'Local de estoque',
+            'LOCAL DE ESTOQUE',
+            'local_estoque',
+            'localestoque',
+        ]);
+        $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
+        
+        // Verificar se algum campo obrigatório tem valor não vazio
+        $hasDescricao = $descricao !== null && trim((string) $descricao) !== '';
+        $hasUnidade = $unidade !== null && trim((string) $unidade) !== '';
+        $hasLocalEstoque = $localEstoque !== null && trim((string) $localEstoque) !== '';
+        $hasQuantidade = $quantidade !== null && trim((string) $quantidade) !== '' && (float) $quantidade > 0;
+        
+        // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
+        if ($hasDescricao || $hasUnidade || $hasLocalEstoque || $hasQuantidade) {
+            return false;
         }
         
         // Se nenhum campo obrigatório tem valor, a linha está vazia
@@ -236,16 +240,27 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
             }
             $normalized = $this->normalizeKey($nameStr);
             $searchTerms[] = $normalized;
+            // Também adicionar variações do termo
+            $searchTerms[] = str_replace(' ', '', strtolower($nameStr));
+            $searchTerms[] = str_replace(' ', '_', strtolower($nameStr));
         }
         
         foreach ($rowArray as $key => $value) {
             $keyNormalized = $this->normalizeKey((string) $key);
+            $keyLower = strtolower(trim((string) $key));
+            
             foreach ($searchTerms as $searchTerm) {
-                // Comparação parcial: se a chave normalizada contém o termo de busca
-                if ($keyNormalized === $searchTerm || 
-                    (strlen($searchTerm) > 5 && strpos($keyNormalized, $searchTerm) !== false) ||
-                    (strlen($keyNormalized) > 5 && strpos($searchTerm, $keyNormalized) !== false)) {
+                // Comparação exata
+                if ($keyNormalized === $searchTerm || $keyLower === $searchTerm) {
                     return $value;
+                }
+                
+                // Comparação parcial para termos maiores
+                if (strlen($searchTerm) > 5 && strlen($keyNormalized) > 5) {
+                    if (strpos($keyNormalized, $searchTerm) !== false ||
+                        strpos($searchTerm, $keyNormalized) !== false) {
+                        return $value;
+                    }
                 }
             }
         }
@@ -473,32 +488,6 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         );
     }
 
-    /**
-     * Regras de validação para o WithValidation
-     * O Maatwebsite/Excel com WithHeadingRow converte cabeçalhos para lowercase
-     * e substitui espaços por underscores, então "Local de Estoque" vira "local_de_estoque"
-     * 
-     * IMPORTANTE: Todas as regras são 'nullable' aqui porque a validação real
-     * é feita manualmente no método validateRow() que tem a lógica correta
-     * para encontrar as colunas independente de como foram convertidas.
-     * 
-     * O WithValidation valida ANTES do processamento, então precisamos aceitar
-     * todas as variações possíveis para evitar erros de validação prematuros.
-     */
-    public function rules(): array
-    {
-        return [
-            // Aceitar todas as variações possíveis de cada campo
-            // O Maatwebsite/Excel pode converter de várias formas
-            'descricao' => 'nullable',
-            'descrição' => 'nullable',
-            'unidade' => 'nullable',
-            'local_de_estoque' => 'nullable', // Formato mais comum: "Local de Estoque" → "local_de_estoque"
-            'local de estoque' => 'nullable', // Com espaços (pode acontecer em algumas versões)
-            'local_estoque' => 'nullable',    // Sem "de" (pode acontecer)
-            'quantidade' => 'nullable',
-        ];
-    }
 
     public function getErrors(): array
     {
