@@ -40,6 +40,11 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
                 $rowNumber = $index + 2; // +2 porque linha 1 é cabeçalho e index começa em 0
 
                 try {
+                    // Verificar se a linha está vazia (ignorar linhas completamente vazias)
+                    if ($this->isRowEmpty($row)) {
+                        continue; // Pular linha vazia sem gerar erro
+                    }
+
                     // Validar linha
                     $this->validateRow($row, $rowNumber);
 
@@ -53,10 +58,11 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
                     $stock = $this->findOrCreateStock($product, $location);
 
                     // Adicionar quantidade ao estoque
-                    $quantity = (float) ($row['quantidade'] ?? 0);
-                    $cost = isset($row['custo_unitario']) && $row['custo_unitario'] !== null 
-                        ? (float) $row['custo_unitario'] 
-                        : null;
+                    $quantidadeValue = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
+                    $quantity = $quantidadeValue !== null ? (float) $quantidadeValue : 0;
+                    
+                    $custoValue = $this->normalizeColumnName($row, ['custo_unitario', 'custo unitário', 'Custo Unitário', 'custo_unitário']);
+                    $cost = ($custoValue !== null && $custoValue !== '') ? (float) $custoValue : null;
 
                     if ($quantity > 0) {
                         $this->addStockQuantity($stock, $quantity, $cost, $row);
@@ -80,25 +86,86 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         }
     }
 
+    /**
+     * Verifica se uma linha está completamente vazia
+     */
+    protected function isRowEmpty($row): bool
+    {
+        // Verificar se pelo menos um campo obrigatório tem valor
+        $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
+        $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
+        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
+        
+        // Se pelo menos um campo obrigatório tiver valor, a linha não está vazia
+        if (($descricao !== null && trim((string) $descricao) !== '') ||
+            ($unidade !== null && trim((string) $unidade) !== '') ||
+            ($localEstoque !== null && trim((string) $localEstoque) !== '') ||
+            ($quantidade !== null && trim((string) $quantidade) !== '')) {
+            return false;
+        }
+        
+        return true; // Linha está vazia
+    }
+
+    /**
+     * Normaliza o nome da coluna do Excel (pode vir com espaços, underscores, etc)
+     */
+    protected function normalizeColumnName($row, $possibleNames)
+    {
+        foreach ($possibleNames as $name) {
+            // Tentar diferentes variações do nome
+            $variations = [
+                $name,
+                strtolower($name),
+                str_replace(' ', '_', strtolower($name)),
+                str_replace('_', ' ', strtolower($name)),
+                str_replace(' ', '', strtolower($name)),
+            ];
+            
+            foreach ($variations as $variation) {
+                if (isset($row[$variation])) {
+                    return $row[$variation];
+                }
+            }
+        }
+        
+        return null;
+    }
+
     protected function validateRow($row, $rowNumber)
     {
+        // Normalizar valores (remover espaços e converter para string)
+        // Tentar diferentes variações dos nomes das colunas
+        $descricao = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
+        $descricao = $descricao !== null ? trim((string) $descricao) : null;
+        
+        $unidade = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
+        $unidade = $unidade !== null ? trim((string) $unidade) : null;
+        
+        $localEstoque = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $localEstoque = $localEstoque !== null ? trim((string) $localEstoque) : null;
+        
+        $quantidade = $this->normalizeColumnName($row, ['quantidade', 'Quantidade']);
+        $quantidade = $quantidade !== null ? trim((string) $quantidade) : null;
+
         $validator = Validator::make([
-            'descricao' => $row['descricao'] ?? null,
-            'unidade' => $row['unidade'] ?? null,
-            'local_estoque' => $row['local_estoque'] ?? null,
-            'quantidade' => $row['quantidade'] ?? null,
+            'descricao' => $descricao,
+            'unidade' => $unidade,
+            'local_estoque' => $localEstoque,
+            'quantidade' => $quantidade,
         ], [
             'descricao' => 'required|string|max:255',
             'unidade' => 'required|string|max:20',
             'local_estoque' => 'required|string',
             'quantidade' => 'required|numeric|min:0.0001',
         ], [
-            'descricao.required' => 'Descrição é obrigatória',
-            'unidade.required' => 'Unidade é obrigatória',
-            'local_estoque.required' => 'Local de Estoque é obrigatório',
-            'quantidade.required' => 'Quantidade é obrigatória',
-            'quantidade.numeric' => 'Quantidade deve ser um número',
-            'quantidade.min' => 'Quantidade deve ser maior que zero',
+            'descricao.required' => 'O campo "Descrição" é obrigatório',
+            'unidade.required' => 'O campo "Unidade" é obrigatório',
+            'local_estoque.required' => 'O campo "Local de Estoque" é obrigatório',
+            'quantidade.required' => 'O campo "Quantidade" é obrigatório',
+            'quantidade.numeric' => 'O campo "Quantidade" deve ser um número',
+            'quantidade.min' => 'O campo "Quantidade" deve ser maior que zero',
         ]);
 
         if ($validator->fails()) {
@@ -111,11 +178,14 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         // Código sempre será gerado automaticamente pelo sistema
         // Ignorar se vier no Excel
         
-        $description = trim($row['descricao']);
-        $reference = isset($row['referencia']) && !empty(trim($row['referencia'] ?? '')) 
-            ? trim($row['referencia']) 
-            : null;
-        $unit = trim($row['unidade']);
+        $description = $this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição']);
+        $description = $description !== null ? trim((string) $description) : '';
+        
+        $reference = $this->normalizeColumnName($row, ['referencia', 'referência', 'Referência']);
+        $reference = ($reference !== null && !empty(trim((string) $reference))) ? trim((string) $reference) : null;
+        
+        $unit = $this->normalizeColumnName($row, ['unidade', 'Unidade']);
+        $unit = $unit !== null ? trim((string) $unit) : '';
 
         // Buscar produto existente por descrição e unidade (não por código)
         // Isso permite atualizar produtos existentes se necessário
@@ -149,7 +219,12 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
 
     protected function findLocation($row)
     {
-        $locationIdentifier = trim($row['local_estoque']);
+        $locationIdentifier = $this->normalizeColumnName($row, ['local_estoque', 'local de estoque', 'local_de_estoque', 'Local de Estoque']);
+        $locationIdentifier = $locationIdentifier !== null ? trim((string) $locationIdentifier) : '';
+
+        if (empty($locationIdentifier)) {
+            throw new \Exception('O campo "Local de Estoque" é obrigatório');
+        }
 
         // Tentar buscar por código
         $location = StockLocation::where('code', $locationIdentifier)
@@ -166,7 +241,7 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         }
 
         if (!$location) {
-            throw new \Exception("Local de estoque '{$locationIdentifier}' não encontrado ou inativo");
+            throw new \Exception("Local de estoque '{$locationIdentifier}' não encontrado ou inativo. Verifique se o local existe e está ativo no cadastro de locais de estoque.");
         }
 
         return $location;
@@ -208,8 +283,9 @@ class StockProductsImport implements ToCollection, WithHeadingRow, WithValidatio
         );
 
         // Criar movimentação
-        $observation = isset($row['observacao']) && !empty(trim($row['observacao'] ?? '')) 
-            ? trim($row['observacao']) 
+        $observacaoValue = $this->normalizeColumnName($row, ['observacao', 'observação', 'Observação']);
+        $observation = ($observacaoValue !== null && !empty(trim((string) $observacaoValue))) 
+            ? trim((string) $observacaoValue) 
             : 'Importação em massa via Excel';
         
         DB::statement(

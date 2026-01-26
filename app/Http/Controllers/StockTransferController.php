@@ -51,7 +51,7 @@ class StockTransferController extends Controller
     /**
      * Buscar transferência específica
      */
-    public function show(Request $request, $id)
+    public function show($id)
     {
         $user = auth()->user();
         
