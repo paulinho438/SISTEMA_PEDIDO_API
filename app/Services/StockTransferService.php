@@ -405,6 +405,50 @@ class StockTransferService
         DB::statement($sql, $values);
     }
 
+    /**
+     * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
+     */
+    private function updateModelWithStringTimestamps($model, array $data)
+    {
+        // Remover campos que não devem ser atualizados
+        unset($data['id'], $data['created_at']);
+        
+        // Adicionar updated_at como string
+        $data['updated_at'] = Carbon::now()->format('Y-m-d H:i:s');
+        
+        // Usar DB::statement() para garantir que campos de data sejam tratados corretamente
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+        
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        
+        // Campos de data que precisam de CAST
+        $dateFields = ['updated_at', 'created_at', 'last_movement_at'];
+        
+        foreach ($columns as $column) {
+            if (in_array($column, $dateFields)) {
+                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = "[{$column}] = ?";
+            }
+            $values[] = $data[$column];
+        }
+        
+        $values[] = $id; // Para o WHERE
+        
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $placeholders) . " WHERE [{$idColumn}] = ?";
+        
+        DB::statement($sql, $values);
+        
+        // Recarregar o modelo para ter os valores atualizados
+        $model->refresh();
+        
+        return $model;
+    }
+
     private function insertStockWithStringTimestamps(array $data): int
     {
         $createdAt = Carbon::now()->format('Y-m-d H:i:s');
