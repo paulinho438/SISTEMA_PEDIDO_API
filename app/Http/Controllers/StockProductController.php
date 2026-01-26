@@ -42,7 +42,9 @@ class StockProductController extends Controller
         ]);
 
         $products = $this->service->list($request);
-        return StockProductResource::collection($products);
+        
+        // Garantir que os metadados de paginação sejam retornados
+        return StockProductResource::collection($products)->response()->getData(true);
     }
 
     public function buscar(Request $request)
