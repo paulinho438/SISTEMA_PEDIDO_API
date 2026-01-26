@@ -253,7 +253,7 @@
         <div class="signature-box">
             <div class="signature-line"></div>
             <div class="signature-name-line"></div>
-            <div class="signature-label">ALMOXERIFADO ORIGEM</div>
+            <div class="signature-label">ALMOXARIFADO ORIGEM</div>
         </div>
         <div class="signature-box">
             <div class="signature-line"></div>
@@ -263,7 +263,7 @@
         <div class="signature-box">
             <div class="signature-line"></div>
             <div class="signature-name-line"></div>
-            <div class="signature-label">RECEBEDOR DO ALMOXERIFADO</div>
+            <div class="signature-label">RECEBEDOR DO ALMOXARIFADO</div>
         </div>
     </div>
 
