@@ -295,6 +295,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/cotacoes/{quote}/reject', [PurchaseQuoteController::class, 'reject']);
     Route::post('/cotacoes/{quote}/finalizar', [PurchaseQuoteController::class, 'finalizeQuote']);
     Route::post('/cotacoes/{quote}/analisar', [PurchaseQuoteController::class, 'analyzeQuote']);
+    Route::post('/cotacoes/{quote}/alterar-quantidade', [PurchaseQuoteController::class, 'alterarQuantidadeItens']);
     Route::post('/cotacoes/{quote}/analisar-aprovacoes', [PurchaseQuoteController::class, 'analyzeAndSelectApprovals']);
     Route::post('/cotacoes/{quote}/aprovar-nivel/{level}', [PurchaseQuoteController::class, 'approveByLevel']);
     Route::post('/cotacoes/{quote}/reprovar', [PurchaseQuoteController::class, 'reprove']);

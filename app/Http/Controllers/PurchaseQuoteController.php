@@ -3577,6 +3577,81 @@ class PurchaseQuoteController extends Controller
     }
 
     /**
+     * Alterar apenas a quantidade dos itens da solicitação
+     * Permite alteração quando status for "cotacao" ou "compra_em_andamento"
+     */
+    public function alterarQuantidadeItens(Request $request, PurchaseQuote $quote)
+    {
+        $user = auth()->user();
+        
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Verificar se o status permite alterar quantidade
+        $statusPermitidos = ['cotacao', 'compra_em_andamento'];
+        if (!in_array($quote->current_status_slug, $statusPermitidos)) {
+            return response()->json([
+                'message' => 'A alteração de quantidade só é permitida quando a cotação está com status "Cotação" ou "Compra em Andamento".',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Verificar se o usuário é o solicitante ou tem permissão
+        $isRequester = $quote->requester_id === $user->id;
+        $hasPermission = $user->hasPermission('edit_cotacoes');
+        
+        if (!$isRequester && !$hasPermission) {
+            return response()->json([
+                'message' => 'Você não tem permissão para alterar a quantidade dos itens desta solicitação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'itens' => 'required|array|min:1',
+            'itens.*.id' => 'required|integer|exists:purchase_quote_items,id',
+            'itens.*.quantidade' => 'required|numeric|min:0.0001',
+        ]);
+
+        DB::beginTransaction();
+        
+        try {
+            // Atualizar apenas a quantidade dos itens
+            foreach ($validated['itens'] as $itemData) {
+                $item = $quote->items()->find($itemData['id']);
+                if ($item) {
+                    $this->updateModelWithStringTimestamps($item, [
+                        'quantity' => $itemData['quantidade']
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            // Recarregar a cotação com os dados atualizados
+            $quote->refresh();
+            $quote->load(['items', 'status']);
+
+            return response()->json([
+                'message' => 'Quantidades alteradas com sucesso.',
+                'data' => [
+                    'id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                ]
+            ], Response::HTTP_OK);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            
+            return response()->json([
+                'message' => 'Erro ao alterar quantidades.',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
      * Verifica se o usuário pode aprovar a cotação no momento atual
      */
     private function canUserApproveQuote(PurchaseQuote $quote, ?User $user): bool
