@@ -43,8 +43,16 @@ class StockProductController extends Controller
 
         $products = $this->service->list($request);
         
-        // Garantir que os metadados de paginação sejam retornados
-        return StockProductResource::collection($products)->response()->getData(true);
+        // Retornar com metadados de paginação no formato esperado pelo frontend
+        return response()->json([
+            'data' => StockProductResource::collection($products)->collection,
+            'current_page' => $products->currentPage(),
+            'per_page' => $products->perPage(),
+            'total' => $products->total(),
+            'last_page' => $products->lastPage(),
+            'from' => $products->firstItem(),
+            'to' => $products->lastItem(),
+        ]);
     }
 
     public function buscar(Request $request)

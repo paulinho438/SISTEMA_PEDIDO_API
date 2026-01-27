@@ -50,6 +50,7 @@ class StockProductService
     {
         $perPage = (int) $request->get('per_page', 15);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
+        $page = (int) $request->get('page', 1);
         
         $companyId = $request->header('company-id');
         $query = StockProduct::where('company_id', $companyId);
@@ -67,7 +68,7 @@ class StockProductService
             $query->where('active', $request->boolean('active'));
         }
 
-        return $query->orderBy('description')->paginate($perPage);
+        return $query->orderBy('description')->paginate($perPage, ['*'], 'page', $page);
     }
 
     /**
