@@ -3611,18 +3611,18 @@ class PurchaseQuoteController extends Controller
         $validated = $request->validate([
             'itens' => 'required|array|min:1',
             'itens.*.id' => 'required|integer|exists:purchase_quote_items,id',
-            'itens.*.quantidade' => 'required|numeric|min:0.0001',
+            'itens.*.quantidade' => 'required|integer|min:1',
         ]);
 
         DB::beginTransaction();
         
         try {
-            // Atualizar apenas a quantidade dos itens
+            // Atualizar apenas a quantidade dos itens (garantindo que seja inteiro)
             foreach ($validated['itens'] as $itemData) {
                 $item = $quote->items()->find($itemData['id']);
                 if ($item) {
                     $this->updateModelWithStringTimestamps($item, [
-                        'quantity' => $itemData['quantidade']
+                        'quantity' => (int) $itemData['quantidade']
                     ]);
                 }
             }
