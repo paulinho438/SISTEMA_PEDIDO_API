@@ -203,6 +203,24 @@
         .summary-table td.number {
             text-align: right;
         }
+        
+        .observations {
+            margin-top: 10px;
+            margin-bottom: 10px;
+            font-size: 8pt;
+            padding: 5px;
+            border: 1px solid #000;
+            background-color: #f9f9f9;
+        }
+        
+        .observations-label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .observations-content {
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -255,6 +273,14 @@
             <h1>QUADRO COMPARATIVO DE PREÇOS</h1>
         </div>
     </div>
+
+    <!-- Observações -->
+    @if($quote->observation)
+    <div class="observations">
+        <div class="observations-label">Observações:</div>
+        <div class="observations-content">{{ $quote->observation }}</div>
+    </div>
+    @endif
 
     <!-- Tabela Principal com Itens e Cotações -->
     <table class="quote-table">
