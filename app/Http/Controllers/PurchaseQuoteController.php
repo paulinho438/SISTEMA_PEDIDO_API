@@ -2160,12 +2160,12 @@ class PurchaseQuoteController extends Controller
                 
                 foreach ($pendingApprovals as $approval) {
                     $approvalOrder = $order[$approval->approval_level] ?? 999;
-                    // Aprovar apenas níveis anteriores ao DIRETOR
+                    // Aprovar apenas níveis anteriores ao DIRETOR (sem vincular assinatura do diretor a esses níveis)
                     if ($approvalOrder < $directorOrder) {
                         $this->updateModelWithStringTimestamps($approval, [
                             'approved' => true,
-                            'approved_by' => $user->id,
-                            'approved_by_name' => $user->nome_completo ?? $user->name,
+                            'approved_by' => null,
+                            'approved_by_name' => 'Aprovado automaticamente pelo diretor',
                             'approved_at' => now()->format('Y-m-d H:i:s'),
                             'notes' => 'Aprovado automaticamente pelo diretor.',
                         ]);
