@@ -136,6 +136,7 @@ class PurchaseOrderController extends Controller
         $order = PurchaseOrder::with([
             'items.quoteItem',
             'company',
+            'quote.buyer',
             'quote.approvals.approver',
             'quote.approvals' => function ($query) {
                 $query->where('required', true);
@@ -174,8 +175,23 @@ class PurchaseOrderController extends Controller
         
         // Buscar assinaturas - usar aprovações da cotação se disponível
         $signatures = $this->getSignaturesByProfile($request, $companyId, $order->quote);
-        
-        // Fallback: Se não encontrar COMPRADOR por perfil, usar assinatura do usuário que criou o pedido
+
+        // COMPRADOR: sempre usar o comprador da cotação (buyer), não quem aprovou nem quem criou o pedido
+        if ($order->quote && $order->quote->buyer_id) {
+            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
+            if ($quoteBuyer) {
+                $signatures['COMPRADOR'] = [
+                    'user_id' => $quoteBuyer->id,
+                    'user_name' => $quoteBuyer->nome_completo ?? $order->quote->buyer_name,
+                    'signature_path' => $quoteBuyer->signature_path ?? null,
+                    'signature_url' => $quoteBuyer->signature_path
+                        ? $request->getSchemeAndHttpHost() . '/storage/' . $quoteBuyer->signature_path
+                        : null,
+                ];
+            }
+        }
+
+        // Fallback: Se não houver comprador na cotação, usar assinatura do usuário que criou o pedido
         if ((!isset($signatures['COMPRADOR']) || !$signatures['COMPRADOR']) && $order->createdBy && $order->createdBy->signature_path) {
             $signatures['COMPRADOR'] = [
                 'user_id' => $order->createdBy->id,
@@ -227,13 +243,22 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        // Comprador: usar o comprador da cotação (buyer), não quem criou o pedido
+        $buyer = $order->createdBy;
+        if ($order->quote && $order->quote->buyer_id) {
+            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
+            if ($quoteBuyer) {
+                $buyer = $quoteBuyer;
+            }
+        }
+
         // Preparar dados para a view
         $dados = [
             'order' => $order,
             'company' => $order->company,
             'items' => $order->items,
             'quote' => $order->quote,
-            'buyer' => $order->createdBy,
+            'buyer' => $buyer,
             'totalIten' => $totalIten,
             'totalIPI' => $totalIPI,
             'totalICM' => $totalICM,

@@ -196,8 +196,14 @@
         .totals-line {
             display: flex;
             justify-content: space-between;
+            align-items: baseline;
             padding: 2px 0;
             border-bottom: 1px dotted #000;
+        }
+        .totals-line .totals-value-right {
+            text-align: right;
+            margin-left: auto;
+            min-width: 80px;
         }
         
         .totals-line-values {
@@ -440,7 +446,7 @@
         <div class="totals-section">
             <div class="totals-line">
                 <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
-                <div><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
+                <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
             </div>
             <div class="totals-line">
                 <div><strong>TIPO FRETE:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE' }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
@@ -454,14 +460,9 @@
                 <div>DESCONTO: {{ number_format($totalDEC, 2, ',', '.') }}</div>
             </div>
             <div class="totals-line total-final">
-                <div><strong>VALOR TOTAL:</strong></div>
-                <div><strong>{{ number_format($valorTotal, 2, ',', '.') }}</strong></div>
+                <div><strong>COMPRADOR:</strong> @if($buyer){{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}@endif</div>
+                <div class="totals-value-right"><strong>VALOR TOTAL:</strong> {{ number_format($valorTotal, 2, ',', '.') }}</div>
             </div>
-            @if($buyer)
-            <div class="totals-line" style="margin-top: 5px;">
-                <div><strong>COMPRADOR:</strong> {{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}</div>
-            </div>
-            @endif
         </div>
         
         <!-- Observações -->
@@ -498,10 +499,10 @@
                 <div class="signature-name-line"></div>
                 <div class="signature-name">COMPRADOR</div>
                 <div class="text-small">
-                    @if(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'])
+                    @if($buyer)
+                        {{ strtoupper($buyer->nome_completo ?? ($order->quote ? $order->quote->buyer_name : null) ?? '') }}
+                    @elseif(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'])
                         {{ strtoupper($signatures['COMPRADOR']['user_name']) }}
-                    @elseif($buyer)
-                        {{ strtoupper($buyer->nome_completo) }}
                     @endif
                 </div>
             </div>
