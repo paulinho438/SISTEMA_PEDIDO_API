@@ -510,11 +510,11 @@
             <div class="signature-box">
                 <div class="signature-line">
                     @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'] && !empty($signatures['GERENTE LOCAL']['signature_base64']))
-                        <img src="{!! $signatures['GERENTE LOCAL']['signature_base64'] !!}" alt="Assinatura Gerente Local" class="signature-image" />
+                        <img src="{!! $signatures['GERENTE LOCAL']['signature_base64'] !!}" alt="Assinatura Gerente Local Compras" class="signature-image" />
                     @endif
                 </div>
                 <div class="signature-name-line"></div>
-                <div class="signature-name">GERENTE LOCAL</div>
+                <div class="signature-name">Gerente Local Compras</div>
                 <div class="text-small">
                     @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'])
                         {{ strtoupper($signatures['GERENTE LOCAL']['user_name']) }}
@@ -540,11 +540,11 @@
             <div class="signature-box">
                 <div class="signature-line">
                     @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'] && !empty($signatures['GERENTE GERAL']['signature_base64']))
-                        <img src="{!! $signatures['GERENTE GERAL']['signature_base64'] !!}" alt="Assinatura Gerente Geral" class="signature-image" />
+                        <img src="{!! $signatures['GERENTE GERAL']['signature_base64'] !!}" alt="Assinatura Gerente Geral Compras" class="signature-image" />
                     @endif
                 </div>
                 <div class="signature-name-line"></div>
-                <div class="signature-name">GERENTE GERAL</div>
+                <div class="signature-name">Gerente Geral Compras</div>
                 <div class="text-small">
                     @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'])
                         {{ strtoupper($signatures['GERENTE GERAL']['user_name']) }}
