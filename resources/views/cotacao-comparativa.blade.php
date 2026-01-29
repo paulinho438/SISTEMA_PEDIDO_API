@@ -797,9 +797,9 @@
         </tbody>
     </table>
 
-    <!-- Rodapé Última Página -->
+    <!-- Rodapé Última Página (usar buyer_name da cotação = comprador atribuído, não o usuário logado) -->
     <div class="footer-totals">
-        <div>COMPRADOR: {{ strtoupper($buyer->nome_completo ?? $buyer->name ?? '') }}</div>
+        <div>COMPRADOR: {{ strtoupper($quote->buyer_name ?? ($buyer ? ($buyer->nome_completo ?? $buyer->name) : '') ?? '') }}</div>
         <div>TOTAL S/ DIFAL: R$ {{ number_format($totalSemDifal, 2, ',', '.') }}</div>
         <div>TOTAL C/ DIFAL: R$ {{ number_format($totalDecisao, 2, ',', '.') }}</div>
     </div>

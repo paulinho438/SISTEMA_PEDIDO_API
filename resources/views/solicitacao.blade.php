@@ -209,15 +209,7 @@
         
         <div class="detail-item">
             <span class="detail-label">Comprador:</span>
-            <span class="detail-value">
-                @if(isset($buyer))
-                    {{ $buyer->nome_completo ?? $buyer->name ?? '-' }}
-                @elseif($quote->buyer)
-                    {{ $quote->buyer->nome_completo ?? $quote->buyer->name ?? '-' }}
-                @else
-                    -
-                @endif
-            </span>
+            <span class="detail-value">{{ $quote->buyer_name ?? (isset($buyer) ? ($buyer->nome_completo ?? $buyer->name) : null) ?? '-' }}</span>
         </div>
         
         <div class="detail-item">

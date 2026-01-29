@@ -203,7 +203,7 @@ class PurchaseQuote extends Model
 
     public function buyer(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'buyer_id')->withDefault();
+        return $this->belongsTo(User::class, 'buyer_id');
     }
 
     public function engineer(): BelongsTo
