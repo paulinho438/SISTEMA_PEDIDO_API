@@ -21,7 +21,7 @@ return new class extends Migration
             }
             if (!Schema::hasColumn('purchase_quotes', 'reset_by')) {
                 $table->unsignedBigInteger('reset_by')->nullable();
-                $table->foreign('reset_by')->references('id')->on('users')->onDelete('set null');
+                $table->foreign('reset_by')->references('id')->on('users')->onDelete('no action')->onUpdate('no action');
             }
         });
     }
