@@ -3152,8 +3152,9 @@ class PurchaseQuoteController extends Controller
     }
 
     /**
-     * Resetar solicitação: elimina assinaturas/aprovações, mantém fornecedores,
-     * coloca status em "aguardando" e grava o motivo para o solicitante ver.
+     * Resetar solicitação: elimina apenas assinaturas/aprovações.
+     * Mantém fornecedores e preços (purchase_quote_suppliers e purchase_quote_supplier_items não são alterados).
+     * Coloca status em "aguardando" e grava o motivo para o solicitante ver.
      */
     public function resetSolicitacao(Request $request, PurchaseQuote $quote)
     {
@@ -3192,6 +3193,7 @@ class PurchaseQuoteController extends Controller
 
         DB::beginTransaction();
         try {
+            // Apenas remove assinaturas/aprovações. Não altera fornecedores nem preços (suppliers / supplier_items).
             $quote->approvals()->delete();
 
             $this->updateModelWithStringTimestamps($quote, [
