@@ -261,6 +261,13 @@ class PurchaseOrderService
             $query->where('order_date', '<=', $filters['date_to']);
         }
 
+        // Filtro por comprador: apenas pedidos cuja cotação tem o buyer_id informado
+        if (isset($filters['buyer_id'])) {
+            $query->whereHas('quote', function ($q) use ($filters) {
+                $q->where('buyer_id', $filters['buyer_id']);
+            });
+        }
+
         return $query->orderByDesc('order_date')->paginate($perPage);
     }
 }

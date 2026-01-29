@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\PurchaseOrderService;
 use App\Services\PurchaseOrderStatusService;
+use App\Services\PurchaseQuote\PurchaseQuoteApprovalService;
 use App\Models\PurchaseQuote;
 use App\Models\PurchaseOrder;
 use App\Models\User;
@@ -25,7 +26,7 @@ class PurchaseOrderController extends Controller
 
     public function index(Request $request)
     {
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
         
         $filters = [
             'company_id' => $companyId,
@@ -36,6 +37,12 @@ class PurchaseOrderController extends Controller
             'date_from' => $request->get('date_from'),
             'date_to' => $request->get('date_to'),
         ];
+
+        // Comprador vê apenas seus pedidos; diretor/gerente veem todos
+        $user = auth()->user();
+        if ($user && $this->isOnlyBuyer($user, $companyId)) {
+            $filters['buyer_id'] = $user->id;
+        }
 
         $perPage = (int) $request->get('per_page', 15);
         $orders = $this->service->list($filters, $perPage);
@@ -48,7 +55,25 @@ class PurchaseOrderController extends Controller
     public function show(Request $request, $id)
     {
         $order = $this->service->find($id);
-        
+        $companyId = (int) $request->header('company-id');
+
+        if ($order->company_id != $companyId) {
+            return response()->json([
+                'message' => 'Pedido não encontrado ou não pertence à empresa.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Comprador só pode ver pedidos em que é o comprador da cotação
+        $user = auth()->user();
+        if ($user && $this->isOnlyBuyer($user, $companyId)) {
+            $quoteBuyerId = $order->quote ? $order->quote->buyer_id : null;
+            if ((int) $quoteBuyerId !== (int) $user->id) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para visualizar este pedido.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         return response()->json([
             'data' => $order
         ]);
@@ -59,12 +84,18 @@ class PurchaseOrderController extends Controller
      */
     public function buscarPorCotacao(Request $request, $quoteId)
     {
-        $companyId = $request->header('company-id');
+        $companyId = (int) $request->header('company-id');
         
         $filters = [
             'company_id' => $companyId,
             'purchase_quote_id' => $quoteId,
         ];
+
+        // Comprador vê apenas seus pedidos
+        $user = auth()->user();
+        if ($user && $this->isOnlyBuyer($user, $companyId)) {
+            $filters['buyer_id'] = $user->id;
+        }
 
         $orders = $this->service->list($filters, 100);
         
@@ -155,6 +186,17 @@ class PurchaseOrderController extends Controller
             return response()->json([
                 'message' => 'Pedido não encontrado ou não pertence à empresa.',
             ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Comprador só pode imprimir pedidos em que é o comprador da cotação
+        $user = auth()->user();
+        if ($user && $this->isOnlyBuyer($user, $companyId)) {
+            $quoteBuyerId = $order->quote ? $order->quote->buyer_id : null;
+            if ((int) $quoteBuyerId !== (int) $user->id) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para imprimir este pedido.',
+                ], Response::HTTP_FORBIDDEN);
+            }
         }
 
         // Calcular totais
@@ -552,6 +594,16 @@ class PurchaseOrderController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
+        // Comprador (apenas nível COMPRADOR) só pode alterar status dos seus próprios pedidos
+        if ($this->isOnlyBuyer($user, $companyId)) {
+            $quoteBuyerId = $order->quote ? $order->quote->buyer_id : null;
+            if ((int) $quoteBuyerId !== (int) $user->id) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para alterar o status deste pedido.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
         // Normalizar status do pedido: tratar vazio/null como 'pendente'
         $currentStatus = trim($order->status ?? '') ?: PurchaseOrder::STATUS_PENDENTE;
         
@@ -636,5 +688,16 @@ class PurchaseOrderController extends Controller
                 }
             })
             ->exists();
+    }
+
+    /**
+     * Verifica se o usuário é apenas comprador (tem somente nível COMPRADOR).
+     * Diretor, gerente etc. têm outros níveis e podem ver todos os pedidos.
+     */
+    private function isOnlyBuyer(User $user, ?int $companyId): bool
+    {
+        $approvalService = app(PurchaseQuoteApprovalService::class);
+        $userLevels = $approvalService->getUserApprovalLevels($user, $companyId ?: null);
+        return count($userLevels) === 1 && in_array('COMPRADOR', $userLevels, true);
     }
 }
