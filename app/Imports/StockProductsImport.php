@@ -23,14 +23,26 @@ class StockProductsImport implements ToCollection, WithHeadingRow
     protected $successCount = 0;
     protected $skipCount = 0;
 
-    public function __construct(int $companyId, int $userId)
+    /** @var bool Modo apenas validação: não persiste, retorna resultado por linha */
+    protected $validateOnly = false;
+
+    /** @var array Resultado da pré-validação (linha, dados, status, mensagem) */
+    protected $validationResults = [];
+
+    public function __construct(int $companyId, int $userId, bool $validateOnly = false)
     {
         $this->companyId = $companyId;
         $this->userId = $userId;
+        $this->validateOnly = $validateOnly;
     }
 
     public function collection(Collection $rows)
     {
+        if ($this->validateOnly) {
+            $this->runValidationOnly($rows);
+            return;
+        }
+
         $productService = new StockProductService();
 
         DB::beginTransaction();
@@ -142,6 +154,76 @@ class StockProductsImport implements ToCollection, WithHeadingRow
             DB::rollBack();
             throw $e;
         }
+    }
+
+    /**
+     * Executa apenas validação por linha, sem persistir. Preenche $this->validationResults.
+     */
+    protected function runValidationOnly(Collection $rows): void
+    {
+        foreach ($rows as $index => $row) {
+            $rowNumber = $index + 2; // +2: linha 1 é cabeçalho, index começa em 0
+            $dados = $this->getRowDisplayData($row);
+
+            if ($this->isRowEmpty($row)) {
+                $this->validationResults[] = [
+                    'linha' => $rowNumber,
+                    'dados' => $dados,
+                    'status' => 'vazio',
+                    'mensagem' => 'Linha vazia (será ignorada)',
+                ];
+                continue;
+            }
+
+            try {
+                $this->validateRow($row, $rowNumber);
+                $this->findLocation($row);
+                $this->validationResults[] = [
+                    'linha' => $rowNumber,
+                    'dados' => $dados,
+                    'status' => 'ok',
+                    'mensagem' => null,
+                ];
+            } catch (\Exception $e) {
+                $this->validationResults[] = [
+                    'linha' => $rowNumber,
+                    'dados' => $dados,
+                    'status' => 'erro',
+                    'mensagem' => $e->getMessage(),
+                ];
+            }
+        }
+    }
+
+    /**
+     * Retorna dados da linha normalizados para exibição na pré-validação.
+     */
+    protected function getRowDisplayData($row): array
+    {
+        $str = function ($v) {
+            if ($v === null || $v === '') {
+                return null;
+            }
+            return trim((string) $v);
+        };
+        return [
+            'referencia' => $str($this->normalizeColumnName($row, ['referencia', 'referência', 'Referência'])),
+            'descricao' => $str($this->normalizeColumnName($row, ['descricao', 'descrição', 'Descrição'])),
+            'unidade' => $str($this->normalizeColumnName($row, ['unidade', 'Unidade'])),
+            'local_estoque' => $str($this->normalizeColumnName($row, [
+                'local de estoque', 'local_de_estoque', 'Local de Estoque', 'Local de estoque',
+                'LOCAL DE ESTOQUE', 'local_estoque', 'localestoque',
+            ])),
+            'quantidade' => $str($this->normalizeColumnName($row, ['quantidade', 'Quantidade'])),
+        ];
+    }
+
+    /**
+     * Retorna o resultado da pré-validação (uso após runValidationOnly).
+     */
+    public function getValidationResults(): array
+    {
+        return $this->validationResults;
     }
 
     /**

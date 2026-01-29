@@ -358,6 +358,68 @@ class StockProductController extends Controller
     }
 
     /**
+     * Pré-validar arquivo Excel: retorna por linha status (ok/erro/vazio) sem persistir.
+     */
+    public function validarExcel(Request $request)
+    {
+        $user = auth()->user();
+
+        if (!$user || !$user->hasPermission('import_estoque_produtos_excel')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para importar produtos via Excel.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|mimes:xlsx,xls|max:10240',
+        ], [
+            'file.required' => 'Arquivo Excel é obrigatório',
+            'file.mimes' => 'O arquivo deve ser do tipo Excel (.xlsx ou .xls)',
+            'file.max' => 'O arquivo não pode ser maior que 10MB',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Erro de validação',
+                'errors' => $validator->errors()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $companyId = (int) $request->header('company-id');
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Company ID é obrigatório',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $file = $request->file('file');
+            $import = new StockProductsImport($companyId, $user->id, true);
+            Excel::import($import, $file);
+
+            $linhas = $import->getValidationResults();
+            $totalOk = count(array_filter($linhas, fn($l) => ($l['status'] ?? '') === 'ok'));
+            $totalErro = count(array_filter($linhas, fn($l) => ($l['status'] ?? '') === 'erro'));
+            $totalVazio = count(array_filter($linhas, fn($l) => ($l['status'] ?? '') === 'vazio'));
+
+            return response()->json([
+                'message' => 'Validação concluída',
+                'data' => [
+                    'linhas' => $linhas,
+                    'total_ok' => $totalOk,
+                    'total_erro' => $totalErro,
+                    'total_vazio' => $totalVazio,
+                ]
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Erro ao validar arquivo Excel',
+                'error' => $e->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
      * Importar produtos em massa via Excel
      */
     public function importarExcel(Request $request)

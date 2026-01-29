@@ -352,6 +352,7 @@ Route::middleware('auth:api')->group(function () {
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);
         Route::get('/produtos/buscar-combinado', [StockProductController::class, 'buscarCombinado']);
         Route::get('/produtos/template-excel', [StockProductController::class, 'baixarTemplate']);
+        Route::post('/produtos/validar-excel', [StockProductController::class, 'validarExcel']);
         Route::post('/produtos/importar-excel', [StockProductController::class, 'importarExcel']);
         Route::post('/produtos', [StockProductController::class, 'store']);
         Route::post('/produtos/cadastrar-com-protheus', [StockProductController::class, 'cadastrarComProtheus']);
