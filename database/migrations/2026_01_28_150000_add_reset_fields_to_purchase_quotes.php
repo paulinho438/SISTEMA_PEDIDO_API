@@ -13,9 +13,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('purchase_quotes', function (Blueprint $table) {
-            $table->text('reset_reason')->nullable()->after('nature_operation_cfop');
-            $table->dateTime('reset_at')->nullable()->after('reset_reason');
-            $table->foreignId('reset_by')->nullable()->after('reset_at')->constrained('users')->onDelete('set null');
+            if (!Schema::hasColumn('purchase_quotes', 'reset_reason')) {
+                $table->text('reset_reason')->nullable();
+            }
+            if (!Schema::hasColumn('purchase_quotes', 'reset_at')) {
+                $table->dateTime('reset_at')->nullable();
+            }
+            if (!Schema::hasColumn('purchase_quotes', 'reset_by')) {
+                $table->unsignedBigInteger('reset_by')->nullable();
+                $table->foreign('reset_by')->references('id')->on('users')->onDelete('set null');
+            }
         });
     }
 
