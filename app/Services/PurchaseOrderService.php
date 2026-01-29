@@ -249,6 +249,18 @@ class PurchaseOrderService
             $query->where('supplier_name', 'like', '%' . $filters['supplier_name'] . '%');
         }
 
+        // Busca genérica (número do pedido, fornecedor ou número da cotação)
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', '%' . $search . '%')
+                  ->orWhere('supplier_name', 'like', '%' . $search . '%')
+                  ->orWhereHas('quote', function ($quoteQ) use ($search) {
+                      $quoteQ->where('quote_number', 'like', '%' . $search . '%');
+                  });
+            });
+        }
+
         if (isset($filters['status'])) {
             $query->where('status', $filters['status']);
         }

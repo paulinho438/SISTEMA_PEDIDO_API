@@ -33,6 +33,7 @@ class PurchaseOrderController extends Controller
             'purchase_quote_id' => $request->get('purchase_quote_id'),
             'order_number' => $request->get('order_number'),
             'supplier_name' => $request->get('supplier_name'),
+            'search' => $request->get('search'),
             'status' => $request->get('status'),
             'date_from' => $request->get('date_from'),
             'date_to' => $request->get('date_to'),
@@ -45,10 +46,17 @@ class PurchaseOrderController extends Controller
         }
 
         $perPage = (int) $request->get('per_page', 15);
+        $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
         $orders = $this->service->list($filters, $perPage);
 
         return response()->json([
-            'data' => $orders
+            'data' => $orders->items(),
+            'pagination' => [
+                'current_page' => $orders->currentPage(),
+                'per_page' => $orders->perPage(),
+                'total' => $orders->total(),
+                'last_page' => $orders->lastPage(),
+            ],
         ]);
     }
 

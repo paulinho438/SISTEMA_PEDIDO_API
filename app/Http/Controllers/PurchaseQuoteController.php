@@ -275,7 +275,13 @@ class PurchaseQuoteController extends Controller
 
         $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
-        if ($request->filled('status')) {
+        if ($request->filled('status_in')) {
+            $slugs = array_map('trim', explode(',', $request->get('status_in')));
+            $slugs = array_filter($slugs);
+            if (!empty($slugs)) {
+                $query->whereIn('current_status_slug', $slugs);
+            }
+        } elseif ($request->filled('status')) {
             $query->where('current_status_slug', $request->get('status'));
         }
 

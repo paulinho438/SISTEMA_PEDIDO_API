@@ -29,9 +29,36 @@ class AssetStandardDescriptionController extends Controller
         if (!$isManagement) {
             $query->where('active', true);
         }
-        
-        $items = $query->orderBy('name')->get();
 
+        // Filtro de busca (código, nome ou descrição)
+        if ($request->filled('search')) {
+            $search = $request->get('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', '%' . $search . '%')
+                  ->orWhere('name', 'like', '%' . $search . '%')
+                  ->orWhere('description', 'like', '%' . $search . '%');
+            });
+        }
+        
+        $query->orderBy('name');
+
+        // Paginação server-side
+        $perPage = (int) $request->get('per_page', 0);
+        if ($perPage > 0) {
+            $perPage = min($perPage, 100);
+            $paginated = $query->paginate($perPage);
+            $resourceArray = AssetStandardDescriptionResource::collection($paginated->items())->toArray();
+            return response()->json(array_merge($resourceArray, [
+                'pagination' => [
+                    'current_page' => $paginated->currentPage(),
+                    'per_page' => $paginated->perPage(),
+                    'total' => $paginated->total(),
+                    'last_page' => $paginated->lastPage(),
+                ],
+            ]));
+        }
+        
+        $items = $query->get();
         return AssetStandardDescriptionResource::collection($items);
     }
 
