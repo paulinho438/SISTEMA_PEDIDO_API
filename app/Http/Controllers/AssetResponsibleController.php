@@ -124,7 +124,7 @@ class AssetResponsibleController extends Controller
         if ($perPage > 0) {
             $perPage = min($perPage, 100);
             $paginated = $query->paginate($perPage);
-            $resourceArray = AssetResponsibleResource::collection($paginated->items())->toArray();
+            $resourceArray = AssetResponsibleResource::collection($paginated->items())->toArray($request);
             return response()->json(array_merge($resourceArray, [
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),

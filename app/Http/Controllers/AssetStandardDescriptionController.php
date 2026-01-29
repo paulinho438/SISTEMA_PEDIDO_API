@@ -47,7 +47,7 @@ class AssetStandardDescriptionController extends Controller
         if ($perPage > 0) {
             $perPage = min($perPage, 100);
             $paginated = $query->paginate($perPage);
-            $resourceArray = AssetStandardDescriptionResource::collection($paginated->items())->toArray();
+            $resourceArray = AssetStandardDescriptionResource::collection($paginated->items())->toArray($request);
             return response()->json(array_merge($resourceArray, [
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),

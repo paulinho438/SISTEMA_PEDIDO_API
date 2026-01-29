@@ -123,7 +123,7 @@ class AssetBranchController extends Controller
         if ($perPage > 0) {
             $perPage = min($perPage, 100);
             $paginated = $query->paginate($perPage);
-            $resourceArray = AssetBranchResource::collection($paginated->items())->toArray();
+            $resourceArray = AssetBranchResource::collection($paginated->items())->toArray($request);
             return response()->json(array_merge($resourceArray, [
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),
