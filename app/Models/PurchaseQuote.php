@@ -42,11 +42,15 @@ class PurchaseQuote extends Model
         'nature_operation_code',
         'nature_operation_description',
         'nature_operation_cfop',
+        'reset_reason',
+        'reset_at',
+        'reset_by',
     ];
 
     protected $casts = [
         // 'requested_at' => 'date', // Removido - o mutator cuida da conversão
         'protheus_exported_at' => 'datetime',
+        'reset_at' => 'datetime',
     ];
 
     /**
@@ -205,6 +209,11 @@ class PurchaseQuote extends Model
     public function engineer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'engineer_id')->withDefault();
+    }
+
+    public function resetByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reset_by');
     }
 
     public function company(): BelongsTo

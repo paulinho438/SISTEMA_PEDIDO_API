@@ -92,7 +92,7 @@ class PurchaseQuoteController extends Controller
         
         foreach ($columns as $column) {
             // Campos de data precisam de CAST
-            if ($column === 'updated_at' || $column === 'approved_at') {
+            if (in_array($column, ['updated_at', 'approved_at', 'reset_at'], true)) {
                 $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
             } else {
                 $placeholders[] = "[{$column}] = ?";
@@ -557,6 +557,7 @@ class PurchaseQuoteController extends Controller
             },
             'statusHistory.status',
             'company',
+            'resetByUser',
         ]);
 
         $itemsCollection = $quote->items;
@@ -741,6 +742,9 @@ class PurchaseQuoteController extends Controller
                     'slug' => $quote->current_status_slug,
                     'label' => $quote->current_status_label,
                 ],
+                'reset_reason' => $quote->reset_reason,
+                'reset_at' => $quote->reset_at ? $quote->reset_at->format('d/m/Y H:i') : null,
+                'reset_by_name' => $quote->resetByUser ? ($quote->resetByUser->nome_completo ?? $quote->resetByUser->name) : null,
                 'buyer' => [
                     'id' => $quote->buyer_id ? (int) $quote->buyer_id : null,
                     'name' => $quote->buyer_name,
@@ -3130,6 +3134,79 @@ class PurchaseQuoteController extends Controller
 
             return response()->json([
                 'message' => 'Não foi possível selecionar os níveis de aprovação.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Resetar solicitação: elimina assinaturas/aprovações, mantém fornecedores,
+     * coloca status em "aguardando" e grava o motivo para o solicitante ver.
+     */
+    public function resetSolicitacao(Request $request, PurchaseQuote $quote)
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('cotacoes_analisar_selecionar')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para resetar a solicitação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'motivo' => 'required|string|max:2000',
+        ]);
+
+        $allowedStatuses = [
+            'em_analise_supervisor',
+            'autorizado',
+            'cotacao',
+            'finalizada',
+            'analisada',
+            'analisada_aguardando',
+            'analise_gerencia',
+        ];
+        if (!in_array($quote->current_status_slug, $allowedStatuses, true)) {
+            return response()->json([
+                'message' => 'A solicitação não está em um status que permite resetar.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $statusAguardando = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
+        if (!$statusAguardando) {
+            return response()->json([
+                'message' => 'Status "aguardando" não configurado.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::beginTransaction();
+        try {
+            $quote->approvals()->delete();
+
+            $this->updateModelWithStringTimestamps($quote, [
+                'reset_reason' => $validated['motivo'],
+                'reset_at' => now()->format('Y-m-d H:i:s'),
+                'reset_by' => $user->id,
+            ]);
+
+            $this->transitionStatus($quote, $statusAguardando, 'Solicitação resetada: ' . $validated['motivo']);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Solicitação resetada com sucesso. O solicitante poderá ver o motivo e editar a solicitação.',
+                'status' => [
+                    'slug' => $quote->fresh()->current_status_slug,
+                    'label' => $quote->fresh()->current_status_label,
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            Log::error('Falha ao resetar solicitação', [
+                'quote_id' => $quote->id,
+                'error' => $exception->getMessage(),
+            ]);
+            return response()->json([
+                'message' => 'Não foi possível resetar a solicitação.',
                 'error' => $exception->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }

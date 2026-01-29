@@ -39,6 +39,8 @@ class PurchaseOrder extends Model
         'total_amount',
         'status',
         'observation',
+        'protheus_order_number',
+        'protheus_exported_at',
         'company_id',
         'created_by',
         'updated_by',
@@ -47,6 +49,7 @@ class PurchaseOrder extends Model
     protected $casts = [
         'order_date' => 'date',
         'expected_delivery_date' => 'date',
+        'protheus_exported_at' => 'datetime',
         'total_amount' => 'decimal:2',
     ];
 
