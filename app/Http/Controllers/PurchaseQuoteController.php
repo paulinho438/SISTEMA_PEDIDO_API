@@ -1178,8 +1178,12 @@ class PurchaseQuoteController extends Controller
                 $quote->refresh();
             }
 
-            // Atualizar itens: remover os que não estão mais na lista
+            // Atualizar itens: remover os que não estão mais na lista (antes remover supplier_items que referenciam)
             $itemIdsFromRequest = array_filter(array_map(fn($item) => $item['id'] ?? null, $validated['itens']));
+            $idsToRemove = $quote->items()->whereNotIn('id', $itemIdsFromRequest)->pluck('id')->toArray();
+            if (!empty($idsToRemove)) {
+                PurchaseQuoteSupplierItem::whereIn('purchase_quote_item_id', $idsToRemove)->delete();
+            }
             $quote->items()->whereNotIn('id', $itemIdsFromRequest)->delete();
 
             $mainCostCenterCode = null;
@@ -1345,12 +1349,20 @@ class PurchaseQuoteController extends Controller
         
         // Atualizar itens se fornecidos
         if (!empty($validated['itens']) && is_array($validated['itens'])) {
-            // Remover itens que não estão mais na lista
+            // Remover itens que não estão mais na lista (antes remover supplier_items que referenciam)
             $itemIdsFromRequest = array_filter(array_map(fn($item) => $item['id'] ?? null, $validated['itens']));
             if (!empty($itemIdsFromRequest)) {
+                $idsToRemove = $quote->items()->whereNotIn('id', $itemIdsFromRequest)->pluck('id')->toArray();
+                if (!empty($idsToRemove)) {
+                    PurchaseQuoteSupplierItem::whereIn('purchase_quote_item_id', $idsToRemove)->delete();
+                }
                 $quote->items()->whereNotIn('id', $itemIdsFromRequest)->delete();
             } else {
                 // Se nenhum item tem ID, remover todos os existentes (serão recriados)
+                $idsToRemove = $quote->items()->pluck('id')->toArray();
+                if (!empty($idsToRemove)) {
+                    PurchaseQuoteSupplierItem::whereIn('purchase_quote_item_id', $idsToRemove)->delete();
+                }
                 $quote->items()->delete();
             }
             
@@ -3998,6 +4010,11 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
+            // Remover supplier_items que referenciam os itens da cotação (evita conflito de FK)
+            $quoteItemIds = $quote->items()->pluck('id')->toArray();
+            if (!empty($quoteItemIds)) {
+                PurchaseQuoteSupplierItem::whereIn('purchase_quote_item_id', $quoteItemIds)->delete();
+            }
             // Deletar relacionamentos em cascata
             $quote->items()->delete();
             $quote->suppliers()->delete();
