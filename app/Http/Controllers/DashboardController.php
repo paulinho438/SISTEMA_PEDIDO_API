@@ -96,36 +96,12 @@ class DashboardController extends Controller
         $accessService = new StockAccessService();
         $accessibleLocationIds = array_map('intval', $accessService->getAccessibleLocationIds($user, $companyId));
 
-        // Almoxarife sem locais associados ou usuário sem acesso: retorna métricas vazias
-        if (empty($accessibleLocationIds)) {
-            return response()->json([
-                'total_products' => 0,
-                'low_stock_products' => [],
-                'out_of_stock_products' => [],
-                'total_low_stock' => 0,
-                'total_value' => 0,
-                'recent_movements' => [],
-            ]);
-        }
-
-        // Buscar produtos ativos
-        // IMPORTANTE: O estoque mínimo é verificado por LOCAL, não pela soma.
-        // Se min_stock = 5, CADA local precisa ter pelo menos 5 unidades.
-        // Se qualquer local tiver menos que o mínimo, o produto aparece como estoque baixo.
+        // Cadastro de produto é único: cards e tabelas (Total, Sem Estoque, Próximos do Mínimo) mostram TODOS os produtos.
+        // Apenas "Últimas Movimentações" é filtrada por local (almoxarife vê só movimentações dos seus almoxarifados).
         $products = \App\Models\StockProduct::where('stock_products.company_id', $companyId)
             ->where('stock_products.active', true)
             ->with(['stocks.location'])
             ->get();
-
-        // Almoxarife: considerar apenas estoques nos locais a que tem acesso
-        foreach ($products as $product) {
-            $product->setRelation('stocks', $product->stocks->filter(
-                fn ($s) => in_array((int) $s->stock_location_id, $accessibleLocationIds)
-            ));
-        }
-
-        // Produtos que têm pelo menos um estoque em algum local acessível
-        $products = $products->filter(fn ($p) => $p->stocks->isNotEmpty());
 
         $totalProducts = $products->count();
         $lowStockProducts = [];
@@ -221,13 +197,17 @@ class DashboardController extends Controller
             return $a['percentage'] <=> $b['percentage'];
         });
 
-        // Buscar últimas 10 movimentações (almoxarife: apenas dos locais a que tem acesso)
-        $recentMovements = StockMovement::where('stock_movements.company_id', $companyId)
-            ->whereIn('stock_movements.stock_location_id', $accessibleLocationIds)
+        // Últimas movimentações: almoxarife vê só dos locais a que tem acesso; demais usuários veem todas
+        $recentMovementsQuery = StockMovement::where('stock_movements.company_id', $companyId)
             ->with(['product', 'location', 'user'])
             ->orderBy('stock_movements.created_at', 'desc')
-            ->limit(10)
-            ->get()
+            ->limit(10);
+        if (!empty($accessibleLocationIds)) {
+            $recentMovementsQuery->whereIn('stock_movements.stock_location_id', $accessibleLocationIds);
+        } else {
+            $recentMovementsQuery->whereRaw('1 = 0'); // almoxarife sem locais: nenhuma movimentação
+        }
+        $recentMovements = $recentMovementsQuery->get()
             ->map(function($movement) {
                 $movementDate = $movement->movement_date 
                     ? \Carbon\Carbon::parse($movement->movement_date)->format('Y-m-d')
