@@ -3811,6 +3811,86 @@ class PurchaseQuoteController extends Controller
     }
 
     /**
+     * Alterar o centro de custo de cada item da solicitação/cotação individualmente.
+     * Disponível independente do status; exige permissão alterar_centro_custo_solicitacao.
+     */
+    public function alterarCentroCustoItens(Request $request, PurchaseQuote $quote)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$user->hasPermission('alterar_centro_custo_solicitacao')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para alterar o centro de custo da solicitação/cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'itens' => 'required|array',
+            'itens.*.id' => 'required|integer|exists:purchase_quote_items,id',
+            'itens.*.centro_custo' => 'required|array',
+            'itens.*.centro_custo.codigo' => 'required|string|max:50',
+            'itens.*.centro_custo.descricao' => 'nullable|string|max:255',
+            'itens.*.centro_custo.classe' => 'nullable|string|max:20',
+        ]);
+
+        $itemIdsFromQuote = $quote->items->pluck('id')->all();
+        DB::beginTransaction();
+        try {
+            foreach ($validated['itens'] as $itemPayload) {
+                $itemId = (int) $itemPayload['id'];
+                if (!in_array($itemId, $itemIdsFromQuote, true)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => "O item {$itemId} não pertence a esta solicitação/cotação.",
+                    ], Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $centro = $itemPayload['centro_custo'];
+                $codigo = $centro['codigo'] ?? '';
+                $descricao = $centro['descricao'] ?? null;
+
+                PurchaseQuoteItem::where('id', $itemId)
+                    ->where('purchase_quote_id', $quote->id)
+                    ->update([
+                        'cost_center_code' => $codigo,
+                        'cost_center_description' => $descricao,
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            // Atualizar main_cost_center da cotação com o primeiro item (para consistência na listagem)
+            $firstItem = PurchaseQuoteItem::where('purchase_quote_id', $quote->id)->orderBy('id')->first();
+            if ($firstItem) {
+                $this->updateModelWithStringTimestamps($quote, [
+                    'main_cost_center_code' => $firstItem->cost_center_code,
+                    'main_cost_center_description' => $firstItem->cost_center_description,
+                ]);
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Centros de custo dos itens alterados com sucesso.',
+                'data' => [
+                    'id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Erro ao alterar centros de custo dos itens.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
      * Verifica se o usuário pode aprovar a cotação no momento atual
      */
     private function canUserApproveQuote(PurchaseQuote $quote, ?User $user): bool
