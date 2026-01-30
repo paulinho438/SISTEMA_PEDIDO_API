@@ -94,7 +94,7 @@ class DashboardController extends Controller
 
         $companyId = (int) $request->header('company-id');
         $accessService = new StockAccessService();
-        $accessibleLocationIds = $accessService->getAccessibleLocationIds($user, $companyId);
+        $accessibleLocationIds = array_map('intval', $accessService->getAccessibleLocationIds($user, $companyId));
 
         // Almoxarife sem locais associados ou usuário sem acesso: retorna métricas vazias
         if (empty($accessibleLocationIds)) {
@@ -120,7 +120,7 @@ class DashboardController extends Controller
         // Almoxarife: considerar apenas estoques nos locais a que tem acesso
         foreach ($products as $product) {
             $product->setRelation('stocks', $product->stocks->filter(
-                fn ($s) => in_array((int) $s->stock_location_id, $accessibleLocationIds, true)
+                fn ($s) => in_array((int) $s->stock_location_id, $accessibleLocationIds)
             ));
         }
 
