@@ -79,19 +79,18 @@ class StockAccessService
         }
 
         // Verificar se usuário está associado a locais (almoxarife)
+        // Se estiver na tabela stock_almoxarife_locations, vê APENAS esses locais (prioridade sobre view_estoque_locais)
         $associatedLocations = DB::table('stock_almoxarife_locations')
             ->where('user_id', $user->id)
             ->where('company_id', $companyId)
             ->pluck('stock_location_id')
             ->toArray();
 
-        // Se tem permissão almoxarife e está associado a locais, retorna apenas os locais associados
-        if ($user->hasPermission('almoxarife') && !empty($associatedLocations)) {
+        if (!empty($associatedLocations)) {
             return $associatedLocations;
         }
 
         // Se usuário tem permissão para visualizar locais, retorna todos os locais ativos
-        // (a menos que seja almoxarife com locais específicos associados)
         if ($user->hasPermission('view_estoque_locais')) {
             return DB::table('stock_locations')
                 ->where('company_id', $companyId)
