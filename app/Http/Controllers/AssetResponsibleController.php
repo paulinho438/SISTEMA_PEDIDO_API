@@ -107,12 +107,13 @@ class AssetResponsibleController extends Controller
             $query->where('active', true);
         }
 
-        // Filtro de busca (código, nome ou descrição)
+        // Filtro de busca (código, nome, matrícula ou descrição)
         if ($request->filled('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
                 $q->where('code', 'like', '%' . $search . '%')
                   ->orWhere('name', 'like', '%' . $search . '%')
+                  ->orWhere('matricula', 'like', '%' . $search . '%')
                   ->orWhere('description', 'like', '%' . $search . '%');
             });
         }
@@ -186,6 +187,7 @@ class AssetResponsibleController extends Controller
         $validator = Validator::make($data, [
             'code' => 'required|string|max:50|unique:asset_responsibles,code,NULL,id,company_id,' . $companyId,
             'name' => 'required|string|max:255',
+            'matricula' => 'nullable|string|max:50',
         ]);
 
         if ($validator->fails()) {
@@ -204,7 +206,15 @@ class AssetResponsibleController extends Controller
     public function update(Request $request, $id)
     {
         $item = AssetResponsible::findOrFail($id);
-        
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'sometimes|required|string|max:255',
+            'matricula' => 'nullable|string|max:50',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
+        }
+
         // Usar helper para atualizar com timestamps como strings (compatível com SQL Server)
         $this->updateModelWithStringTimestamps($item, $request->all());
         

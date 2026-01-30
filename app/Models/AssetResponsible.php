@@ -12,6 +12,7 @@ class AssetResponsible extends Model
     protected $fillable = [
         'code',
         'name',
+        'matricula',
         'description',
         'active',
         'company_id',

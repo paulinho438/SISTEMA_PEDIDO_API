@@ -12,6 +12,7 @@ class AssetResponsibleResource extends JsonResource
             'id' => $this->id,
             'code' => $this->code,
             'name' => $this->name,
+            'matricula' => $this->matricula,
             'description' => $this->description,
             'active' => $this->active,
             'company_id' => $this->company_id,
