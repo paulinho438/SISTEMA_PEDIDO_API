@@ -3749,6 +3749,68 @@ class PurchaseQuoteController extends Controller
     }
 
     /**
+     * Alterar o centro de custo de todos os itens da solicitação/cotação.
+     * Disponível independente do status; exige permissão alterar_centro_custo_solicitacao.
+     */
+    public function alterarCentroCusto(Request $request, PurchaseQuote $quote)
+    {
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        if (!$user->hasPermission('alterar_centro_custo_solicitacao')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para alterar o centro de custo da solicitação/cotação.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $validated = $request->validate([
+            'centro_custo' => 'required|array',
+            'centro_custo.codigo' => 'required|string|max:50',
+            'centro_custo.descricao' => 'nullable|string|max:255',
+            'centro_custo.classe' => 'nullable|string|max:20',
+        ]);
+
+        $centro = $validated['centro_custo'];
+        $codigo = $centro['codigo'] ?? '';
+        $descricao = $centro['descricao'] ?? null;
+
+        DB::beginTransaction();
+        try {
+            PurchaseQuoteItem::where('purchase_quote_id', $quote->id)->update([
+                'cost_center_code' => $codigo,
+                'cost_center_description' => $descricao,
+                'updated_at' => now(),
+            ]);
+
+            $this->updateModelWithStringTimestamps($quote, [
+                'main_cost_center_code' => $codigo,
+                'main_cost_center_description' => $descricao,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Centro de custo alterado em todos os itens da solicitação/cotação.',
+                'data' => [
+                    'id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                ],
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Erro ao alterar centro de custo.',
+                'error' => $e->getMessage(),
+            ], Response::HTTP_BAD_REQUEST);
+        }
+    }
+
+    /**
      * Verifica se o usuário pode aprovar a cotação no momento atual
      */
     private function canUserApproveQuote(PurchaseQuote $quote, ?User $user): bool
