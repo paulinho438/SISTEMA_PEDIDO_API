@@ -120,23 +120,28 @@ class AssetResponsibleController extends Controller
 
         $query->orderBy('name');
 
-        // Paginação server-side
+        // Paginação server-side: retornar sempre { data: [...], pagination: {...} } para o frontend exibir corretamente
         $perPage = (int) $request->get('per_page', 0);
         if ($perPage > 0) {
             $perPage = min($perPage, 100);
             $paginated = $query->paginate($perPage);
             $resourceArray = AssetResponsibleResource::collection($paginated->items())->toArray($request);
-            return response()->json(array_merge($resourceArray, [
+            $items = isset($resourceArray['data']) ? $resourceArray['data'] : array_values($resourceArray);
+            return response()->json([
+                'data' => $items,
                 'pagination' => [
                     'current_page' => $paginated->currentPage(),
                     'per_page' => $paginated->perPage(),
                     'total' => $paginated->total(),
                     'last_page' => $paginated->lastPage(),
                 ],
-            ]));
+            ]);
         }
 
-        return AssetResponsibleResource::collection($query->get());
+        $all = $query->get();
+        $resourceArray = AssetResponsibleResource::collection($all)->toArray($request);
+        $items = isset($resourceArray['data']) ? $resourceArray['data'] : array_values($resourceArray);
+        return response()->json(['data' => $items]);
     }
 
     public function show(Request $request, $id)
