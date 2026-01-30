@@ -522,7 +522,7 @@ class PurchaseQuoteController extends Controller
                 'solicitante' => $quote->requester_name,
                 'empresa' => $quote->company_name,
                 'centro_custo' => $quote->main_cost_center_description ?? $quote->main_cost_center_code,
-                'frente_obra' => $quote->work_front,
+                'local' => $quote->location,
                 'solicitacao' => $solicitacaoLabel,
                 'status' => [
                     'slug' => $quote->current_status_slug,
