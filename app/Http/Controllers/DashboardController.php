@@ -7,6 +7,7 @@ use App\Models\CustomLog;
 use App\Models\Emprestimo;
 use App\Models\StockMovement;
 use App\Services\PurchaseQuote\PurchaseQuoteDashboardService;
+use App\Services\StockAccessService;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 class DashboardController extends Controller
@@ -91,8 +92,22 @@ class DashboardController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $companyId = $request->header('company-id');
-        
+        $companyId = (int) $request->header('company-id');
+        $accessService = new StockAccessService();
+        $accessibleLocationIds = $accessService->getAccessibleLocationIds($user, $companyId);
+
+        // Almoxarife sem locais associados ou usuário sem acesso: retorna métricas vazias
+        if (empty($accessibleLocationIds)) {
+            return response()->json([
+                'total_products' => 0,
+                'low_stock_products' => [],
+                'out_of_stock_products' => [],
+                'total_low_stock' => 0,
+                'total_value' => 0,
+                'recent_movements' => [],
+            ]);
+        }
+
         // Buscar produtos ativos
         // IMPORTANTE: O estoque mínimo é verificado por LOCAL, não pela soma.
         // Se min_stock = 5, CADA local precisa ter pelo menos 5 unidades.
@@ -101,6 +116,16 @@ class DashboardController extends Controller
             ->where('stock_products.active', true)
             ->with(['stocks.location'])
             ->get();
+
+        // Almoxarife: considerar apenas estoques nos locais a que tem acesso
+        foreach ($products as $product) {
+            $product->setRelation('stocks', $product->stocks->filter(
+                fn ($s) => in_array((int) $s->stock_location_id, $accessibleLocationIds, true)
+            ));
+        }
+
+        // Produtos que têm pelo menos um estoque em algum local acessível
+        $products = $products->filter(fn ($p) => $p->stocks->isNotEmpty());
 
         $totalProducts = $products->count();
         $lowStockProducts = [];
@@ -196,8 +221,9 @@ class DashboardController extends Controller
             return $a['percentage'] <=> $b['percentage'];
         });
 
-        // Buscar últimas 10 movimentações
+        // Buscar últimas 10 movimentações (almoxarife: apenas dos locais a que tem acesso)
         $recentMovements = StockMovement::where('stock_movements.company_id', $companyId)
+            ->whereIn('stock_movements.stock_location_id', $accessibleLocationIds)
             ->with(['product', 'location', 'user'])
             ->orderBy('stock_movements.created_at', 'desc')
             ->limit(10)
