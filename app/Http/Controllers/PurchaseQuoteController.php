@@ -3897,16 +3897,14 @@ class PurchaseQuoteController extends Controller
                 $centro = $itemPayload['centro_custo'];
                 $codigo = $centro['codigo'] !== null && $centro['codigo'] !== '' ? (string) $centro['codigo'] : '';
                 $descricao = $centro['descricao'] ?? null;
+                $updatedAt = now()->format('Y-m-d H:i:s');
 
-                $item = PurchaseQuoteItem::where('id', $itemId)
-                    ->where('purchase_quote_id', $quote->id)
-                    ->first();
-                if ($item) {
-                    $item->cost_center_code = $codigo;
-                    $item->cost_center_description = $descricao;
-                    $item->updated_at = now()->format('Y-m-d H:i:s');
-                    $item->save();
-                }
+                // Atualizar via SQL com CAST para evitar erro de conversão datetime no SQL Server (ODBC)
+                DB::statement('
+                    UPDATE [purchase_quote_items]
+                    SET [cost_center_code] = ?, [cost_center_description] = ?, [updated_at] = CAST(? AS DATETIME2)
+                    WHERE [id] = ? AND [purchase_quote_id] = ?
+                ', [$codigo, $descricao, $updatedAt, $itemId, $quote->id]);
             }
 
             // Atualizar main_cost_center da cotação com o primeiro item (para consistência na listagem)
