@@ -3895,16 +3895,18 @@ class PurchaseQuoteController extends Controller
                     ], Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
                 $centro = $itemPayload['centro_custo'];
-                $codigo = $centro['codigo'] ?? '';
+                $codigo = $centro['codigo'] !== null && $centro['codigo'] !== '' ? (string) $centro['codigo'] : '';
                 $descricao = $centro['descricao'] ?? null;
 
-                PurchaseQuoteItem::where('id', $itemId)
+                $item = PurchaseQuoteItem::where('id', $itemId)
                     ->where('purchase_quote_id', $quote->id)
-                    ->update([
-                        'cost_center_code' => $codigo,
-                        'cost_center_description' => $descricao,
-                        'updated_at' => now()->format('Y-m-d H:i:s'),
-                    ]);
+                    ->first();
+                if ($item) {
+                    $item->cost_center_code = $codigo;
+                    $item->cost_center_description = $descricao;
+                    $item->updated_at = now()->format('Y-m-d H:i:s');
+                    $item->save();
+                }
             }
 
             // Atualizar main_cost_center da cotação com o primeiro item (para consistência na listagem)
