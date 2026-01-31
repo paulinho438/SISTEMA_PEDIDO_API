@@ -3784,7 +3784,7 @@ class PurchaseQuoteController extends Controller
             PurchaseQuoteItem::where('purchase_quote_id', $quote->id)->update([
                 'cost_center_code' => $codigo,
                 'cost_center_description' => $descricao,
-                'updated_at' => now(),
+                'updated_at' => now()->format('Y-m-d H:i:s'),
             ]);
 
             $this->updateModelWithStringTimestamps($quote, [
@@ -3859,7 +3859,7 @@ class PurchaseQuoteController extends Controller
                     ->update([
                         'cost_center_code' => $codigo,
                         'cost_center_description' => $descricao,
-                        'updated_at' => now(),
+                        'updated_at' => now()->format('Y-m-d H:i:s'),
                     ]);
             }
 
