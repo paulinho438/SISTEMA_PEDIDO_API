@@ -121,6 +121,11 @@ class AssetService
         // Centro de custo do Protheus vem como código (ex: "6.19"), não como id numérico
         $data = $this->normalizeCostCenterForAsset($data);
 
+        // SQL Server: datas como string (evita conversão nvarchar → datetime fora do intervalo)
+        $data['acquisition_date'] = Carbon::parse($data['acquisition_date'])->format('Y-m-d');
+        $data['created_at'] = now()->format('Y-m-d H:i:s');
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+
         $asset = Asset::create($data);
 
         // Criar movimentação de cadastro

@@ -82,6 +82,13 @@ class Asset extends Model
             $model->attributes['updated_at'] = $updatedAt instanceof \Carbon\Carbon
                 ? $updatedAt->format('Y-m-d H:i:s')
                 : $now;
+            // Coluna DATE no SQL Server: enviar só Y-m-d (evita conversão nvarchar → datetime fora do intervalo)
+            $acq = $model->attributes['acquisition_date'] ?? null;
+            if ($acq !== null) {
+                $model->attributes['acquisition_date'] = $acq instanceof \Carbon\Carbon
+                    ? $acq->format('Y-m-d')
+                    : \Carbon\Carbon::parse($acq)->format('Y-m-d');
+            }
         });
 
         static::updating(function (self $model): void {
@@ -89,6 +96,12 @@ class Asset extends Model
             $model->attributes['updated_at'] = $updatedAt instanceof \Carbon\Carbon
                 ? $updatedAt->format('Y-m-d H:i:s')
                 : now()->format('Y-m-d H:i:s');
+            $acq = $model->attributes['acquisition_date'] ?? null;
+            if ($acq !== null) {
+                $model->attributes['acquisition_date'] = $acq instanceof \Carbon\Carbon
+                    ? $acq->format('Y-m-d')
+                    : \Carbon\Carbon::parse($acq)->format('Y-m-d');
+            }
         });
     }
 
