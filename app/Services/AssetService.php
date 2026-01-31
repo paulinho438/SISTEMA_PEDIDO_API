@@ -121,12 +121,13 @@ class AssetService
         // Centro de custo do Protheus vem como código (ex: "6.19"), não como id numérico
         $data = $this->normalizeCostCenterForAsset($data);
 
-        // SQL Server: datas como string (evita conversão nvarchar → datetime fora do intervalo)
+        // SQL Server: INSERT com CAST para datas (evita conversão nvarchar → datetime fora do intervalo)
         $data['acquisition_date'] = Carbon::parse($data['acquisition_date'])->format('Y-m-d');
         $data['created_at'] = now()->format('Y-m-d H:i:s');
         $data['updated_at'] = now()->format('Y-m-d H:i:s');
 
-        $asset = Asset::create($data);
+        $assetId = $this->insertAssetWithCastForSqlServer($data);
+        $asset = Asset::findOrFail($assetId);
 
         // Criar movimentação de cadastro
         AssetMovement::create([
@@ -154,6 +155,38 @@ class AssetService
         $this->updateModelWithStringTimestamps($asset, $data);
 
         return $asset->fresh();
+    }
+
+    /**
+     * INSERT em assets com CAST para colunas de data/datetime (compatível com SQL Server).
+     * Retorna o id do registro inserido.
+     */
+    private function insertAssetWithCastForSqlServer(array $data): int
+    {
+        $model = new Asset();
+        $fillable = $model->getFillable();
+        $data = array_intersect_key($data, array_flip($fillable));
+        unset($data['id']);
+
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        foreach ($columns as $col) {
+            if (in_array($col, ['acquisition_date', 'document_issue_date'], true)) {
+                $placeholders[] = "CAST(? AS DATE)";
+            } elseif (in_array($col, ['created_at', 'updated_at'], true)) {
+                $placeholders[] = "CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = '?';
+            }
+            $values[] = $data[$col];
+        }
+
+        $colsStr = implode(', ', array_map(fn ($c) => "[{$c}]", $columns));
+        $placeStr = implode(', ', $placeholders);
+        $sql = "INSERT INTO [assets] ({$colsStr}) OUTPUT INSERTED.id VALUES ({$placeStr})";
+        $result = DB::select($sql, $values);
+        return (int) $result[0]->id;
     }
 
     /**
