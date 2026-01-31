@@ -74,17 +74,20 @@ class Asset extends Model
     {
         static::creating(function (self $model): void {
             $now = now()->format('Y-m-d H:i:s');
-            $model->attributes['created_at'] = $model->attributes['created_at'] instanceof \Carbon\Carbon
-                ? $model->attributes['created_at']->format('Y-m-d H:i:s')
+            $createdAt = $model->attributes['created_at'] ?? null;
+            $updatedAt = $model->attributes['updated_at'] ?? null;
+            $model->attributes['created_at'] = $createdAt instanceof \Carbon\Carbon
+                ? $createdAt->format('Y-m-d H:i:s')
                 : $now;
-            $model->attributes['updated_at'] = $model->attributes['updated_at'] instanceof \Carbon\Carbon
-                ? $model->attributes['updated_at']->format('Y-m-d H:i:s')
+            $model->attributes['updated_at'] = $updatedAt instanceof \Carbon\Carbon
+                ? $updatedAt->format('Y-m-d H:i:s')
                 : $now;
         });
 
         static::updating(function (self $model): void {
-            $model->attributes['updated_at'] = $model->attributes['updated_at'] instanceof \Carbon\Carbon
-                ? $model->attributes['updated_at']->format('Y-m-d H:i:s')
+            $updatedAt = $model->attributes['updated_at'] ?? null;
+            $model->attributes['updated_at'] = $updatedAt instanceof \Carbon\Carbon
+                ? $updatedAt->format('Y-m-d H:i:s')
                 : now()->format('Y-m-d H:i:s');
         });
     }
