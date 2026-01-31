@@ -296,6 +296,14 @@ class PurchaseQuoteController extends Controller
             $buyerId = auth()->id();
             $query->whereNotNull('buyer_id')->where('buyer_id', $buyerId);
         }
+
+        // Filtro por comprador (ID do usuário comprador)
+        if ($request->filled('buyer_id')) {
+            $buyerIdFilter = (int) $request->get('buyer_id');
+            if ($buyerIdFilter > 0) {
+                $query->where('buyer_id', $buyerIdFilter);
+            }
+        }
         
         // NOTA: Não aplicar filtro de company_id por padrão para mostrar todas as cotações
         // O filtro de company_id só é aplicado quando my_approvals está ativo
@@ -548,6 +556,42 @@ class PurchaseQuoteController extends Controller
                 'last_page' => $quotes->lastPage(),
             ],
         ], Response::HTTP_OK);
+    }
+
+    /**
+     * Lista compradores (usuários com grupo Comprador) para filtros.
+     */
+    public function listBuyers(Request $request)
+    {
+        $companyId = (int) $request->header('company-id');
+        $user = auth()->user();
+        if (!$companyId && $user && $user->companies()->exists()) {
+            $companyId = $user->companies()->first()->id;
+        }
+
+        $buyersQuery = User::query()
+            ->select(['id', 'nome_completo', 'login'])
+            ->whereHas('groups', function ($query) use ($companyId) {
+                if ($companyId) {
+                    $query->where('company_id', $companyId);
+                }
+                $query->where(function ($groupQuery) {
+                    $groupQuery->where('name', 'LIKE', '%comprador%')
+                        ->orWhereHas('items', function ($itemQuery) {
+                            $itemQuery->where('slug', 'LIKE', '%comprador%');
+                        });
+                });
+            })
+            ->orderBy('nome_completo')
+            ->distinct();
+
+        $buyers = $buyersQuery->get()->map(fn (User $u) => [
+            'id' => $u->id,
+            'name' => $u->nome_completo ?? $u->login,
+            'label' => $u->nome_completo ?? $u->login,
+        ]);
+
+        return response()->json(['data' => $buyers], Response::HTTP_OK);
     }
 
     public function show(Request $request, PurchaseQuote $quote)
