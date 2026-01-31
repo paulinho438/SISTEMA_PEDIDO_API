@@ -118,6 +118,9 @@ class AssetService
         $data['created_by'] = $userId ?? auth()->id();
         $data['status'] = $data['status'] ?? 'incluido';
 
+        // Centro de custo do Protheus vem como código (ex: "6.19"), não como id numérico
+        $data = $this->normalizeCostCenterForAsset($data);
+
         $asset = Asset::create($data);
 
         // Criar movimentação de cadastro
@@ -140,11 +143,39 @@ class AssetService
     public function update(Asset $asset, array $data, ?int $userId = null): Asset
     {
         $data['updated_by'] = $userId ?? auth()->id();
-        
+        $data = $this->normalizeCostCenterForAsset($data);
+
         // Usar método auxiliar para garantir compatibilidade com SQL Server
         $this->updateModelWithStringTimestamps($asset, $data);
 
         return $asset->fresh();
+    }
+
+    /**
+     * Normaliza cost_center_id: se for código Protheus (string ou decimal), grava em cost_center_code e zera cost_center_id.
+     */
+    private function normalizeCostCenterForAsset(array $data): array
+    {
+        if (!array_key_exists('cost_center_id', $data)) {
+            return $data;
+        }
+        $value = $data['cost_center_id'];
+        if ($value === null || $value === '') {
+            $data['cost_center_id'] = null;
+            $data['cost_center_code'] = $data['cost_center_code'] ?? null;
+            return $data;
+        }
+        $isValidInteger = is_int($value) || (is_numeric($value) && (string) (int) $value === (string) $value);
+        if (!$isValidInteger) {
+            $data['cost_center_code'] = (string) $value;
+            $data['cost_center_id'] = null;
+        } else {
+            $data['cost_center_id'] = (int) $value;
+            if (!isset($data['cost_center_code'])) {
+                $data['cost_center_code'] = null;
+            }
+        }
+        return $data;
     }
 
     /**

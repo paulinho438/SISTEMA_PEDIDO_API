@@ -43,6 +43,7 @@ class Asset extends Model
         'branch_id',
         'account_id',
         'cost_center_id',
+        'cost_center_code',
         'location_id',
         'responsible_id',
         'project_id',

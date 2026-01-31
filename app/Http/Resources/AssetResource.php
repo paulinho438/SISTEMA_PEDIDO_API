@@ -43,6 +43,7 @@ class AssetResource extends JsonResource
                 ];
             }),
             'cost_center_id' => $this->cost_center_id,
+            'cost_center_code' => $this->cost_center_code,
             'cost_center' => $this->whenLoaded('costCenter', function() {
                 return [
                     'id' => $this->costCenter->id,
