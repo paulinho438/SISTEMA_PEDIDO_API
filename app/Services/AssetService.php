@@ -42,15 +42,16 @@ class AssetService
         
         $companyId = $request->header('company-id');
         $query = Asset::where('company_id', $companyId)
-            ->with(['branch', 'location', 'responsible']);
+            ->with(['branch', 'location', 'responsible', 'standardDescription']);
 
         if ($request->filled('search')) {
             $search = $request->get('search');
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('asset_number', 'like', "%{$search}%")
                   ->orWhere('description', 'like', "%{$search}%")
                   ->orWhere('tag', 'like', "%{$search}%")
-                  ->orWhere('serial_number', 'like', "%{$search}%");
+                  ->orWhere('serial_number', 'like', "%{$search}%")
+                  ->orWhereHas('standardDescription', fn ($q) => $q->where('name', 'like', "%{$search}%"));
             });
         }
 

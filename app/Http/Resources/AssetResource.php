@@ -15,6 +15,13 @@ class AssetResource extends JsonResource
             'acquisition_date' => $this->acquisition_date ? $this->acquisition_date->format('d/m/Y') : null,
             'status' => $this->status,
             'description' => $this->description,
+            'standard_description_id' => $this->standard_description_id,
+            'standard_description' => $this->whenLoaded('standardDescription', function () {
+                return $this->standardDescription ? [
+                    'id' => $this->standardDescription->id,
+                    'name' => $this->standardDescription->name,
+                ] : null;
+            }),
             'brand' => $this->brand,
             'model' => $this->model,
             'serial_number' => $this->serial_number,
