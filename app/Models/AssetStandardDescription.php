@@ -29,24 +29,20 @@ class AssetStandardDescription extends Model
         parent::boot();
 
         static::creating(function ($model) {
-            if (!isset($model->attributes['created_at']) || $model->attributes['created_at'] === null) {
-                $model->attributes['created_at'] = now()->format('Y-m-d H:i:s');
-            } elseif ($model->attributes['created_at'] instanceof \Carbon\Carbon) {
-                $model->attributes['created_at'] = $model->attributes['created_at']->format('Y-m-d H:i:s');
-            }
-            if (!isset($model->attributes['updated_at']) || $model->attributes['updated_at'] === null) {
-                $model->attributes['updated_at'] = now()->format('Y-m-d H:i:s');
-            } elseif ($model->attributes['updated_at'] instanceof \Carbon\Carbon) {
-                $model->attributes['updated_at'] = $model->attributes['updated_at']->format('Y-m-d H:i:s');
-            }
+            // Sempre forçar formato ISO para SQL Server (evita conversão nvarchar → datetime fora do intervalo)
+            $now = now()->format('Y-m-d H:i:s');
+            $model->attributes['created_at'] = $model->attributes['created_at'] instanceof \Carbon\Carbon
+                ? $model->attributes['created_at']->format('Y-m-d H:i:s')
+                : $now;
+            $model->attributes['updated_at'] = $model->attributes['updated_at'] instanceof \Carbon\Carbon
+                ? $model->attributes['updated_at']->format('Y-m-d H:i:s')
+                : $now;
         });
-        
+
         static::updating(function ($model) {
-            if (!isset($model->attributes['updated_at']) || $model->attributes['updated_at'] === null) {
-                $model->attributes['updated_at'] = now()->format('Y-m-d H:i:s');
-            } elseif ($model->attributes['updated_at'] instanceof \Carbon\Carbon) {
-                $model->attributes['updated_at'] = $model->attributes['updated_at']->format('Y-m-d H:i:s');
-            }
+            $model->attributes['updated_at'] = $model->attributes['updated_at'] instanceof \Carbon\Carbon
+                ? $model->attributes['updated_at']->format('Y-m-d H:i:s')
+                : now()->format('Y-m-d H:i:s');
         });
     }
 

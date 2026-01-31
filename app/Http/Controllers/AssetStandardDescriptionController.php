@@ -79,7 +79,7 @@ class AssetStandardDescriptionController extends Controller
         }
 
         $item = AssetStandardDescription::create([
-            ...$request->all(),
+            ...$request->only(['code', 'name', 'description', 'active']),
             'company_id' => $request->header('company-id'),
         ]);
 
@@ -104,7 +104,7 @@ class AssetStandardDescriptionController extends Controller
             return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
         }
 
-        $item->update($request->all());
+        $item->update($request->only(['code', 'name', 'description', 'active']));
 
         return new AssetStandardDescriptionResource($item->fresh());
     }
