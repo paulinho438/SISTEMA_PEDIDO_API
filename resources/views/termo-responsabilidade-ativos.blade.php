@@ -199,13 +199,15 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 5%;">Item</th>
-                <th style="width: 15%;">Número</th>
-                <th style="width: 30%;">Descrição Completa</th>
+                <th style="width: 4%;">Item</th>
+                <th style="width: 10%;">Número</th>
+                <th style="width: 18%;">Descrição</th>
+                <th style="width: 12%;">Marca</th>
+                <th style="width: 12%;">Modelo</th>
                 <th style="width: 10%;">Filial</th>
                 <th style="width: 10%;">Local</th>
-                <th style="width: 15%;">Situação do Patrimônio</th>
-                <th style="width: 15%;">Valor</th>
+                <th style="width: 12%;">Situação do Patrimônio</th>
+                <th style="width: 12%;">Valor</th>
             </tr>
         </thead>
         <tbody>
@@ -220,7 +222,9 @@
             <tr>
                 <td class="number">{{ $index + 1 }}</td>
                 <td>{{ $asset->asset_number ?? '' }}</td>
-                <td>{{ strtoupper($asset->description ?? '') }}</td>
+                <td>{{ strtoupper($asset->standardDescription?->name ?? $asset->description ?? '-') }}</td>
+                <td>{{ strtoupper($asset->brand ?? '-') }}</td>
+                <td>{{ strtoupper($asset->model ?? '-') }}</td>
                 <td>{{ $asset->branch->name ?? '-' }}</td>
                 <td>{{ $asset->location->name ?? '-' }}</td>
                 <td>{{ strtoupper($asset->status ?? 'incluido') }}</td>

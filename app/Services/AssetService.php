@@ -83,7 +83,7 @@ class AssetService
         return Asset::where('company_id', $companyId)
             ->where('responsible_id', $responsibleId)
             ->where('status', '!=', 'baixado')
-            ->with(['branch', 'location', 'responsible'])
+            ->with(['branch', 'location', 'responsible', 'standardDescription'])
             ->orderBy('asset_number')
             ->get();
     }
