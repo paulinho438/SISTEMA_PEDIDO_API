@@ -129,11 +129,11 @@ class AssetService
         $assetId = $this->insertAssetWithCastForSqlServer($data);
         $asset = Asset::findOrFail($assetId);
 
-        // Criar movimentação de cadastro (movement_date como Y-m-d para coluna DATE no SQL Server)
+        // Criar movimentação de cadastro via INSERT com CAST (SQL Server: evita conversão nvarchar → datetime)
         $movementDate = $asset->acquisition_date
             ? Carbon::parse($asset->acquisition_date)->format('Y-m-d')
             : Carbon::now()->format('Y-m-d');
-        AssetMovement::create([
+        $this->insertAssetMovementWithCastForSqlServer([
             'asset_id' => $asset->id,
             'movement_type' => 'cadastro',
             'movement_date' => $movementDate,
@@ -158,6 +158,36 @@ class AssetService
         $this->updateModelWithStringTimestamps($asset, $data);
 
         return $asset->fresh();
+    }
+
+    /**
+     * INSERT em asset_movements com CAST para colunas de data/datetime (compatível com SQL Server).
+     * Público para uso por StockService e outros que precisem criar movimentações sem erro de conversão.
+     */
+    public function insertAssetMovementWithCastForSqlServer(array $data): void
+    {
+        $now = now()->format('Y-m-d H:i:s');
+        $data['created_at'] = $now;
+        $data['updated_at'] = $now;
+
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+        foreach ($columns as $col) {
+            if ($col === 'movement_date') {
+                $placeholders[] = "CAST(? AS DATE)";
+            } elseif (in_array($col, ['created_at', 'updated_at'], true)) {
+                $placeholders[] = "CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = '?';
+            }
+            $values[] = $data[$col];
+        }
+
+        $colsStr = implode(', ', array_map(fn ($c) => "[{$c}]", $columns));
+        $placeStr = implode(', ', $placeholders);
+        $sql = "INSERT INTO [asset_movements] ({$colsStr}) VALUES ({$placeStr})";
+        DB::statement($sql, $values);
     }
 
     /**
@@ -285,10 +315,10 @@ class AssetService
                 'updated_by' => $userId ?? auth()->id(),
             ]);
 
-            AssetMovement::create([
+            $this->insertAssetMovementWithCastForSqlServer([
                 'asset_id' => $asset->id,
                 'movement_type' => 'baixa',
-                'movement_date' => Carbon::now()->toDateString(),
+                'movement_date' => Carbon::now()->format('Y-m-d'),
                 'observation' => $observation ?? $reason,
                 'user_id' => $userId ?? auth()->id(),
                 'reference_type' => 'ajuste_manual',
@@ -328,10 +358,10 @@ class AssetService
                 'updated_by' => $userId ?? auth()->id(),
             ]);
 
-            AssetMovement::create([
+            $this->insertAssetMovementWithCastForSqlServer([
                 'asset_id' => $asset->id,
                 'movement_type' => 'transferencia',
-                'movement_date' => Carbon::now()->toDateString(),
+                'movement_date' => Carbon::now()->format('Y-m-d'),
                 'from_branch_id' => $fromBranchId,
                 'to_branch_id' => $toBranchId,
                 'from_location_id' => $fromLocationId,
@@ -370,10 +400,10 @@ class AssetService
                 'updated_by' => $userId ?? auth()->id(),
             ]);
 
-            AssetMovement::create([
+            $this->insertAssetMovementWithCastForSqlServer([
                 'asset_id' => $asset->id,
                 'movement_type' => 'alteracao_responsavel',
-                'movement_date' => Carbon::now()->toDateString(),
+                'movement_date' => Carbon::now()->format('Y-m-d'),
                 'from_responsible_id' => $fromResponsibleId,
                 'to_responsible_id' => $toResponsibleId,
                 'observation' => $observation ?? 'Alteração de responsável',

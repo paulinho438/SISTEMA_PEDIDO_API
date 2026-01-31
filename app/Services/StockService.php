@@ -864,11 +864,14 @@ class StockService
             // 5. Criar ativo
             $asset = $this->assetService->create($assetData, $companyId, auth()->id());
 
-            // 6. Criar movimentação inicial do ativo com informações do estoque
-            AssetMovement::create([
+            // 6. Criar movimentação inicial do ativo (INSERT com CAST para SQL Server)
+            $movementDate = $asset->acquisition_date
+                ? Carbon::parse($asset->acquisition_date)->format('Y-m-d')
+                : Carbon::now()->format('Y-m-d');
+            $this->assetService->insertAssetMovementWithCastForSqlServer([
                 'asset_id' => $asset->id,
                 'movement_type' => 'cadastro',
-                'movement_date' => $asset->acquisition_date ?? Carbon::now()->toDateString(),
+                'movement_date' => $movementDate,
                 'to_branch_id' => $asset->branch_id,
                 'to_location_id' => $asset->location_id ?? $stock->stock_location_id,
                 'to_responsible_id' => $asset->responsible_id,
