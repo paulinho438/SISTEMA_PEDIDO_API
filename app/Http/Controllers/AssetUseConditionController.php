@@ -21,10 +21,12 @@ class AssetUseConditionController extends Controller
 
     public function index(Request $request)
     {
-        $items = AssetUseCondition::where('company_id', $request->header('company-id'))
-            ->where('active', true)
-            ->orderBy('name')
-            ->get();
+        $query = AssetUseCondition::where('company_id', $request->header('company-id'));
+        // Ao editar ativo, o front envia all=true para incluir inativos e exibir o valor já selecionado
+        if (!$request->boolean('all')) {
+            $query->where('active', true);
+        }
+        $items = $query->orderBy('name')->get();
 
         return AssetUseConditionResource::collection($items);
     }

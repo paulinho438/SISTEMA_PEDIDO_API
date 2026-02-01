@@ -8,7 +8,15 @@ class AssetResource extends JsonResource
 {
     public function toArray($request)
     {
-        return [
+        $useCondition = null;
+        if ($this->relationLoaded('useCondition') && $this->useCondition) {
+            $useCondition = [
+                'id' => $this->useCondition->id,
+                'name' => $this->useCondition->name,
+            ];
+        }
+
+        return array_merge([
             'id' => $this->id,
             'asset_number' => $this->asset_number,
             'increment' => $this->increment,
@@ -26,6 +34,8 @@ class AssetResource extends JsonResource
             'model' => $this->model,
             'serial_number' => $this->serial_number,
             'tag' => $this->tag,
+            'use_condition_id' => $this->use_condition_id,
+            'use_condition' => $useCondition,
             'value_brl' => (float) $this->value_brl,
             'value_usd' => $this->value_usd ? (float) $this->value_usd : null,
             'branch_id' => $this->branch_id,
@@ -74,7 +84,10 @@ class AssetResource extends JsonResource
             'image_path' => $this->image_path,
             'image_url' => $this->image_path ? url('/storage/' . $this->image_path) : null,
             'created_at' => $this->created_at ? $this->created_at->format('d/m/Y H:i:s') : null,
-        ];
+        ], [
+            'use_condition_id' => $this->use_condition_id,
+            'use_condition' => $useCondition,
+        ]);
     }
 }
 

@@ -94,7 +94,7 @@ class AssetService
             'branch', 'location', 'responsible', 'account',
             'project', 'businessUnit', 'grouping',
             'standardDescription', 'subType1', 'subType2', 'useCondition',
-            'movements', 'images'
+            'costCenter', 'movements', 'images'
         ])->findOrFail($id);
     }
 
@@ -152,6 +152,9 @@ class AssetService
 
     public function update(Asset $asset, array $data, ?int $userId = null): Asset
     {
+        // Aplicar apenas campos fillable do model (evita dados aninhados ou chaves extras do request)
+        $fillable = $asset->getFillable();
+        $data = array_intersect_key($data, array_flip($fillable));
         $data['updated_by'] = $userId ?? auth()->id();
         $data = $this->normalizeCostCenterForAsset($data);
 
