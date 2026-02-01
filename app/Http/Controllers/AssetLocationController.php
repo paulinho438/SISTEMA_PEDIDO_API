@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetLocation;
+use App\Models\AuditLog;
 use App\Http\Resources\AssetLocationResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -170,6 +171,8 @@ class AssetLocationController extends Controller
                 'address' => $request->input('address'),
                 'active' => $request->boolean('active', true),
                 'company_id' => $companyId,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
             ];
 
             $id = $this->insertWithStringTimestamps('asset_locations', $data);
@@ -177,16 +180,20 @@ class AssetLocationController extends Controller
         });
 
         $item = AssetLocation::findOrFail($data['id']);
+        AuditLog::record('asset_location', (string) $item->id, AuditLog::ACTION_CREATED, null, $item->toArray());
         return new AssetLocationResource($item);
     }
 
     public function update(Request $request, $id)
     {
         $item = AssetLocation::findOrFail($id);
-        
-        // Usar helper para atualizar com timestamps como strings (compatível com SQL Server)
-        $this->updateModelWithStringTimestamps($item, $request->all());
-        
+        $oldValues = $item->toArray();
+        $updateData = array_merge($request->all(), ['updated_by' => auth()->id()]);
+
+        $this->updateModelWithStringTimestamps($item, $updateData);
+        $item->refresh();
+        AuditLog::record('asset_location', (string) $id, AuditLog::ACTION_UPDATED, $oldValues, $item->toArray());
+
         return new AssetLocationResource($item->fresh());
     }
 

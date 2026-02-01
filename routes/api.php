@@ -53,7 +53,8 @@ use App\Http\Controllers\{
     AssetGroupingController,
     AssetAccountController,
     AssetProjectController,
-    AssetBusinessUnitController
+    AssetBusinessUnitController,
+    AuditController
 };
 use App\Models\BotaoCobranca;
 use Illuminate\Http\Request;
@@ -154,6 +155,8 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/relatorios/historico-periodo', [ReportController::class, 'historyByPeriod']);
     Route::get('/relatorios/solicitacao-produto', [ReportController::class, 'solicitacaoProduto']);
     Route::get('/relatorios/produtos-com-solicitacao', [ReportController::class, 'produtosComSolicitacao']);
+
+    Route::get('/auditoria', [AuditController::class, 'index']);
 
     Route::post('/auth/validate', [AuthController::class, 'validateToken']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);

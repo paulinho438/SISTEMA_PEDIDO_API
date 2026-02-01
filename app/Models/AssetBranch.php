@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\Auditable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AssetBranch extends Model
 {
-    use HasFactory;
+    use Auditable, HasFactory;
 
     protected $fillable = [
         'code',
@@ -15,6 +16,8 @@ class AssetBranch extends Model
         'address',
         'active',
         'company_id',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -29,6 +32,16 @@ class AssetBranch extends Model
     public function assets()
     {
         return $this->hasMany(Asset::class, 'branch_id');
+    }
+
+    public function createdByUser()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updatedByUser()
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 }
 

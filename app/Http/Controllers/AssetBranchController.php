@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AssetBranch;
+use App\Models\AuditLog;
 use App\Http\Resources\AssetBranchResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -169,6 +170,8 @@ class AssetBranchController extends Controller
                 'address' => $request->input('address'),
                 'active' => $request->boolean('active', true),
                 'company_id' => $companyId,
+                'created_by' => auth()->id(),
+                'updated_by' => auth()->id(),
             ];
 
             $id = $this->insertWithStringTimestamps('asset_branches', $data);
@@ -176,16 +179,20 @@ class AssetBranchController extends Controller
         });
 
         $item = AssetBranch::findOrFail($result['id']);
+        AuditLog::record('asset_branch', (string) $item->id, AuditLog::ACTION_CREATED, null, $item->toArray());
         return new AssetBranchResource($item);
     }
 
     public function update(Request $request, $id)
     {
         $item = AssetBranch::findOrFail($id);
-        
-        // Usar helper para atualizar com timestamps como strings (compatível com SQL Server)
-        $this->updateModelWithStringTimestamps($item, $request->all());
-        
+        $oldValues = $item->toArray();
+        $updateData = array_merge($request->all(), ['updated_by' => auth()->id()]);
+
+        $this->updateModelWithStringTimestamps($item, $updateData);
+        $item->refresh();
+        AuditLog::record('asset_branch', (string) $id, AuditLog::ACTION_UPDATED, $oldValues, $item->toArray());
+
         return new AssetBranchResource($item->fresh());
     }
 
