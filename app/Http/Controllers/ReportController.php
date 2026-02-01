@@ -147,6 +147,67 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Relatório detalhado por centro de custo: uma linha por item com código centro, descrição, fornecedor, valor e data da solicitação.
+     * Permite exportação para Excel (CSV).
+     */
+    public function costsByCostCenterDetalhado(Request $request)
+    {
+        $companyId = $request->header('company-id');
+        $statusFilter = $this->normalizeStatusFilter($request->get('status'), $this->defaultStatuses);
+
+        $quotes = $this->fetchQuotesWithDetails($request, $companyId, $statusFilter)
+            ->filter(function ($quote) {
+                return $quote->items->contains(function ($item) {
+                    return $item->cost_center_code !== null || $item->cost_center_description !== null;
+                });
+            });
+
+        $result = [];
+
+        foreach ($quotes as $quote) {
+            $dataCriacao = $quote->requested_at
+                ? Carbon::parse($quote->requested_at)->format('d/m/Y')
+                : '-';
+
+            foreach ($quote->items as $item) {
+                if ($item->cost_center_code === null && $item->cost_center_description === null) {
+                    continue;
+                }
+
+                $valor = $this->resolveItemTotal($quote, $item);
+                $fornecedor = '-';
+                if ($item->selectedSupplier && $item->selectedSupplier->supplier_name) {
+                    $fornecedor = $item->selectedSupplier->supplier_name;
+                }
+
+                $result[] = [
+                    'codigo_centro_custo' => $item->cost_center_code ?? '',
+                    'descricao_centro_custo' => $item->cost_center_description ?? '',
+                    'fornecedor' => $fornecedor,
+                    'valor' => round($valor, 2),
+                    'valor_formatado' => $this->formatCurrency($valor),
+                    'data_criacao_solicitacao' => $dataCriacao,
+                ];
+            }
+        }
+
+        usort($result, static function ($a, $b) {
+            $cmpCodigo = strcmp($a['codigo_centro_custo'] ?? '', $b['codigo_centro_custo'] ?? '');
+            if ($cmpCodigo !== 0) {
+                return $cmpCodigo;
+            }
+            return ($b['valor'] <=> $a['valor']);
+        });
+
+        return response()->json([
+            'data' => $result,
+            'meta' => [
+                'statuses' => $this->statusesToMeta($this->loadStatuses($statusFilter)),
+            ],
+        ]);
+    }
+
     public function quotesSummary(Request $request)
     {
         $companyId = $request->header('company-id');
