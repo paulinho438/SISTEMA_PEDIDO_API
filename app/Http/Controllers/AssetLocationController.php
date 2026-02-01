@@ -147,7 +147,7 @@ class AssetLocationController extends Controller
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:50',
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
         ]);
 
@@ -155,15 +155,28 @@ class AssetLocationController extends Controller
             return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
         }
 
-        $data = [
-            ...$request->all(),
-            'company_id' => $request->header('company-id'),
-        ];
+        $companyId = $request->header('company-id');
 
-        // Usar helper para inserir com timestamps como strings (compatível com SQL Server)
-        $id = $this->insertWithStringTimestamps('asset_locations', $data);
-        $item = AssetLocation::findOrFail($id);
+        $data = DB::transaction(function () use ($request, $companyId) {
+            $code = trim((string) $request->input('code', ''));
+            if ($code === '') {
+                $maxId = AssetLocation::where('company_id', $companyId)->lockForUpdate()->max('id');
+                $code = 'LOC-' . (($maxId ?? 0) + 1);
+            }
 
+            $data = [
+                'code' => $code,
+                'name' => $request->input('name'),
+                'address' => $request->input('address'),
+                'active' => $request->boolean('active', true),
+                'company_id' => $companyId,
+            ];
+
+            $id = $this->insertWithStringTimestamps('asset_locations', $data);
+            return ['id' => $id, 'data' => $data];
+        });
+
+        $item = AssetLocation::findOrFail($data['id']);
         return new AssetLocationResource($item);
     }
 

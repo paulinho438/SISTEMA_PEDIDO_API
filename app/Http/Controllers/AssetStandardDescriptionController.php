@@ -6,6 +6,7 @@ use App\Models\AssetStandardDescription;
 use App\Models\CustomLog;
 use App\Http\Resources\AssetStandardDescriptionResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -70,7 +71,7 @@ class AssetStandardDescriptionController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'code' => 'required|string|max:50',
+            'code' => 'nullable|string|max:50',
             'name' => 'required|string|max:255',
         ]);
 
@@ -78,10 +79,24 @@ class AssetStandardDescriptionController extends Controller
             return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
         }
 
-        $item = AssetStandardDescription::create([
-            ...$request->only(['code', 'name', 'description', 'active']),
-            'company_id' => $request->header('company-id'),
-        ]);
+        $companyId = $request->header('company-id');
+        $item = null;
+
+        DB::transaction(function () use ($request, $companyId, &$item) {
+            $code = trim((string) $request->input('code', ''));
+            if ($code === '') {
+                $maxId = AssetStandardDescription::where('company_id', $companyId)->lockForUpdate()->max('id');
+                $code = 'DESC-' . (($maxId ?? 0) + 1);
+            }
+
+            $item = AssetStandardDescription::create([
+                'code' => $code,
+                'name' => $request->input('name'),
+                'description' => $request->input('description'),
+                'active' => $request->boolean('active', true),
+                'company_id' => $companyId,
+            ]);
+        });
 
         return new AssetStandardDescriptionResource($item);
     }
