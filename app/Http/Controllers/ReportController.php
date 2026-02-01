@@ -602,6 +602,103 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Relatório Solicitação/Produto: retorna todas as solicitações (cotações) que contêm itens
+     * que batem com o filtro de produto (código ou descrição). Filtros: período, empresa, produto.
+     */
+    public function solicitacaoProduto(Request $request)
+    {
+        $companyId = $request->header('company-id');
+        $companyIdFilter = $request->get('company_id') ? (int) $request->get('company_id') : $companyId;
+
+        $start = $request->get('start_date');
+        $end = $request->get('end_date');
+        $productTerm = $request->get('product');
+        $productTerm = is_string($productTerm) ? trim($productTerm) : '';
+
+        $startDate = $start ? Carbon::parse($start)->startOfDay() : null;
+        $endDate = $end ? Carbon::parse($end)->endOfDay() : null;
+
+        if ($productTerm === '') {
+            return response()->json([
+                'data' => [],
+                'meta' => ['total_qtd' => 0],
+            ]);
+        }
+
+        $query = PurchaseQuote::query()
+            ->with([
+                'items' => function ($q) use ($productTerm) {
+                    $q->select([
+                        'id',
+                        'purchase_quote_id',
+                        'product_code',
+                        'description',
+                        'quantity',
+                    ]);
+                    if ($productTerm !== '') {
+                        $term = '%' . strtoupper($productTerm) . '%';
+                        $q->where(function ($q2) use ($term) {
+                            $q2->whereRaw('UPPER(description) LIKE ?', [$term])
+                                ->orWhereRaw('UPPER(product_code) LIKE ?', [$term]);
+                        });
+                    }
+                },
+            ])
+            ->when($startDate, fn ($q) => $q->where('requested_at', '>=', $startDate->format('Y-m-d H:i:s')))
+            ->when($endDate, fn ($q) => $q->where('requested_at', '<=', $endDate->format('Y-m-d H:i:s')))
+            ->when($companyIdFilter, function ($q) use ($companyIdFilter) {
+                $q->where(function ($builder) use ($companyIdFilter) {
+                    $builder->where('company_id', $companyIdFilter)->orWhereNull('company_id');
+                });
+            })
+            ->orderByDesc('requested_at');
+
+        $quotes = $query->get();
+
+        $result = [];
+
+        foreach ($quotes as $quote) {
+            $items = $quote->items;
+
+            if ($productTerm !== '') {
+                $items = $items->filter(function ($item) use ($productTerm) {
+                    $term = strtoupper($productTerm);
+                    $desc = strtoupper($item->description ?? '');
+                    $code = strtoupper($item->product_code ?? '');
+                    return str_contains($desc, $term) || str_contains($code, $term);
+                });
+            }
+
+            if ($items->isEmpty()) {
+                continue;
+            }
+
+            $dataSolicitacao = $quote->requested_at
+                ? Carbon::parse($quote->requested_at)->format('d/m/Y')
+                : '-';
+            $obs = $quote->observation ?? '';
+
+            foreach ($items as $item) {
+                $result[] = [
+                    'cotacao_id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                    'data' => $dataSolicitacao,
+                    'produto' => $item->description ?? $item->product_code ?? '-',
+                    'qtd' => (int) ($item->quantity ?? 0),
+                    'obs' => $obs,
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => $result,
+            'meta' => [
+                'total_qtd' => array_sum(array_column($result, 'qtd')),
+            ],
+        ]);
+    }
+
     protected function normalizeStatusFilter(?string $filter, ?array $fallback = null): array
     {
         if ($filter === null || trim($filter) === '') {
