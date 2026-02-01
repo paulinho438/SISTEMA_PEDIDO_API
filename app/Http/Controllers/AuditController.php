@@ -38,7 +38,7 @@ class AuditController extends Controller
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
-        $query = AuditLog::query()->with('user:id,name,email');
+        $query = AuditLog::query()->with('user:id,nome_completo,login,email');
 
         if ($request->filled('auditable_type')) {
             $query->where('auditable_type', $request->input('auditable_type'));
