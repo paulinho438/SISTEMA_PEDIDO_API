@@ -699,6 +699,63 @@ class ReportController extends Controller
         ]);
     }
 
+    /**
+     * Lista produtos que têm pelo menos um item em alguma solicitação (cotações).
+     * Usado no relatório Solicitação/Produto para o modal de seleção de produto.
+     */
+    public function produtosComSolicitacao(Request $request)
+    {
+        $companyId = $request->header('company-id');
+        $companyIdFilter = $request->get('company_id') ? (int) $request->get('company_id') : $companyId;
+        $busca = $request->get('busca');
+        $busca = is_string($busca) ? trim($busca) : '';
+        $perPage = min((int) $request->get('per_page', 10), 100);
+        $perPage = $perPage > 0 ? $perPage : 10;
+        $page = max(1, (int) $request->get('page', 1));
+
+        $query = PurchaseQuoteItem::query()
+            ->select('product_code', 'description', 'unit')
+            ->whereNotNull('product_code')
+            ->where('product_code', '!=', '')
+            ->when($companyIdFilter, function ($q) use ($companyIdFilter) {
+                $q->whereHas('quote', function ($q2) use ($companyIdFilter) {
+                    $q2->where(function ($qb) use ($companyIdFilter) {
+                        $qb->where('company_id', $companyIdFilter)->orWhereNull('company_id');
+                    });
+                });
+            })
+            ->when($busca !== '', function ($q) use ($busca) {
+                $term = '%' . strtoupper($busca) . '%';
+                $q->where(function ($q2) use ($term) {
+                    $q2->whereRaw('UPPER(product_code) LIKE ?', [$term])
+                        ->orWhereRaw('UPPER(description) LIKE ?', [$term]);
+                });
+            })
+            ->groupBy('product_code', 'description', 'unit')
+            ->orderBy('description');
+
+        $total = $query->get()->count();
+        $items = $query->skip(($page - 1) * $perPage)->take($perPage)->get();
+
+        $data = $items->map(function ($row) {
+            return [
+                'B1_COD' => $row->product_code,
+                'B1_DESC' => $row->description ?? '',
+                'B1_UM' => $row->unit ?? '',
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => (int) ceil(max(1, $total) / $perPage),
+            ],
+        ]);
+    }
+
     protected function normalizeStatusFilter(?string $filter, ?array $fallback = null): array
     {
         if ($filter === null || trim($filter) === '') {

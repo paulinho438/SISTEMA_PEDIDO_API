@@ -153,6 +153,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/relatorios/custos-solicitacao', [ReportController::class, 'costsByQuote']);
     Route::get('/relatorios/historico-periodo', [ReportController::class, 'historyByPeriod']);
     Route::get('/relatorios/solicitacao-produto', [ReportController::class, 'solicitacaoProduto']);
+    Route::get('/relatorios/produtos-com-solicitacao', [ReportController::class, 'produtosComSolicitacao']);
 
     Route::post('/auth/validate', [AuthController::class, 'validateToken']);
     Route::post('/auth/logout', [AuthController::class, 'logout']);
