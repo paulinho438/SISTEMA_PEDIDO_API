@@ -90,11 +90,12 @@ class AssetService
 
     public function find($id)
     {
+        // costCenter não incluído: tabela costcenter pode não existir no banco (ex.: SQL Server)
         return Asset::with([
             'branch', 'location', 'responsible', 'account',
             'project', 'businessUnit', 'grouping',
             'standardDescription', 'subType1', 'subType2', 'useCondition',
-            'costCenter', 'movements', 'images'
+            'movements', 'images'
         ])->findOrFail($id);
     }
 
