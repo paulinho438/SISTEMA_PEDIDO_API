@@ -21,7 +21,7 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 235px;
+            padding-top: 248px;
             padding-bottom: 285px;
         }
 
@@ -31,11 +31,11 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 228px;
+            height: 242px;
             box-sizing: border-box;
             background: #fff;
             z-index: 9999;
-            padding: 6px 10px 8px 10px;
+            padding: 6px 10px 10px 10px;
             border-bottom: 1px solid #ccc;
             overflow: hidden;
         }
@@ -80,7 +80,7 @@
         }
         
         .print-header .info-blocks {
-            margin-bottom: 6px;
+            margin-bottom: 12px;
         }
         
         .print-header .info-block,
@@ -90,9 +90,15 @@
         }
         
         .print-header .delivery-block {
+            margin-top: 4px;
             margin-bottom: 0;
-            padding: 4px 5px;
+            padding: 6px 5px 4px 5px;
             font-size: 7pt;
+            border-top: 1px solid #eee;
+        }
+        
+        .print-header .delivery-block .info-block-title {
+            margin-top: 4px;
         }
         
         .print-header .delivery-row,
@@ -218,7 +224,6 @@
 
         /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/observações vêm depois */
         .top {
-            margin-top: 20px;
             margin-bottom: 0;
         }
 
