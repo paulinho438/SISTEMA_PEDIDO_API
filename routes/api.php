@@ -39,6 +39,7 @@ use App\Http\Controllers\{
     StockMovementController,
     StockAlmoxarifeController,
     StockTransferController,
+    ResponsibilityTermController,
     PurchaseInvoiceController,
     PurchaseOrderController,
     AssetController,
@@ -154,6 +155,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/relatorios/custos-solicitacao', [ReportController::class, 'costsByQuote']);
     Route::get('/relatorios/historico-periodo', [ReportController::class, 'historyByPeriod']);
     Route::get('/relatorios/solicitacao-produto', [ReportController::class, 'solicitacaoProduto']);
+    Route::get('/relatorios/solicitacao-produto-todos', [ReportController::class, 'solicitacaoProdutoTodos']);
     Route::get('/relatorios/produtos-com-solicitacao', [ReportController::class, 'produtosComSolicitacao']);
 
     Route::get('/auditoria', [AuditController::class, 'index']);
@@ -353,6 +355,13 @@ Route::middleware('auth:api')->group(function () {
         Route::delete('/transferencias/{id}', [StockTransferController::class, 'destroy']);
         Route::get('/transferencias/{id}/documento', [StockTransferController::class, 'gerarDocumento']);
         Route::post('/transferencias/visualizar-documento', [StockTransferController::class, 'visualizarDocumento']);
+        
+        // Termos de Responsabilidade (ferramentas)
+        Route::get('/termos-responsabilidade', [ResponsibilityTermController::class, 'index']);
+        Route::post('/termos-responsabilidade', [ResponsibilityTermController::class, 'store']);
+        Route::get('/termos-responsabilidade/{id}', [ResponsibilityTermController::class, 'show']);
+        Route::post('/termos-responsabilidade/{id}/devolver', [ResponsibilityTermController::class, 'devolver']);
+        Route::get('/termos-responsabilidade/{id}/pdf', [ResponsibilityTermController::class, 'pdf']);
         
         // Produtos
         Route::get('/produtos/buscar', [StockProductController::class, 'buscar']);

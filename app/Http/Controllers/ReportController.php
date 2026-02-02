@@ -188,6 +188,7 @@ class ReportController extends Controller
                     'valor' => round($valor, 2),
                     'valor_formatado' => $this->formatCurrency($valor),
                     'data_criacao_solicitacao' => $dataCriacao,
+                    'numero_solicitacao' => $quote->quote_number ?? '',
                 ];
             }
         }
@@ -670,6 +671,68 @@ class ReportController extends Controller
                 });
             }
 
+            if ($items->isEmpty()) {
+                continue;
+            }
+
+            $dataSolicitacao = $quote->requested_at
+                ? Carbon::parse($quote->requested_at)->format('d/m/Y')
+                : '-';
+            $obs = $quote->observation ?? '';
+
+            foreach ($items as $item) {
+                $result[] = [
+                    'cotacao_id' => $quote->id,
+                    'numero' => $quote->quote_number,
+                    'data' => $dataSolicitacao,
+                    'produto' => $item->description ?? $item->product_code ?? '-',
+                    'qtd' => (int) ($item->quantity ?? 0),
+                    'obs' => $obs,
+                ];
+            }
+        }
+
+        return response()->json([
+            'data' => $result,
+            'meta' => [
+                'total_qtd' => array_sum(array_column($result, 'qtd')),
+            ],
+        ]);
+    }
+
+    /**
+     * Relatório Solicitação/Produto (todos): retorna todos os itens de todas as solicitações (cotações),
+     * sem filtro de período nem de produto. Opcionalmente filtra por empresa (company_id do header ou query).
+     */
+    public function solicitacaoProdutoTodos(Request $request)
+    {
+        $companyId = $request->header('company-id');
+        $companyIdFilter = $request->get('company_id') ? (int) $request->get('company_id') : $companyId;
+
+        $query = PurchaseQuote::query()
+            ->with([
+                'items' => function ($q) {
+                    $q->select([
+                        'id',
+                        'purchase_quote_id',
+                        'product_code',
+                        'description',
+                        'quantity',
+                    ]);
+                },
+            ])
+            ->when($companyIdFilter, function ($q) use ($companyIdFilter) {
+                $q->where(function ($builder) use ($companyIdFilter) {
+                    $builder->where('company_id', $companyIdFilter)->orWhereNull('company_id');
+                });
+            })
+            ->orderByDesc('requested_at');
+
+        $quotes = $query->get();
+        $result = [];
+
+        foreach ($quotes as $quote) {
+            $items = $quote->items;
             if ($items->isEmpty()) {
                 continue;
             }

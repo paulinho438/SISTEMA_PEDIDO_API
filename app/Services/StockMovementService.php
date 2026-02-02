@@ -379,6 +379,87 @@ class StockMovementService
     }
 
     /**
+     * Saída de estoque por Termo de Responsabilidade (ferramentas entregues ao responsável).
+     */
+    public function saidaTermoResponsabilidade(int $stockId, float $quantity, int $termId, $user, int $companyId): StockMovement
+    {
+        $stock = Stock::findOrFail($stockId);
+        if (!$this->accessService->canAccessLocation($user, $stock->stock_location_id, $companyId)) {
+            throw new \Exception('Acesso negado a este local.');
+        }
+        if ($stock->quantity_available < $quantity) {
+            throw new \Exception('Quantidade disponível insuficiente para o item.');
+        }
+
+        $quantityBefore = $stock->quantity_available;
+        $quantityAfter = $stock->quantity_available - $quantity;
+
+        $this->updateModelWithStringTimestamps($stock, [
+            'quantity_available' => $quantityAfter,
+            'quantity_total' => $stock->quantity_total - $quantity,
+            'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $movementId = $this->insertWithStringTimestamps('stock_movements', [
+            'stock_id' => $stock->id,
+            'stock_product_id' => $stock->stock_product_id,
+            'stock_location_id' => $stock->stock_location_id,
+            'movement_type' => 'saida',
+            'quantity' => $quantity,
+            'quantity_before' => $quantityBefore,
+            'quantity_after' => $quantityAfter,
+            'reference_type' => 'termo_responsabilidade',
+            'reference_id' => $termId,
+            'reference_number' => null,
+            'observation' => 'Termo de responsabilidade',
+            'user_id' => $user->id,
+            'company_id' => $companyId,
+            'movement_date' => Carbon::now()->toDateString(),
+        ]);
+
+        return StockMovement::find($movementId)->load(['product', 'location', 'user']);
+    }
+
+    /**
+     * Entrada de estoque por devolução do Termo de Responsabilidade.
+     */
+    public function entradaTermoResponsabilidade(int $stockId, float $quantity, int $termId, $user, int $companyId): StockMovement
+    {
+        $stock = Stock::findOrFail($stockId);
+        if (!$this->accessService->canAccessLocation($user, $stock->stock_location_id, $companyId)) {
+            throw new \Exception('Acesso negado a este local.');
+        }
+
+        $quantityBefore = $stock->quantity_available;
+        $quantityAfter = $stock->quantity_available + $quantity;
+
+        $this->updateModelWithStringTimestamps($stock, [
+            'quantity_available' => $quantityAfter,
+            'quantity_total' => $stock->quantity_total + $quantity,
+            'last_movement_at' => Carbon::now()->format('Y-m-d H:i:s'),
+        ]);
+
+        $movementId = $this->insertWithStringTimestamps('stock_movements', [
+            'stock_id' => $stock->id,
+            'stock_product_id' => $stock->stock_product_id,
+            'stock_location_id' => $stock->stock_location_id,
+            'movement_type' => 'entrada',
+            'quantity' => $quantity,
+            'quantity_before' => $quantityBefore,
+            'quantity_after' => $quantityAfter,
+            'reference_type' => 'termo_responsabilidade',
+            'reference_id' => $termId,
+            'reference_number' => null,
+            'observation' => 'Devolução - Termo de responsabilidade',
+            'user_id' => $user->id,
+            'company_id' => $companyId,
+            'movement_date' => Carbon::now()->toDateString(),
+        ]);
+
+        return StockMovement::find($movementId)->load(['product', 'location', 'user']);
+    }
+
+    /**
      * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server)
      */
     private function updateModelWithStringTimestamps($model, array $data)
