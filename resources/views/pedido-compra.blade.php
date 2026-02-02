@@ -21,35 +21,34 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 248px;
+            padding-top: 275px;
             padding-bottom: 285px;
         }
 
-        /* Topo fixo em todas as páginas: logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA */
+        /* Topo fixo em todas as páginas: mesmo layout de "Estava assim" (logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA) */
         .print-header {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            height: 242px;
+            height: 268px;
             box-sizing: border-box;
             background: #fff;
             z-index: 9999;
-            padding: 6px 10px 10px 10px;
+            padding: 8px 10px 10px 10px;
             border-bottom: 1px solid #ccc;
-            overflow: hidden;
         }
         
         .print-header-row {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 6px;
+            margin-bottom: 10px;
         }
         
         .print-header .logo {
-            width: 100px;
-            height: 50px;
+            width: 120px;
+            height: 60px;
             margin-bottom: 0;
         }
         
@@ -62,48 +61,69 @@
         
         .print-header .header-right {
             text-align: right;
-            font-size: 8pt;
-            line-height: 1.3;
-            padding-bottom: 2px;
+            font-size: 9pt;
+            line-height: 1.4;
+            padding-bottom: 4px;
         }
         
         .print-header .header-right > div {
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
         
         .print-header .header-center h1 {
-            font-size: 13pt;
+            font-size: 16pt;
+            font-weight: bold;
+            margin: 0;
+            text-transform: uppercase;
         }
         
         .print-header .page-info::after {
             content: "Página " counter(page);
         }
         
+        /* FORNECEDOR e FATURAR A: mesmo estilo do layout original (borda preta, 8pt) */
         .print-header .info-blocks {
-            margin-bottom: 12px;
+            margin-bottom: 10px;
         }
         
-        .print-header .info-block,
+        .print-header .info-block {
+            border: 1px solid #000;
+            padding: 5px;
+            font-size: 8pt;
+        }
+        
         .print-header .info-block-content {
-            font-size: 7pt;
-            line-height: 1.25;
+            font-size: 8pt;
+            line-height: 1.3;
         }
         
+        .print-header .info-block-title {
+            font-weight: bold;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+        }
+        
+        /* ENDEREÇO DE ENTREGA: mesmo estilo do layout original (borda preta, 8pt, espaço acima) */
         .print-header .delivery-block {
-            margin-top: 4px;
+            margin-top: 0;
             margin-bottom: 0;
-            padding: 6px 5px 4px 5px;
-            font-size: 7pt;
-            border-top: 1px solid #eee;
+            border: 1px solid #000;
+            padding: 5px;
+            font-size: 8pt;
         }
         
         .print-header .delivery-block .info-block-title {
-            margin-top: 4px;
+            margin-top: 0;
+            margin-bottom: 3px;
         }
         
         .print-header .delivery-row,
         .print-header .dates-row {
-            margin-bottom: 2px;
+            margin-bottom: 3px;
+        }
+        
+        .print-header .dates-row {
+            margin-top: 5px;
         }
 
         /* Fundo fixo em todas as páginas */
