@@ -241,13 +241,16 @@
         }
         
         .print-signatures .signature-line {
-            min-height: 40px;
-            padding-top: 2px;
-            margin-bottom: 2px;
+            min-height: 36px;
+            padding-top: 0;
+            margin-bottom: 0;
+            display: flex;
+            align-items: flex-end;
         }
         
         .print-signatures .signature-image {
-            max-height: 38px;
+            max-height: 36px;
+            vertical-align: bottom;
         }
         
         .print-signatures .signature-name {
@@ -257,7 +260,8 @@
         
         .print-signatures .signature-name-line {
             min-height: 14px;
-            margin-top: 2px;
+            margin-top: 0;
+            padding-top: 2px;
             padding-bottom: 2px;
         }
         
