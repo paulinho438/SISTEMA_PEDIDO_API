@@ -126,6 +126,17 @@
         .print-header .dates-row {
             margin-top: 5px;
             margin-bottom: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        
+        .print-header .dates-row > div:last-child {
+            margin-left: auto;
+        }
+        
+        .print-header .delivery-row-address .delivery-row-item {
+            flex: 1;
         }
 
         /* Fundo fixo em todas as páginas */
@@ -624,7 +635,7 @@
         </div>
         <div class="delivery-block">
             <div class="info-block-title">ENDEREÇO DE ENTREGA</div>
-            <div class="delivery-row">
+            <div class="delivery-row delivery-row-address">
                 <div class="delivery-row-item">
                     {{ strtoupper($company->company ?? '') }}
                     @if($company->endereco)
@@ -637,13 +648,11 @@
                         {{ strtoupper($company->cidade) }}@if($company->uf){{ ' ' . strtoupper($company->uf) }}@endif
                     @endif
                 </div>
-                <div class="delivery-row-item" style="text-align: right;">
-                    <strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}
-                </div>
             </div>
             <div class="dates-row">
                 <div><strong>PRAZO DE ENTREGA:</strong> {{ $order->expected_delivery_date ? $order->expected_delivery_date->format('d/m/Y') : '' }}</div>
                 <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+                <div style="text-align: right;"><strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}</div>
             </div>
         </div>
     </div>
