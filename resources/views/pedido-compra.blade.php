@@ -22,7 +22,7 @@
             padding: 0;
             color: #000;
             padding-top: 95px;
-            padding-bottom: 38px;
+            padding-bottom: 150px;
         }
 
         /* Topo fixo em todas as páginas (Dompdf repete position:fixed a cada página) */
@@ -101,7 +101,50 @@
             content: "Página " counter(page);
         }
 
-        /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/assinaturas vêm depois */
+        /* Assinaturas fixas em todas as páginas */
+        .print-signatures {
+            position: fixed;
+            bottom: 32px;
+            left: 0;
+            width: 100%;
+            box-sizing: border-box;
+            background: #fff;
+            z-index: 9998;
+            border-top: 1px solid #ccc;
+            padding: 8px 5px 5px 5px;
+        }
+        
+        .print-signatures .signatures {
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        .print-signatures .signature-line {
+            min-height: 40px;
+            padding-top: 2px;
+            margin-bottom: 2px;
+        }
+        
+        .print-signatures .signature-image {
+            max-height: 38px;
+        }
+        
+        .print-signatures .signature-name {
+            font-size: 8pt;
+            margin-top: 2px;
+        }
+        
+        .print-signatures .signature-name-line {
+            min-height: 14px;
+            margin-top: 2px;
+            padding-bottom: 2px;
+        }
+        
+        .print-signatures .text-small {
+            font-size: 6pt;
+        }
+
+        /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/observações vêm depois */
         .top {
             margin-bottom: 0;
         }
@@ -438,6 +481,113 @@
         <span class="footer-page"></span>
     </div>
 
+    <!-- Assinaturas fixas: repetidas em todas as páginas -->
+    <div class="print-signatures">
+        <div class="signatures">
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'] && !empty($signatures['COMPRADOR']['signature_base64']))
+                        <img src="{!! $signatures['COMPRADOR']['signature_base64'] !!}" alt="Assinatura Comprador" class="signature-image" />
+                    @elseif($buyer && $buyer->signature_path)
+                        @php
+                            $buyerSigPath = storage_path('app/public/' . $buyer->signature_path);
+                            if (file_exists($buyerSigPath)) {
+                                $buyerImageData = file_get_contents($buyerSigPath);
+                                $extension = strtolower(pathinfo($buyerSigPath, PATHINFO_EXTENSION));
+                                $mimeType = $extension === 'jpg' || $extension === 'jpeg' ? 'image/jpeg' : ($extension === 'png' ? 'image/png' : 'image/png');
+                                $buyerBase64 = base64_encode($buyerImageData);
+                                $buyerBase64 = str_replace(["\r", "\n"], '', $buyerBase64);
+                                $buyerBase64Url = 'data:' . $mimeType . ';base64,' . $buyerBase64;
+                            }
+                        @endphp
+                        @if(isset($buyerBase64Url))
+                            <img src="{!! $buyerBase64Url !!}" alt="Assinatura Comprador" class="signature-image" />
+                        @endif
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">COMPRADOR</div>
+                <div class="text-small">
+                    @if($buyer)
+                        {{ strtoupper($buyer->nome_completo ?? ($order->quote ? $order->quote->buyer_name : null) ?? '') }}
+                    @elseif(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'])
+                        {{ strtoupper($signatures['COMPRADOR']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'] && !empty($signatures['GERENTE LOCAL']['signature_base64']))
+                        <img src="{!! $signatures['GERENTE LOCAL']['signature_base64'] !!}" alt="Assinatura Gerente Local Compras" class="signature-image" />
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">Gerente Local Compras</div>
+                <div class="text-small">
+                    @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'])
+                        {{ strtoupper($signatures['GERENTE LOCAL']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['ENGENHEIRO']) && $signatures['ENGENHEIRO'] && !empty($signatures['ENGENHEIRO']['signature_base64']))
+                        <img src="{!! $signatures['ENGENHEIRO']['signature_base64'] !!}" alt="Assinatura Engenheiro" class="signature-image" />
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">ENGENHEIRO</div>
+                <div class="text-small">
+                    @if(isset($signatures['ENGENHEIRO']) && $signatures['ENGENHEIRO'])
+                        {{ strtoupper($signatures['ENGENHEIRO']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'] && !empty($signatures['GERENTE GERAL']['signature_base64']))
+                        <img src="{!! $signatures['GERENTE GERAL']['signature_base64'] !!}" alt="Assinatura Gerente Geral Compras" class="signature-image" />
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">Gerente Geral Compras</div>
+                <div class="text-small">
+                    @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'])
+                        {{ strtoupper($signatures['GERENTE GERAL']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['DIRETOR']) && $signatures['DIRETOR'] && !empty($signatures['DIRETOR']['signature_base64']))
+                        <img src="{!! $signatures['DIRETOR']['signature_base64'] !!}" alt="Assinatura Diretor" class="signature-image" />
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">DIRETOR</div>
+                <div class="text-small">
+                    @if(isset($signatures['DIRETOR']) && $signatures['DIRETOR'])
+                        {{ strtoupper($signatures['DIRETOR']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    @if(isset($signatures['PRESIDENTE']) && $signatures['PRESIDENTE'] && !empty($signatures['PRESIDENTE']['signature_base64']))
+                        <img src="{!! $signatures['PRESIDENTE']['signature_base64'] !!}" alt="Assinatura Presidente" class="signature-image" />
+                    @endif
+                </div>
+                <div class="signature-name-line"></div>
+                <div class="signature-name">PRESIDENTE</div>
+                <div class="text-small">
+                    @if(isset($signatures['PRESIDENTE']) && $signatures['PRESIDENTE'])
+                        {{ strtoupper($signatures['PRESIDENTE']['user_name']) }}
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Conteúdo Principal (fluxo normal; itens podem ocupar várias páginas) -->
     <div class="top">
         <!-- Blocos de Informação: Fornecedor e Faturar A -->
@@ -566,7 +716,7 @@
         @endforeach
     </div>
 
-    <!-- Totais, Observações e Assinaturas (em fluxo normal, após a tabela) -->
+    <!-- Totais e Observações (em fluxo normal, após a tabela; assinaturas ficam no rodapé fixo em todas as páginas) -->
     <div class="bottom">
         <!-- Totais -->
         <div class="totals-section">
@@ -598,116 +748,6 @@
             <div class="text-small">{!! nl2br(e(strtoupper($order->observation))) !!}</div>
         </div>
         @endif
-
-        <!-- Assinaturas -->
-        <div class="signatures">
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'] && !empty($signatures['COMPRADOR']['signature_base64']))
-                        <img src="{!! $signatures['COMPRADOR']['signature_base64'] !!}" alt="Assinatura Comprador" class="signature-image" />
-                    @elseif($buyer && $buyer->signature_path)
-                        @php
-                            $buyerSigPath = storage_path('app/public/' . $buyer->signature_path);
-                            if (file_exists($buyerSigPath)) {
-                                $buyerImageData = file_get_contents($buyerSigPath);
-                                $extension = strtolower(pathinfo($buyerSigPath, PATHINFO_EXTENSION));
-                                $mimeType = $extension === 'jpg' || $extension === 'jpeg' ? 'image/jpeg' : ($extension === 'png' ? 'image/png' : 'image/png');
-                                $buyerBase64 = base64_encode($buyerImageData);
-                                $buyerBase64 = str_replace(["\r", "\n"], '', $buyerBase64);
-                                $buyerBase64Url = 'data:' . $mimeType . ';base64,' . $buyerBase64;
-                            }
-                        @endphp
-                        @if(isset($buyerBase64Url))
-                            <img src="{!! $buyerBase64Url !!}" alt="Assinatura Comprador" class="signature-image" />
-                        @endif
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">COMPRADOR</div>
-                <div class="text-small">
-                    @if($buyer)
-                        {{ strtoupper($buyer->nome_completo ?? ($order->quote ? $order->quote->buyer_name : null) ?? '') }}
-                    @elseif(isset($signatures['COMPRADOR']) && $signatures['COMPRADOR'])
-                        {{ strtoupper($signatures['COMPRADOR']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'] && !empty($signatures['GERENTE LOCAL']['signature_base64']))
-                        <img src="{!! $signatures['GERENTE LOCAL']['signature_base64'] !!}" alt="Assinatura Gerente Local Compras" class="signature-image" />
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">Gerente Local Compras</div>
-                <div class="text-small">
-                    @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'])
-                        {{ strtoupper($signatures['GERENTE LOCAL']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['ENGENHEIRO']) && $signatures['ENGENHEIRO'] && !empty($signatures['ENGENHEIRO']['signature_base64']))
-                        <img src="{!! $signatures['ENGENHEIRO']['signature_base64'] !!}" alt="Assinatura Engenheiro" class="signature-image" />
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">ENGENHEIRO</div>
-                <div class="text-small">
-                    @if(isset($signatures['ENGENHEIRO']) && $signatures['ENGENHEIRO'])
-                        {{ strtoupper($signatures['ENGENHEIRO']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'] && !empty($signatures['GERENTE GERAL']['signature_base64']))
-                        <img src="{!! $signatures['GERENTE GERAL']['signature_base64'] !!}" alt="Assinatura Gerente Geral Compras" class="signature-image" />
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">Gerente Geral Compras</div>
-                <div class="text-small">
-                    @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'])
-                        {{ strtoupper($signatures['GERENTE GERAL']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['DIRETOR']) && $signatures['DIRETOR'] && !empty($signatures['DIRETOR']['signature_base64']))
-                        <img src="{!! $signatures['DIRETOR']['signature_base64'] !!}" alt="Assinatura Diretor" class="signature-image" />
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">DIRETOR</div>
-                <div class="text-small">
-                    @if(isset($signatures['DIRETOR']) && $signatures['DIRETOR'])
-                        {{ strtoupper($signatures['DIRETOR']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-            
-            <div class="signature-box">
-                <div class="signature-line">
-                    @if(isset($signatures['PRESIDENTE']) && $signatures['PRESIDENTE'] && !empty($signatures['PRESIDENTE']['signature_base64']))
-                        <img src="{!! $signatures['PRESIDENTE']['signature_base64'] !!}" alt="Assinatura Presidente" class="signature-image" />
-                    @endif
-                </div>
-                <div class="signature-name-line"></div>
-                <div class="signature-name">PRESIDENTE</div>
-                <div class="text-small">
-                    @if(isset($signatures['PRESIDENTE']) && $signatures['PRESIDENTE'])
-                        {{ strtoupper($signatures['PRESIDENTE']['user_name']) }}
-                    @endif
-                </div>
-            </div>
-        </div>
     </div>
 </body>
 </html>
