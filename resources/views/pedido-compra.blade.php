@@ -259,6 +259,12 @@
         .top {
             margin-bottom: 0;
         }
+        
+        /* Linha horizontal logo acima da tabela de itens (desce junto com a tabela) */
+        .table-separator-line {
+            border-top: 1px solid #000;
+            margin-bottom: 8px;
+        }
 
         .bottom {
             margin-top: 20px;
@@ -808,6 +814,8 @@
 
     <!-- Conteúdo Principal: apenas tabelas de itens (topo e fundo estão nos blocos fixos) -->
     <div class="top">
+        <!-- Linha separadora: acompanha a tabela (fica logo acima) -->
+        <div class="table-separator-line"></div>
         <!-- Tabela de Itens: no máximo 17 itens por página -->
         @foreach($itemChunks as $chunkIndex => $chunk)
         <div class="items-page">
