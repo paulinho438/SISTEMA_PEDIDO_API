@@ -104,13 +104,15 @@
             text-transform: uppercase;
         }
         
-        /* ENDEREÇO DE ENTREGA: mesmo estilo do layout original (borda preta, 8pt, espaço acima) */
+        /* ENDEREÇO DE ENTREGA: mesmo estilo do layout original (borda preta, 8pt, espaço acima); na frente de tudo */
         .print-header .delivery-block {
             margin-top: 0;
             margin-bottom: 0;
             border: 1px solid #000;
             padding: 5px;
             font-size: 8pt;
+            position: relative;
+            z-index: 999;
         }
         
         .print-header .delivery-block .info-block-title {
