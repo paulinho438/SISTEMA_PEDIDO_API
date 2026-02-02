@@ -674,10 +674,6 @@
         </div>
     </div>
 
-    <!-- Fundo fixo: repetido em todas as páginas -->
-    <div class="print-footer">
-        <span class="footer-page"></span>
-    </div>
 
     <!-- Totais + Observações fixos: repetidos em todas as páginas -->
     <div class="print-summary">
