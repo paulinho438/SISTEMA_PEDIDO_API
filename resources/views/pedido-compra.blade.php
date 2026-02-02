@@ -529,7 +529,7 @@
         .signatures {
             display: table;
             width: 100%;
-            margin-top: 30px;
+            margin-top: 40px;
             padding-top: 20px;
             page-break-inside: avoid;
         }
