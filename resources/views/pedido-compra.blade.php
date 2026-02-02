@@ -21,21 +21,87 @@
             margin: 0;
             padding: 0;
             color: #000;
-            position: relative;
-            min-height: 100vh;
+            padding-top: 90px;
+            padding-bottom: 35px;
         }
 
-        .top {
-            padding-bottom: 120px;
+        /* Topo fixo em todas as páginas */
+        .print-header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 85px;
+            background: #fff;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 5px 0;
+            border-bottom: 1px solid #ccc;
+        }
+        
+        .print-header .logo {
+            width: 110px;
+            height: 55px;
+            margin-bottom: 0;
+        }
+        
+        .print-header .header-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        
+        .print-header .header-right {
+            text-align: right;
+            font-size: 8pt;
+        }
+        
+        .print-header .header-center h1 {
+            font-size: 14pt;
+        }
+        
+        .print-header .page-info::after {
+            content: "Página " counter(page) " de " counter(pages);
         }
 
-        .bottom {
+        /* Fundo fixo em todas as páginas */
+        .print-footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            width: 100%;
-            margin-top: auto;
+            height: 30px;
+            background: #fff;
+            z-index: 10;
+            border-top: 1px solid #ccc;
+            font-size: 8pt;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+        }
+        
+        .print-footer .footer-order::before {
+            content: "Pedido: {{ $order->order_number }}";
+        }
+        
+        .print-footer .footer-page::after {
+            content: "Página " counter(page) " de " counter(pages);
+        }
+
+        /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/assinaturas vêm depois */
+        .top {
+            margin-bottom: 0;
+        }
+
+        .bottom {
+            margin-top: 20px;
+            padding-top: 10px;
+            page-break-before: avoid;
+            page-break-inside: avoid;
         }
         
         img {
@@ -43,7 +109,7 @@
             height: auto;
         }
         
-        /* Header Styles */
+        /* Header Styles (usado dentro do print-header) */
         .header {
             display: flex;
             justify-content: space-between;
@@ -149,25 +215,46 @@
             font-size: 8pt;
         }
         
-        /* Table Styles */
+        /* Table Styles - permite quebra de página na tabela; cabeçalho repete em cada página */
         .items-table {
             width: 100%;
             border-collapse: collapse;
             margin: 10px 0;
             font-size: 8pt;
+            page-break-inside: auto;
         }
         
-        .items-table th {
+        .items-table thead {
+            display: table-header-group;
+        }
+        
+        .items-table thead th {
             border: 1px solid #000;
-            padding: 3px;
+            padding: 4px 3px;
             background-color: #f0f0f0;
             font-weight: bold;
             text-align: center;
+            vertical-align: bottom;
+            line-height: 1.2;
+        }
+        
+        .items-table tbody {
+            display: table-row-group;
+        }
+        
+        .items-table tbody td {
+            padding: 4px 3px;
+            vertical-align: top;
+            line-height: 1.25;
+        }
+        
+        .items-table tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
         }
         
         .items-table td {
             border: 1px solid #000;
-            padding: 3px;
             text-align: left;
             word-wrap: break-word;
             word-break: break-word;
@@ -185,19 +272,22 @@
             white-space: nowrap;
         }
         
-        /* Totals Section Styles */
+        /* Totals Section Styles - evita quebrar no meio; linhas com altura mínima para não sobrepor */
         .totals-section {
             border: 1px solid #000;
-            padding: 5px;
-            margin-top: 10px;
+            padding: 8px;
+            margin-top: 15px;
             font-size: 8pt;
+            line-height: 1.4;
+            page-break-inside: avoid;
         }
         
         .totals-line {
             display: flex;
             justify-content: space-between;
             align-items: baseline;
-            padding: 2px 0;
+            padding: 4px 0;
+            min-height: 1.4em;
             border-bottom: 1px dotted #000;
         }
         .totals-line .totals-value-right {
@@ -209,15 +299,17 @@
         .totals-line-values {
             display: table;
             width: 100%;
-            padding: 2px 0;
+            padding: 4px 0;
             font-size: 8pt;
+            line-height: 1.4;
         }
         
         .totals-line-values > div {
             display: table-cell;
             text-align: left;
             width: 16.66%;
-            padding-right: 5px;
+            padding: 2px 5px 2px 0;
+            vertical-align: top;
         }
         
         .total-final {
@@ -228,6 +320,15 @@
             margin-top: 5px;
         }
         
+        /* Quebra de página após cada bloco de itens (máx. 17 por página) */
+        .page-break-after {
+            page-break-after: always;
+        }
+        
+        .items-page {
+            page-break-inside: avoid;
+        }
+        
         /* Observations Styles */
         .observations {
             border: 1px solid #000;
@@ -235,6 +336,7 @@
             margin-top: 10px;
             min-height: 60px;
             font-size: 8pt;
+            page-break-inside: avoid;
         }
         
         .observations-title {
@@ -243,12 +345,13 @@
             text-transform: uppercase;
         }
         
-        /* Signatures Styles */
+        /* Signatures Styles - evita quebrar no meio do bloco de assinaturas */
         .signatures {
             display: table;
             width: 100%;
             margin-top: 30px;
             padding-top: 20px;
+            page-break-inside: avoid;
         }
         
         .signature-box {
@@ -305,23 +408,29 @@
     </style>
 </head>
 <body>
-    <!-- Conteúdo Principal -->
-    <div class="top">
-        <!-- Cabeçalho -->
-        <div class="header">
-            <div class="logo">
-                <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
-            </div>
-            <div class="header-center">
-                <h1>PEDIDO DE COMPRA</h1>
-            </div>
-            <div class="header-right">
-                <div>Página : {{ str_pad($pageNumber, 2, '0', STR_PAD_LEFT) }}</div>
-                <div>Dt Emissão: {{ $order->order_date->format('d/m/Y') }}</div>
-                <div>No. Pedido: {{ $order->order_number }}</div>
-            </div>
+    <!-- Topo fixo: repetido em todas as páginas -->
+    <div class="print-header">
+        <div class="logo">
+            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
         </div>
+        <div class="header-center">
+            <h1>PEDIDO DE COMPRA</h1>
+        </div>
+        <div class="header-right">
+            <div class="page-info"></div>
+            <div>Dt Emissão: {{ $order->order_date->format('d/m/Y') }}</div>
+            <div>No. Pedido: {{ $order->order_number }}</div>
+        </div>
+    </div>
 
+    <!-- Fundo fixo: repetido em todas as páginas -->
+    <div class="print-footer">
+        <span class="footer-order"></span>
+        <span class="footer-page"></span>
+    </div>
+
+    <!-- Conteúdo Principal (fluxo normal; itens podem ocupar várias páginas) -->
+    <div class="top">
         <!-- Blocos de Informação: Fornecedor e Faturar A -->
         <div class="info-blocks">
             <div class="info-block info-block-left">
@@ -398,49 +507,57 @@
             </div>
         </div>
 
-        <!-- Tabela de Itens -->
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width: 4%;">Item</th>
-                    <th style="width: 8%;">Cod.</th>
-                    <th style="width: 25%;">Descrição do Material / Serviço</th>
-                    <th style="width: 15%;">Aplicação</th>
-                    <th style="width: 10%;">Marca</th>
-                    <th style="width: 5%;">Unid.</th>
-                    <th style="width: 7%;">Qtd.</th>
-                    <th style="width: 12%;">Vlr Unit.</th>
-                    <th style="width: 14%;">Vlr Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($items as $index => $item)
-                    @php
-                        $quoteItem = $item->quoteItem;
-                        $description = $item->product_description ?? '';
-                        $application = $quoteItem ? ($quoteItem->application ?? '') : '';
-                        $brand = '';
-                        if ($quoteItem && $quoteItem->tag) {
-                            $brand = $quoteItem->tag;
-                        }
-                    @endphp
+        <!-- Tabela de Itens: no máximo 17 itens por página -->
+        @foreach($itemChunks as $chunkIndex => $chunk)
+        <div class="items-page">
+            <table class="items-table">
+                <thead>
                     <tr>
-                        <td class="center">{{ str_pad($index + 1, 4, '0', STR_PAD_LEFT) }}</td>
-                        <td>{{ $item->product_code ?? '' }}</td>
-                        <td>{{ strtoupper($description) }}</td>
-                        <td>{{ strtoupper($application) }}</td>
-                        <td>{{ strtoupper($brand) }}</td>
-                        <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
-                        <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
-                        <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                        <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
+                        <th style="width: 4%;">Item</th>
+                        <th style="width: 8%;">Cod.</th>
+                        <th style="width: 25%;">Descrição do Material / Serviço</th>
+                        <th style="width: 15%;">Aplicação</th>
+                        <th style="width: 10%;">Marca</th>
+                        <th style="width: 5%;">Unid.</th>
+                        <th style="width: 7%;">Qtd.</th>
+                        <th style="width: 12%;">Vlr Unit.</th>
+                        <th style="width: 14%;">Vlr Total</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach($chunk as $indexInChunk => $item)
+                        @php
+                            $globalIndex = $chunkIndex * 17 + $indexInChunk + 1;
+                            $quoteItem = $item->quoteItem;
+                            $description = $item->product_description ?? '';
+                            $application = $quoteItem ? ($quoteItem->application ?? '') : '';
+                            $brand = '';
+                            if ($quoteItem && $quoteItem->tag) {
+                                $brand = $quoteItem->tag;
+                            }
+                        @endphp
+                        <tr>
+                            <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>
+                            <td>{{ $item->product_code ?? '' }}</td>
+                            <td>{{ strtoupper($description) }}</td>
+                            <td>{{ strtoupper($application) }}</td>
+                            <td>{{ strtoupper($brand) }}</td>
+                            <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
+                            <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
+                            <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
+                            <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @if(!$loop->last)
+        <div class="page-break-after"></div>
+        @endif
+        @endforeach
     </div>
 
-    <!-- Rodapé Fixo (Totais, Observações e Assinaturas) -->
+    <!-- Totais, Observações e Assinaturas (em fluxo normal, após a tabela) -->
     <div class="bottom">
         <!-- Totais -->
         <div class="totals-section">

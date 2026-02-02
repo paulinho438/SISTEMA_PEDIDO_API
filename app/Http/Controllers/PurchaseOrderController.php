@@ -302,11 +302,16 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        // Paginar itens: no máximo 17 itens por página na impressão
+        $itemsArray = $order->items->values()->all();
+        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 17);
+
         // Preparar dados para a view
         $dados = [
             'order' => $order,
             'company' => $order->company,
             'items' => $order->items,
+            'itemChunks' => $itemChunks,
             'quote' => $order->quote,
             'buyer' => $buyer,
             'totalIten' => $totalIten,
