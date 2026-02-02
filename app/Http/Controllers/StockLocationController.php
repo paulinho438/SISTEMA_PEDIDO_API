@@ -142,16 +142,28 @@ class StockLocationController extends Controller
     }
 
     /**
-     * Listar todos os locais ativos (sem filtro de acesso) - usado para seleção de destino
+     * Listar todos os locais ativos (sem filtro de acesso) - usado para seleção de destino e termo de responsabilidade
      */
     public function listAllActive(Request $request)
     {
         $user = auth()->user();
         
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+        $canView = $user && (
+            $user->hasPermission('view_estoque_movimentacoes_create')
+            || $user->hasPermission('view_estoque_movimentacoes')
+            || $user->hasPermission('view_estoque_locais')
+        );
+        if (!$canView) {
             return response()->json([
                 'message' => 'Você não tem permissão para visualizar locais de estoque.',
             ], Response::HTTP_FORBIDDEN);
+        }
+
+        $companyId = $request->header('company-id');
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Empresa não informada. Selecione uma empresa no menu superior.',
+            ], Response::HTTP_BAD_REQUEST);
         }
 
         $locations = $this->service->listAllActive($request);
