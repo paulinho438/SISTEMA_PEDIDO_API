@@ -22,6 +22,7 @@
             padding: 0;
             color: #000;
             padding-top: 352px;
+            padding-left: 10px;
             padding-bottom: 285px;
         }
 
