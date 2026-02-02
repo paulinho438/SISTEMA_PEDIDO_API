@@ -21,7 +21,7 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 275px;
+            padding-top: 295px;
             padding-bottom: 285px;
         }
 
@@ -31,12 +31,13 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 268px;
+            height: 288px;
             box-sizing: border-box;
             background: #fff;
             z-index: 9999;
             padding: 8px 10px 10px 10px;
             border-bottom: 1px solid #ccc;
+            overflow: hidden;
         }
         
         .print-header-row {
@@ -117,13 +118,13 @@
             margin-bottom: 3px;
         }
         
-        .print-header .delivery-row,
-        .print-header .dates-row {
+        .print-header .delivery-row {
             margin-bottom: 3px;
         }
         
         .print-header .dates-row {
             margin-top: 5px;
+            margin-bottom: 0;
         }
 
         /* Fundo fixo em todas as páginas */
