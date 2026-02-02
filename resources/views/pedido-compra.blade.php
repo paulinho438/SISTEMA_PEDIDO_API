@@ -556,6 +556,7 @@
             width: auto;
             display: inline-block;
             vertical-align: middle;
+            margin-top: 10px;
         }
         
         .signature-name {
