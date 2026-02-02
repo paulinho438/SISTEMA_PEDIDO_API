@@ -21,23 +21,24 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 90px;
-            padding-bottom: 35px;
+            padding-top: 95px;
+            padding-bottom: 38px;
         }
 
-        /* Topo fixo em todas as páginas */
+        /* Topo fixo em todas as páginas (Dompdf repete position:fixed a cada página) */
         .print-header {
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            height: 85px;
+            width: 100%;
+            height: 90px;
+            box-sizing: border-box;
             background: #fff;
-            z-index: 10;
+            z-index: 9999;
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 5px 0;
+            padding: 8px 10px 14px 10px;
             border-bottom: 1px solid #ccc;
         }
         
@@ -57,6 +58,13 @@
         .print-header .header-right {
             text-align: right;
             font-size: 8pt;
+            line-height: 1.35;
+            padding-bottom: 4px;
+            margin-bottom: 0;
+        }
+        
+        .print-header .header-right > div {
+            margin-bottom: 2px;
         }
         
         .print-header .header-center h1 {
@@ -64,7 +72,7 @@
         }
         
         .print-header .page-info::after {
-            content: "Página " counter(page) " de " counter(pages);
+            content: "Página " counter(page);
         }
 
         /* Fundo fixo em todas as páginas */
@@ -72,10 +80,11 @@
             position: fixed;
             bottom: 0;
             left: 0;
-            right: 0;
-            height: 30px;
+            width: 100%;
+            height: 32px;
+            box-sizing: border-box;
             background: #fff;
-            z-index: 10;
+            z-index: 9999;
             border-top: 1px solid #ccc;
             font-size: 8pt;
             display: flex;
@@ -89,7 +98,7 @@
         }
         
         .print-footer .footer-page::after {
-            content: "Página " counter(page) " de " counter(pages);
+            content: "Página " counter(page);
         }
 
         /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/assinaturas vêm depois */
