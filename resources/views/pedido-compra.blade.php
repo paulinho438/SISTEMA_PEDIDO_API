@@ -529,7 +529,7 @@
         .signatures {
             display: table;
             width: 100%;
-            margin-top: 40px;
+            margin-top: 30px;
             padding-top: 20px;
             page-break-inside: avoid;
         }
@@ -556,7 +556,6 @@
             width: auto;
             display: inline-block;
             vertical-align: middle;
-            margin-top: 10px;
         }
         
         .signature-name {
