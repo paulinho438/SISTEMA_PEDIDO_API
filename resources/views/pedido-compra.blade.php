@@ -21,7 +21,7 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 342px;
+            padding-top: 352px;
             padding-bottom: 285px;
         }
 
