@@ -21,7 +21,7 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 348px;
+            padding-top: 328px;
             padding-bottom: 285px;
         }
 
@@ -123,9 +123,16 @@
             margin-bottom: 3px;
         }
         
+        .print-header .delivery-row-address {
+            margin-bottom: 10px;
+            padding-bottom: 4px;
+        }
+        
         .print-header .dates-row {
-            margin-top: 5px;
+            margin-top: 12px;
             margin-bottom: 0;
+            padding-top: 6px;
+            border-top: 1px solid #ccc;
             display: flex;
             justify-content: space-between;
             align-items: baseline;
@@ -260,10 +267,11 @@
             margin-bottom: 0;
         }
         
-        /* Linha horizontal logo acima da tabela de itens (desce junto com a tabela) */
+        /* Linha horizontal logo acima da tabela de itens (igual 3ª foto: separação clara) */
         .table-separator-line {
             border-top: 1px solid #000;
-            margin-bottom: 8px;
+            margin-top: 0;
+            margin-bottom: 6px;
         }
 
         .bottom {
