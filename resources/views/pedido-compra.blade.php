@@ -115,10 +115,11 @@
         
         .print-header .delivery-block .info-block-title {
             margin-top: 0;
-            margin-bottom: 3px;
+            margin-bottom: 10px;
         }
         
         .print-header .delivery-row {
+            margin-top: 4px;
             margin-bottom: 3px;
         }
         
