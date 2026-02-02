@@ -241,10 +241,10 @@
         }
         
         .print-signatures .signature-line {
-            min-height: 28px;
+            min-height: 38px;
             height: 28px;
             padding-top: 0;
-            margin-bottom: 0;
+            margin-bottom: -20px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
