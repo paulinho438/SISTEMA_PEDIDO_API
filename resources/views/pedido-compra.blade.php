@@ -218,6 +218,7 @@
 
         /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/observações vêm depois */
         .top {
+            margin-top: 20px;
             margin-bottom: 0;
         }
 
