@@ -21,30 +21,35 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 95px;
-            padding-bottom: 150px;
+            padding-top: 235px;
+            padding-bottom: 285px;
         }
 
-        /* Topo fixo em todas as páginas (Dompdf repete position:fixed a cada página) */
+        /* Topo fixo em todas as páginas: logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA */
         .print-header {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
-            height: 90px;
+            height: 228px;
             box-sizing: border-box;
             background: #fff;
             z-index: 9999;
+            padding: 6px 10px 8px 10px;
+            border-bottom: 1px solid #ccc;
+            overflow: hidden;
+        }
+        
+        .print-header-row {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 8px 10px 14px 10px;
-            border-bottom: 1px solid #ccc;
+            margin-bottom: 6px;
         }
         
         .print-header .logo {
-            width: 110px;
-            height: 55px;
+            width: 100px;
+            height: 50px;
             margin-bottom: 0;
         }
         
@@ -58,21 +63,41 @@
         .print-header .header-right {
             text-align: right;
             font-size: 8pt;
-            line-height: 1.35;
-            padding-bottom: 4px;
-            margin-bottom: 0;
+            line-height: 1.3;
+            padding-bottom: 2px;
         }
         
         .print-header .header-right > div {
-            margin-bottom: 2px;
+            margin-bottom: 1px;
         }
         
         .print-header .header-center h1 {
-            font-size: 14pt;
+            font-size: 13pt;
         }
         
         .print-header .page-info::after {
             content: "Página " counter(page);
+        }
+        
+        .print-header .info-blocks {
+            margin-bottom: 6px;
+        }
+        
+        .print-header .info-block,
+        .print-header .info-block-content {
+            font-size: 7pt;
+            line-height: 1.25;
+        }
+        
+        .print-header .delivery-block {
+            margin-bottom: 0;
+            padding: 4px 5px;
+            font-size: 7pt;
+        }
+        
+        .print-header .delivery-row,
+        .print-header .dates-row {
+            margin-bottom: 2px;
         }
 
         /* Fundo fixo em todas as páginas */
@@ -99,6 +124,53 @@
         
         .print-footer .footer-page::after {
             content: "Página " counter(page);
+        }
+
+        /* Totais + Observações fixos em todas as páginas */
+        .print-summary {
+            position: fixed;
+            bottom: 132px;
+            left: 0;
+            width: 100%;
+            box-sizing: border-box;
+            background: #fff;
+            z-index: 9997;
+            border-top: 1px solid #ccc;
+            padding: 6px 8px 6px 8px;
+        }
+        
+        .print-summary .totals-section {
+            margin-top: 0;
+            padding: 5px 6px;
+            font-size: 7pt;
+            line-height: 1.3;
+        }
+        
+        .print-summary .totals-line {
+            padding: 2px 0;
+            min-height: 1.2em;
+        }
+        
+        .print-summary .totals-line-values {
+            padding: 2px 0;
+            font-size: 7pt;
+        }
+        
+        .print-summary .total-final {
+            font-size: 9pt;
+            padding-top: 3px;
+            margin-top: 3px;
+        }
+        
+        .print-summary .observations {
+            margin-top: 6px;
+            padding: 4px 5px;
+            min-height: 36px;
+            font-size: 7pt;
+        }
+        
+        .print-summary .observations-title {
+            margin-bottom: 2px;
         }
 
         /* Assinaturas fixas em todas as páginas */
@@ -460,18 +532,91 @@
     </style>
 </head>
 <body>
-    <!-- Topo fixo: repetido em todas as páginas -->
+    <!-- Topo fixo: repetido em todas as páginas (logo, título, dados, fornecedor, faturar a, endereço) -->
     <div class="print-header">
-        <div class="logo">
-            <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+        <div class="print-header-row">
+            <div class="logo">
+                <img src="https://www.gruporialma.com.br/assets/logo_sem_fundo-Dbkuj9iO.png" alt="Logo Rialma" />
+            </div>
+            <div class="header-center">
+                <h1>PEDIDO DE COMPRA</h1>
+            </div>
+            <div class="header-right">
+                <div class="page-info"></div>
+                <div>Dt Emissão: {{ $order->order_date->format('d/m/Y') }}</div>
+                <div>No. Pedido: {{ $order->order_number }}</div>
+            </div>
         </div>
-        <div class="header-center">
-            <h1>PEDIDO DE COMPRA</h1>
+        <div class="info-blocks">
+            <div class="info-block info-block-left">
+                <div class="info-block-title">FORNECEDOR</div>
+                <div class="info-block-content">
+                    <div class="text-bold">{{ strtoupper($order->supplier_name ?? '') }}</div>
+                    @php
+                        $quoteSupplier = $order->quoteSupplier;
+                    @endphp
+                    @if($quoteSupplier && $quoteSupplier->municipality)
+                        <div><strong>END:</strong> {{ strtoupper($quoteSupplier->municipality) }}</div>
+                    @endif
+                    @if($quoteSupplier && $quoteSupplier->state)
+                        <div><strong>CIDADE:</strong> {{ strtoupper($quoteSupplier->municipality ?? '') }} - {{ strtoupper($quoteSupplier->state) }}</div>
+                    @endif
+                    @if($order->supplier_document)
+                        <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $order->supplier_document) }}</div>
+                    @endif
+                    @if($order->vendor_phone)
+                        <div><strong>FONE:</strong> {{ $order->vendor_phone }}</div>
+                    @endif
+                </div>
+            </div>
+            <div class="info-block info-block-right">
+                <div class="info-block-title">FATURAR A</div>
+                <div class="info-block-content">
+                    <div class="text-bold">{{ strtoupper($company->razao_social ?? $company->company ?? '') }}</div>
+                    @if($company->endereco)
+                        <div><strong>ENDERECO:</strong> {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif</div>
+                    @endif
+                    @if($company->bairro)
+                        <div><strong>BAIRRO:</strong> {{ strtoupper($company->bairro) }}</div>
+                    @endif
+                    @if($company->cidade)
+                        <div><strong>CIDADE:</strong> {{ strtoupper($company->cidade) }}@if($company->uf){{ ' - ' . strtoupper($company->uf) }}@endif</div>
+                    @endif
+                    @if($company->cep)
+                        <div><strong>CEP:</strong> {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $company->cep) }}</div>
+                    @endif
+                    @if($company->cnpj)
+                        <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $company->cnpj) }}</div>
+                    @endif
+                    @if($company->inscricao_estadual)
+                        <div><strong>INSC.EST.:</strong> {{ $company->inscricao_estadual }}</div>
+                    @endif
+                </div>
+            </div>
         </div>
-        <div class="header-right">
-            <div class="page-info"></div>
-            <div>Dt Emissão: {{ $order->order_date->format('d/m/Y') }}</div>
-            <div>No. Pedido: {{ $order->order_number }}</div>
+        <div class="delivery-block">
+            <div class="info-block-title">ENDEREÇO DE ENTREGA</div>
+            <div class="delivery-row">
+                <div class="delivery-row-item">
+                    {{ strtoupper($company->company ?? '') }}
+                    @if($company->endereco)
+                        {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif
+                    @endif
+                    @if($company->bairro)
+                        {{ strtoupper($company->bairro) }}
+                    @endif
+                    @if($company->cidade)
+                        {{ strtoupper($company->cidade) }}@if($company->uf){{ ' ' . strtoupper($company->uf) }}@endif
+                    @endif
+                </div>
+                <div class="delivery-row-item" style="text-align: right;">
+                    <strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}
+                </div>
+            </div>
+            <div class="dates-row">
+                <div><strong>PRAZO DE ENTREGA:</strong> {{ $order->expected_delivery_date ? $order->expected_delivery_date->format('d/m/Y') : '' }}</div>
+                <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+            </div>
         </div>
     </div>
 
@@ -479,6 +624,42 @@
     <div class="print-footer">
         <span class="footer-order"></span>
         <span class="footer-page"></span>
+    </div>
+
+    <!-- Totais + Observações fixos: repetidos em todas as páginas -->
+    <div class="print-summary">
+        <div class="totals-section">
+            <div class="totals-line">
+                <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+                <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
+            </div>
+            <div class="totals-line">
+                <div><strong>TIPO FRETE:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE' }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
+            </div>
+            <div class="totals-line-values">
+                <div>IPI: {{ number_format($totalIPI, 2, ',', '.') }}</div>
+                <div>ICMS RETIDO: {{ number_format($totalICM, 2, ',', '.') }}</div>
+                <div>FRETE: {{ number_format($totalFRE, 2, ',', '.') }}</div>
+                <div>DESPESAS: {{ number_format($totalDES, 2, ',', '.') }}</div>
+                <div>SEGURO: {{ number_format($totalSEG, 2, ',', '.') }}</div>
+                <div>DESCONTO: {{ number_format($totalDEC, 2, ',', '.') }}</div>
+            </div>
+            <div class="totals-line total-final">
+                <div><strong>COMPRADOR:</strong> @if($buyer){{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}@endif</div>
+                <div class="totals-value-right"><strong>VALOR TOTAL:</strong> {{ number_format($valorTotal, 2, ',', '.') }}</div>
+            </div>
+        </div>
+        @if($order->observation)
+        <div class="observations">
+            <div class="observations-title">OBSERVACOES</div>
+            <div class="text-small">{!! nl2br(e(strtoupper($order->observation))) !!}</div>
+        </div>
+        @else
+        <div class="observations">
+            <div class="observations-title">OBSERVACOES</div>
+            <div class="text-small">&nbsp;</div>
+        </div>
+        @endif
     </div>
 
     <!-- Assinaturas fixas: repetidas em todas as páginas -->
@@ -588,84 +769,8 @@
         </div>
     </div>
 
-    <!-- Conteúdo Principal (fluxo normal; itens podem ocupar várias páginas) -->
+    <!-- Conteúdo Principal: apenas tabelas de itens (topo e fundo estão nos blocos fixos) -->
     <div class="top">
-        <!-- Blocos de Informação: Fornecedor e Faturar A -->
-        <div class="info-blocks">
-            <div class="info-block info-block-left">
-                <div class="info-block-title">FORNECEDOR</div>
-                <div class="info-block-content">
-                    <div class="text-bold">{{ strtoupper($order->supplier_name ?? '') }}</div>
-                    @php
-                        $quoteSupplier = $order->quoteSupplier;
-                    @endphp
-                    @if($quoteSupplier && $quoteSupplier->municipality)
-                        <div><strong>END:</strong> {{ strtoupper($quoteSupplier->municipality) }}</div>
-                    @endif
-                    @if($quoteSupplier && $quoteSupplier->state)
-                        <div><strong>CIDADE:</strong> {{ strtoupper($quoteSupplier->municipality ?? '') }} - {{ strtoupper($quoteSupplier->state) }}</div>
-                    @endif
-                    @if($order->supplier_document)
-                        <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $order->supplier_document) }}</div>
-                    @endif
-                    @if($order->vendor_phone)
-                        <div><strong>FONE:</strong> {{ $order->vendor_phone }}</div>
-                    @endif
-                </div>
-            </div>
-            
-            <div class="info-block info-block-right">
-                <div class="info-block-title">FATURAR A</div>
-                <div class="info-block-content">
-                    <div class="text-bold">{{ strtoupper($company->razao_social ?? $company->company ?? '') }}</div>
-                    @if($company->endereco)
-                        <div><strong>ENDERECO:</strong> {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif</div>
-                    @endif
-                    @if($company->bairro)
-                        <div><strong>BAIRRO:</strong> {{ strtoupper($company->bairro) }}</div>
-                    @endif
-                    @if($company->cidade)
-                        <div><strong>CIDADE:</strong> {{ strtoupper($company->cidade) }}@if($company->uf){{ ' - ' . strtoupper($company->uf) }}@endif</div>
-                    @endif
-                    @if($company->cep)
-                        <div><strong>CEP:</strong> {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $company->cep) }}</div>
-                    @endif
-                    @if($company->cnpj)
-                        <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $company->cnpj) }}</div>
-                    @endif
-                    @if($company->inscricao_estadual)
-                        <div><strong>INSC.EST.:</strong> {{ $company->inscricao_estadual }}</div>
-                    @endif
-                </div>
-            </div>
-        </div>
-
-        <!-- Endereço de Entrega -->
-        <div class="delivery-block">
-            <div class="info-block-title">ENDEREÇO DE ENTREGA</div>
-            <div class="delivery-row">
-                <div class="delivery-row-item">
-                    {{ strtoupper($company->company ?? '') }}
-                    @if($company->endereco)
-                        {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif
-                    @endif
-                    @if($company->bairro)
-                        {{ strtoupper($company->bairro) }}
-                    @endif
-                    @if($company->cidade)
-                        {{ strtoupper($company->cidade) }}@if($company->uf){{ ' ' . strtoupper($company->uf) }}@endif
-                    @endif
-                </div>
-                <div class="delivery-row-item" style="text-align: right;">
-                    <strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}
-                </div>
-            </div>
-            <div class="dates-row">
-                <div><strong>PRAZO DE ENTREGA:</strong> {{ $order->expected_delivery_date ? $order->expected_delivery_date->format('d/m/Y') : '' }}</div>
-                <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
-            </div>
-        </div>
-
         <!-- Tabela de Itens: no máximo 17 itens por página -->
         @foreach($itemChunks as $chunkIndex => $chunk)
         <div class="items-page">
@@ -714,40 +819,6 @@
         <div class="page-break-after"></div>
         @endif
         @endforeach
-    </div>
-
-    <!-- Totais e Observações (em fluxo normal, após a tabela; assinaturas ficam no rodapé fixo em todas as páginas) -->
-    <div class="bottom">
-        <!-- Totais -->
-        <div class="totals-section">
-            <div class="totals-line">
-                <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
-                <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
-            </div>
-            <div class="totals-line">
-                <div><strong>TIPO FRETE:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE' }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
-            </div>
-            <div class="totals-line-values">
-                <div>IPI: {{ number_format($totalIPI, 2, ',', '.') }}</div>
-                <div>ICMS RETIDO: {{ number_format($totalICM, 2, ',', '.') }}</div>
-                <div>FRETE: {{ number_format($totalFRE, 2, ',', '.') }}</div>
-                <div>DESPESAS: {{ number_format($totalDES, 2, ',', '.') }}</div>
-                <div>SEGURO: {{ number_format($totalSEG, 2, ',', '.') }}</div>
-                <div>DESCONTO: {{ number_format($totalDEC, 2, ',', '.') }}</div>
-            </div>
-            <div class="totals-line total-final">
-                <div><strong>COMPRADOR:</strong> @if($buyer){{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}@endif</div>
-                <div class="totals-value-right"><strong>VALOR TOTAL:</strong> {{ number_format($valorTotal, 2, ',', '.') }}</div>
-            </div>
-        </div>
-        
-        <!-- Observações -->
-        @if($order->observation)
-        <div class="observations">
-            <div class="observations-title">OBSERVACOES</div>
-            <div class="text-small">{!! nl2br(e(strtoupper($order->observation))) !!}</div>
-        </div>
-        @endif
     </div>
 </body>
 </html>
