@@ -90,7 +90,9 @@ class StockProductController extends Controller
         }
 
         try {
+            \Log::info('StockProductController::buscar INÍCIO', ['location_id' => $request->get('location_id'), 'page' => $request->get('page')]);
             $products = $this->service->buscar($request);
+            \Log::info('StockProductController::buscar OK', ['total' => $products->total()]);
         } catch (\Throwable $e) {
             \Log::warning('StockProductController::buscar', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([

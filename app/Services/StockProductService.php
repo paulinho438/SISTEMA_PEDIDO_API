@@ -76,6 +76,7 @@ class StockProductService
      */
     public function buscar(Request $request)
     {
+        \Log::info('StockProductService::buscar INÍCIO', ['location_id' => $request->get('location_id'), 'page' => $request->get('page')]);
         $perPage = (int) $request->get('per_page', 15);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
 
@@ -101,7 +102,8 @@ class StockProductService
         }
         
         $productIds = $productIdsQuery->pluck('id')->toArray();
-        
+        \Log::info('StockProductService::buscar productIds count', ['count' => count($productIds)]);
+
         if (empty($productIds)) {
             // Retornar paginação vazia se não houver produtos
             return new \Illuminate\Pagination\LengthAwarePaginator(
@@ -126,6 +128,7 @@ class StockProductService
         }
 
         $products = $query->orderBy('description')->paginate($perPage);
+        \Log::info('StockProductService::buscar paginate OK', ['total' => $products->total()]);
 
         // Carregar estoques por local para cada produto
         foreach ($products->items() as $product) {
@@ -147,6 +150,7 @@ class StockProductService
             });
         }
 
+        \Log::info('StockProductService::buscar FIM');
         return $products;
     }
 
