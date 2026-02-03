@@ -304,7 +304,15 @@ class PurchaseQuoteController extends Controller
                 $query->where('buyer_id', $buyerIdFilter);
             }
         }
-        
+
+        // Filtro por solicitante (ID do usuário que criou a solicitação)
+        if ($request->filled('requester_id')) {
+            $requesterIdFilter = (int) $request->get('requester_id');
+            if ($requesterIdFilter > 0) {
+                $query->where('requester_id', $requesterIdFilter);
+            }
+        }
+
         // NOTA: Não aplicar filtro de company_id por padrão para mostrar todas as cotações
         // O filtro de company_id só é aplicado quando my_approvals está ativo
 
@@ -592,6 +600,30 @@ class PurchaseQuoteController extends Controller
         ]);
 
         return response()->json(['data' => $buyers], Response::HTTP_OK);
+    }
+
+    /**
+     * Lista solicitantes (usuários que criaram ao menos uma solicitação) para filtros.
+     */
+    public function listRequesters(Request $request)
+    {
+        $requesters = PurchaseQuote::query()
+            ->select('requester_id', 'requester_name')
+            ->whereNotNull('requester_id')
+            ->whereNotNull('requester_name')
+            ->distinct()
+            ->orderBy('requester_name')
+            ->get()
+            ->map(fn ($row) => [
+                'id' => (int) $row->requester_id,
+                'name' => $row->requester_name,
+                'label' => $row->requester_name,
+            ])
+            ->unique('id')
+            ->values()
+            ->all();
+
+        return response()->json(['data' => $requesters], Response::HTTP_OK);
     }
 
     public function show(Request $request, PurchaseQuote $quote)
