@@ -6,7 +6,8 @@ use App\Models\ResponsibilityTerm;
 use App\Services\ResponsibilityTermService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -108,7 +109,7 @@ class ResponsibilityTermController extends Controller
     /**
      * Gerar PDF do termo.
      */
-    public function pdf(int $id): StreamedResponse|JsonResponse
+    public function pdf(int $id): Response|StreamedResponse|JsonResponse
     {
         $user = auth()->user();
         if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
