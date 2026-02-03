@@ -3556,7 +3556,7 @@ class PurchaseQuoteController extends Controller
         $pdf->getDomPDF()->setOptions($options);
         
         // Configurar tamanho do papel
-        $pdf->setPaper('A4', $paperOrientation);
+        $pdf->setPaper('A2', $paperOrientation);
         
         return $pdf->stream('cotacao-' . $quote->quote_number . '.pdf');
     }
