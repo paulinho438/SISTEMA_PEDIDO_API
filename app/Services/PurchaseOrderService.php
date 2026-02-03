@@ -231,7 +231,7 @@ class PurchaseOrderService
      */
     public function list(array $filters = [], int $perPage = 15)
     {
-        $query = PurchaseOrder::with(['quote', 'quoteSupplier', 'company']);
+        $query = PurchaseOrder::with(['quote', 'quoteSupplier', 'company', 'items']);
 
         if (isset($filters['company_id'])) {
             $query->where('company_id', $filters['company_id']);

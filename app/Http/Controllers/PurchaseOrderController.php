@@ -49,8 +49,18 @@ class PurchaseOrderController extends Controller
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
         $orders = $this->service->list($filters, $perPage);
 
+        // Recalcular valor total a partir dos itens (evita valores desatualizados no banco)
+        $data = collect($orders->items())->map(function (PurchaseOrder $order) {
+            $totalFromItems = $order->items->sum(function ($item) {
+                $valor = $item->final_cost ?? $item->total_price ?? 0;
+                return (float) $valor;
+            });
+            $order->setAttribute('total_amount', $totalFromItems);
+            return $order;
+        })->all();
+
         return response()->json([
-            'data' => $orders->items(),
+            'data' => $data,
             'pagination' => [
                 'current_page' => $orders->currentPage(),
                 'per_page' => $orders->perPage(),
