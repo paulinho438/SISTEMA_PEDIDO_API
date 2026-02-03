@@ -80,6 +80,22 @@ class StockProductService
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
         
         $companyId = $request->header('company-id');
+        if ($companyId === null || $companyId === '') {
+            $user = auth()->user();
+            if ($user && $user->companies()->exists()) {
+                $companyId = $user->companies()->first()->id;
+            }
+        }
+        $companyId = $companyId !== null && $companyId !== '' ? (int) $companyId : null;
+        if ($companyId === null) {
+            return new \Illuminate\Pagination\LengthAwarePaginator(
+                collect([]),
+                0,
+                $perPage,
+                1,
+                ['path' => $request->url(), 'query' => $request->query()]
+            );
+        }
         
         // Primeiro, buscar IDs dos produtos que têm estoque disponível
         $productIdsQuery = DB::table('stocks')
