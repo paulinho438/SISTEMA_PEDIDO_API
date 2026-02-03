@@ -3547,9 +3547,9 @@ class PurchaseQuoteController extends Controller
             // Quando vem da tela de cotação ou tem fornecedores, sempre usar template comparativo
             $viewTemplate = 'cotacao-comparativa';
             $paperOrientation = 'landscape';
-            // Até 10 itens: A4; mais de 10 itens: A2
+            // Até 5 itens: A4; de 6 a 9: A3; 10 ou mais: A2
             $itemCount = $quote->items->count();
-            $paperSize = $itemCount <= 10 ? 'A4' : 'A2';
+            $paperSize = $itemCount <= 5 ? 'A4' : ($itemCount <= 9 ? 'A3' : 'A2');
         } else {
             // Fallback: sem fornecedores, usar template de solicitação
             $viewTemplate = 'solicitacao';
