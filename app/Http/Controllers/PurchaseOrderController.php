@@ -92,6 +92,13 @@ class PurchaseOrderController extends Controller
             }
         }
 
+        // Recalcular valor total a partir dos itens (evita valor desatualizado no banco)
+        $totalFromItems = $order->items->sum(function ($item) {
+            $valor = $item->final_cost ?? $item->total_price ?? 0;
+            return (float) $valor;
+        });
+        $order->setAttribute('total_amount', $totalFromItems);
+
         return response()->json([
             'data' => $order
         ]);
