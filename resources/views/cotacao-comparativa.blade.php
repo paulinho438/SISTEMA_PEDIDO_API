@@ -7,7 +7,7 @@
     <style>
         @page {
             margin: 0.5cm;
-            size: A2 landscape;
+            size: {{ $paperSize ?? 'A2' }} landscape;
         }
         
         * {

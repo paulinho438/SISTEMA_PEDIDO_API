@@ -3542,21 +3542,28 @@ class PurchaseQuoteController extends Controller
             // Sempre usar template de solicitação quando vem da tela de solicitação
             $viewTemplate = 'solicitacao';
             $paperOrientation = 'portrait';
+            $paperSize = 'A4';
         } elseif ($tipo === 'cotacao' || $hasSuppliers) {
             // Quando vem da tela de cotação ou tem fornecedores, sempre usar template comparativo
             $viewTemplate = 'cotacao-comparativa';
             $paperOrientation = 'landscape';
+            // Até 10 itens: A4; mais de 10 itens: A2
+            $itemCount = $quote->items->count();
+            $paperSize = $itemCount <= 10 ? 'A4' : 'A2';
         } else {
             // Fallback: sem fornecedores, usar template de solicitação
             $viewTemplate = 'solicitacao';
             $paperOrientation = 'portrait';
+            $paperSize = 'A4';
         }
+        
+        $dados['paperSize'] = $paperSize;
         
         $pdf = Pdf::loadView($viewTemplate, $dados);
         $pdf->getDomPDF()->setOptions($options);
         
         // Configurar tamanho do papel
-        $pdf->setPaper('A2', $paperOrientation);
+        $pdf->setPaper($paperSize, $paperOrientation);
         
         return $pdf->stream('cotacao-' . $quote->quote_number . '.pdf');
     }
