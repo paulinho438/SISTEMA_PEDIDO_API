@@ -69,9 +69,15 @@ class StockProductController extends Controller
         }
 
         $companyId = $request->header('company-id');
-        $companyId = ($companyId !== null && $companyId !== '') ? (int) $companyId : 0;
-        if (!$companyId && $user->companies()->exists()) {
-            $companyId = (int) $user->companies()->first()->id;
+        if ($companyId === null || $companyId === '') {
+            try {
+                $first = $user->companies()->first();
+                $companyId = $first ? (int) $first->id : 0;
+            } catch (\Throwable $e) {
+                $companyId = 0;
+            }
+        } else {
+            $companyId = (int) $companyId;
         }
         if (!$companyId) {
             return response()->json([
@@ -94,6 +100,7 @@ class StockProductController extends Controller
         try {
             $products = $this->service->buscar($request);
         } catch (\Throwable $e) {
+            \Log::warning('StockProductController::buscar', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 'message' => 'Erro ao carregar produtos do estoque. ' . ($e->getMessage() ?: ''),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
