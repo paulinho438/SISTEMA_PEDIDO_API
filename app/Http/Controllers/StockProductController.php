@@ -68,24 +68,18 @@ class StockProductController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
 
+        $isSuperAdmin = false;
         $companyId = $request->header('company-id');
-        if ($companyId === null || $companyId === '') {
-            try {
-                $first = $user->companies()->first();
-                $companyId = $first ? (int) $first->id : 0;
-            } catch (\Throwable $e) {
-                $companyId = 0;
-            }
-        } else {
+        if ($companyId !== null && $companyId !== '') {
             $companyId = (int) $companyId;
+            $isSuperAdmin = $user->getGroupNameByEmpresaId($companyId) === 'Super Administrador';
+        } else {
+            $first = $user->companies()->first();
+            if ($first) {
+                $companyId = (int) $first->id;
+                $isSuperAdmin = $user->getGroupNameByEmpresaId($companyId) === 'Super Administrador';
+            }
         }
-        if (!$companyId) {
-            return response()->json([
-                'message' => 'Selecione uma empresa no menu superior para listar os produtos do estoque.',
-            ], Response::HTTP_BAD_REQUEST);
-        }
-
-        $isSuperAdmin = $user->getGroupNameByEmpresaId($companyId) === 'Super Administrador';
         $podeVerProdutos = $user->hasPermission('view_estoque_produtos');
         $podeMovimentacao = $user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create');
 
@@ -94,8 +88,6 @@ class StockProductController extends Controller
                 'message' => 'Você não tem permissão para visualizar produtos de estoque. Necessário: Produtos de Estoque ou Movimentações.',
             ], Response::HTTP_FORBIDDEN);
         }
-
-        $request->headers->set('company-id', (string) $companyId);
 
         try {
             $products = $this->service->buscar($request);

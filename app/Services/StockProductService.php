@@ -78,39 +78,10 @@ class StockProductService
     {
         $perPage = (int) $request->get('per_page', 15);
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
-        
-        $companyId = $request->header('company-id');
-        if ($companyId === null || $companyId === '') {
-            try {
-                $user = auth()->user();
-                if ($user && method_exists($user, 'companies')) {
-                    $companies = $user->companies();
-                    if ($companies && $companies->exists()) {
-                        $first = $companies->first();
-                        if ($first && isset($first->id)) {
-                            $companyId = $first->id;
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                $companyId = null;
-            }
-        }
-        $companyId = $companyId !== null && $companyId !== '' ? (int) $companyId : null;
-        if ($companyId === null) {
-            return new \Illuminate\Pagination\LengthAwarePaginator(
-                collect([]),
-                0,
-                $perPage,
-                1,
-                ['path' => $request->url(), 'query' => $request->query()]
-            );
-        }
-        
-        // Primeiro, buscar IDs dos produtos que têm estoque disponível
+
+        // Buscar produtos com estoque no local informado, sem filtrar por company
         $productIdsQuery = DB::table('stocks')
             ->join('stock_products', 'stocks.stock_product_id', '=', 'stock_products.id')
-            ->where('stock_products.company_id', $companyId)
             ->where('stock_products.active', true)
             ->where('stocks.quantity_available', '>', 0)
             ->select('stock_products.id')
