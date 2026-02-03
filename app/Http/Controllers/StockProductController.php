@@ -57,10 +57,16 @@ class StockProductController extends Controller
 
     public function buscar(Request $request)
     {
-        $products = $this->service->buscar($request);
-        
+        try {
+            $products = $this->service->buscar($request);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Erro ao carregar produtos do estoque. ' . ($e->getMessage() ?: ''),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
         // Formatar resposta com locations
-        $formatted = $products->getCollection()->map(function($product) {
+        $formatted = $products->getCollection()->map(function ($product) {
             return [
                 'id' => $product->id,
                 'code' => $product->code,
@@ -78,7 +84,7 @@ class StockProductController extends Controller
                 'per_page' => $products->perPage(),
                 'total' => $products->total(),
                 'last_page' => $products->lastPage(),
-            ]
+            ],
         ]);
     }
 

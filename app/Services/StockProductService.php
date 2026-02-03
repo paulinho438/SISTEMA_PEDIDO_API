@@ -81,9 +81,19 @@ class StockProductService
         
         $companyId = $request->header('company-id');
         if ($companyId === null || $companyId === '') {
-            $user = auth()->user();
-            if ($user && $user->companies()->exists()) {
-                $companyId = $user->companies()->first()->id;
+            try {
+                $user = auth()->user();
+                if ($user && method_exists($user, 'companies')) {
+                    $companies = $user->companies();
+                    if ($companies && $companies->exists()) {
+                        $first = $companies->first();
+                        if ($first && isset($first->id)) {
+                            $companyId = $first->id;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                $companyId = null;
             }
         }
         $companyId = $companyId !== null && $companyId !== '' ? (int) $companyId : null;
