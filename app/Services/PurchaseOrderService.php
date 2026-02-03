@@ -171,7 +171,7 @@ class PurchaseOrderService
                     $unitPrice = $quoteItem->selected_unit_cost ?? ($supplierItem->unit_cost ?? 0);
                     $quantity = $quoteItem->quantity ?? 1;
                     $totalPrice = $unitPrice * $quantity;
-                    $finalCost = $supplierItem->final_cost ?? $totalPrice;
+                    $finalCostUnit = $supplierItem->final_cost ?? $unitPrice;
 
                     // Criar item do pedido usando helper para timestamps como strings
                     $this->insertWithStringTimestamps('purchase_order_items', [
@@ -187,11 +187,12 @@ class PurchaseOrderService
                         'total_price' => $totalPrice,
                         'ipi' => $supplierItem->ipi ?? null,
                         'icms' => $supplierItem->icms ?? null,
-                        'final_cost' => $finalCost,
+                        'final_cost' => $finalCostUnit,
                         'observation' => $quoteItem->application ?? null,
                     ]);
 
-                    $totalAmount += $finalCost;
+                    // Total do pedido: soma do total por linha (total_price = quantidade × preço unit.)
+                    $totalAmount += $totalPrice;
                 }
 
                 // Atualizar total do pedido usando helper para timestamps como strings

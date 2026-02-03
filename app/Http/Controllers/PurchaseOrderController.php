@@ -49,11 +49,14 @@ class PurchaseOrderController extends Controller
         $perPage = ($perPage > 0 && $perPage <= 100) ? $perPage : 15;
         $orders = $this->service->list($filters, $perPage);
 
-        // Recalcular valor total a partir dos itens (evita valores desatualizados no banco)
+        // Recalcular valor total a partir dos itens (soma do total por linha: total_price ou final_cost * quantity)
         $data = collect($orders->items())->map(function (PurchaseOrder $order) {
             $totalFromItems = $order->items->sum(function ($item) {
-                $valor = $item->final_cost ?? $item->total_price ?? 0;
-                return (float) $valor;
+                $lineTotal = $item->total_price;
+                if ($lineTotal === null || (float) $lineTotal === 0.0) {
+                    $lineTotal = ($item->final_cost ?? 0) * ($item->quantity ?? 1);
+                }
+                return (float) $lineTotal;
             });
             $order->setAttribute('total_amount', $totalFromItems);
             return $order;
@@ -92,10 +95,13 @@ class PurchaseOrderController extends Controller
             }
         }
 
-        // Recalcular valor total a partir dos itens (evita valor desatualizado no banco)
+        // Recalcular valor total a partir dos itens (soma do total por linha: total_price ou final_cost * quantity)
         $totalFromItems = $order->items->sum(function ($item) {
-            $valor = $item->final_cost ?? $item->total_price ?? 0;
-            return (float) $valor;
+            $lineTotal = $item->total_price;
+            if ($lineTotal === null || (float) $lineTotal === 0.0) {
+                $lineTotal = ($item->final_cost ?? 0) * ($item->quantity ?? 1);
+            }
+            return (float) $lineTotal;
         });
         $order->setAttribute('total_amount', $totalFromItems);
 
