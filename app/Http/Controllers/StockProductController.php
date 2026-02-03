@@ -94,7 +94,12 @@ class StockProductController extends Controller
             $products = $this->service->buscar($request);
             \Log::info('StockProductController::buscar OK', ['total' => $products->total()]);
         } catch (\Throwable $e) {
-            \Log::warning('StockProductController::buscar', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            \Log::error('StockProductController::buscar CATCH', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'message' => 'Erro ao carregar produtos do estoque. ' . ($e->getMessage() ?: ''),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
