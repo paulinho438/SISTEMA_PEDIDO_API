@@ -372,7 +372,7 @@
                         <td style="text-align: right;">{{ $icmsPercent > 0 ? number_format($icmsPercent, 2, ',', '.') . '%' : '' }}</td>
                         <td style="text-align: right;">R$ {{ number_format($icmsTotal, 2, ',', '.') }}</td>
                         <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithDifal, 2, ',', '.') }}</td>
-                        <td class="center">{{ strtoupper($item->tag ?? '') }}</td>
+                        <td class="center">{{ strtoupper($supplierItem->brand ?? $item->tag ?? '') }}</td>
                     @else
                         <td></td>
                         <td></td>
@@ -584,7 +584,7 @@
                                             <td style="text-align: right;">{{ $icmsPercent > 0 ? number_format($icmsPercent, 2, ',', '.') . '%' : '' }}</td>
                                             <td style="text-align: right;">R$ {{ number_format($icmsTotal, 2, ',', '.') }}</td>
                                             <td class="{{ $highlight ? $highlightClass : '' }}" style="text-align: right;">R$ {{ number_format($totalWithDifal, 2, ',', '.') }}</td>
-                                            <td class="center">{{ strtoupper($item->tag ?? '') }}</td>
+                                            <td class="center">{{ strtoupper($supplierItem->brand ?? $item->tag ?? '') }}</td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -752,11 +752,13 @@
                     $totalComDifal += $menorPrecoComDifal ?? 0;
                     $totalDecisao += $decisaoCompra ?? 0;
                     
-                    // Buscar marca do fornecedor selecionado
-                    $marca = '';
+                    // Buscar marca: do item do fornecedor selecionado ou do item da cotação (tag)
+                    $marca = $item->tag ?? '';
                     if ($decisaoCompraSupplier) {
                         $supplierItemSelecionado = $decisaoCompraSupplier->items->firstWhere('purchase_quote_item_id', $item->id);
-                        $marca = $supplierItemSelecionado->brand ?? '';
+                        if ($supplierItemSelecionado && !empty($supplierItemSelecionado->brand)) {
+                            $marca = $supplierItemSelecionado->brand;
+                        }
                     }
                 @endphp
             <tr>
