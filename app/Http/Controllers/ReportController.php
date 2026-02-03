@@ -636,6 +636,7 @@ class ReportController extends Controller
                         'product_code',
                         'description',
                         'quantity',
+                        'unit',
                     ]);
                     if ($productTerm !== '') {
                         $term = '%' . strtoupper($productTerm) . '%';
@@ -685,7 +686,9 @@ class ReportController extends Controller
                     'cotacao_id' => $quote->id,
                     'numero' => $quote->quote_number,
                     'data' => $dataSolicitacao,
+                    'solicitante' => $quote->requester_name ?? '-',
                     'produto' => $item->description ?? $item->product_code ?? '-',
+                    'unidade' => $item->unit ?? '-',
                     'qtd' => (int) ($item->quantity ?? 0),
                     'obs' => $obs,
                 ];
@@ -718,6 +721,7 @@ class ReportController extends Controller
                         'product_code',
                         'description',
                         'quantity',
+                        'unit',
                     ]);
                 },
             ])
@@ -747,7 +751,9 @@ class ReportController extends Controller
                     'cotacao_id' => $quote->id,
                     'numero' => $quote->quote_number,
                     'data' => $dataSolicitacao,
+                    'solicitante' => $quote->requester_name ?? '-',
                     'produto' => $item->description ?? $item->product_code ?? '-',
+                    'unidade' => $item->unit ?? '-',
                     'qtd' => (int) ($item->quantity ?? 0),
                     'obs' => $obs,
                 ];
