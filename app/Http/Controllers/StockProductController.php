@@ -57,18 +57,39 @@ class StockProductController extends Controller
 
     /**
      * Buscar produtos com estoque disponível (para seleção em Termo de Responsabilidade, etc.).
-     * Permite acesso com view_estoque_produtos OU view_estoque_movimentacoes/view_estoque_movimentacoes_create.
+     * Permite acesso: Super Administrador OU view_estoque_produtos OU view_estoque_movimentacoes/view_estoque_movimentacoes_create.
      */
     public function buscar(Request $request)
     {
         $user = auth()->user();
-        $podeVerProdutos = $user && $user->hasPermission('view_estoque_produtos');
-        $podeMovimentacao = $user && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create'));
-        if (!$user || (!$podeVerProdutos && !$podeMovimentacao)) {
+        if (!$user) {
+            return response()->json([
+                'message' => 'Usuário não autenticado.',
+            ], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $companyId = $request->header('company-id');
+        $companyId = ($companyId !== null && $companyId !== '') ? (int) $companyId : 0;
+        if (!$companyId && $user->companies()->exists()) {
+            $companyId = (int) $user->companies()->first()->id;
+        }
+        if (!$companyId) {
+            return response()->json([
+                'message' => 'Selecione uma empresa no menu superior para listar os produtos do estoque.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $isSuperAdmin = $user->getGroupNameByEmpresaId($companyId) === 'Super Administrador';
+        $podeVerProdutos = $user->hasPermission('view_estoque_produtos');
+        $podeMovimentacao = $user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create');
+
+        if (!$isSuperAdmin && !$podeVerProdutos && !$podeMovimentacao) {
             return response()->json([
                 'message' => 'Você não tem permissão para visualizar produtos de estoque. Necessário: Produtos de Estoque ou Movimentações.',
             ], Response::HTTP_FORBIDDEN);
         }
+
+        $request->headers->set('company-id', (string) $companyId);
 
         try {
             $products = $this->service->buscar($request);
