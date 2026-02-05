@@ -271,6 +271,9 @@
         </div>
         <div class="header-title">
             <h1>QUADRO COMPARATIVO DE PREÇOS</h1>
+            <div style="font-size: 10pt; margin-top: 5px; font-weight: bold;">
+                N° da Solicitação: {{ $quote->quote_number ?? 'N/A' }}
+            </div>
         </div>
     </div>
 
@@ -487,6 +490,9 @@
                 </div>
                 <div class="header-title">
                     <h1>QUADRO COMPARATIVO DE PREÇOS</h1>
+                    <div style="font-size: 10pt; margin-top: 5px; font-weight: bold;">
+                        N° da Solicitação: {{ $quote->quote_number ?? 'N/A' }}
+                    </div>
                 </div>
             </div>
             
