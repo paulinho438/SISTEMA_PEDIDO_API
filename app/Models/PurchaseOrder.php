@@ -36,6 +36,8 @@ class PurchaseOrder extends Model
         'vendor_phone',
         'vendor_email',
         'proposal_number',
+        'freight_type',
+        'freight_value',
         'total_amount',
         'status',
         'observation',
@@ -51,6 +53,7 @@ class PurchaseOrder extends Model
         'expected_delivery_date' => 'date',
         'protheus_exported_at' => 'datetime',
         'total_amount' => 'decimal:2',
+        'freight_value' => 'decimal:2',
     ];
 
     /**

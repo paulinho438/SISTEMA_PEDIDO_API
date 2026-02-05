@@ -103,7 +103,15 @@ class PurchaseOrderController extends Controller
             }
             return (float) $lineTotal;
         });
-        $order->setAttribute('total_amount', $totalFromItems);
+        
+        // Adicionar frete ao total se houver
+        $freightValue = $order->freight_value ?? 0;
+        $totalWithFreight = $totalFromItems + $freightValue;
+        
+        // Atualizar o total_amount apenas se estiver diferente (para não sobrescrever se já estiver correto)
+        if (abs((float) $order->total_amount - $totalWithFreight) > 0.01) {
+            $order->setAttribute('total_amount', $totalWithFreight);
+        }
 
         return response()->json([
             'data' => $order
@@ -234,7 +242,8 @@ class PurchaseOrderController extends Controller
         $totalIten = $order->items->sum('total_price');
         $totalIPI = $order->items->sum('ipi');
         $totalICM = $order->items->sum('icms');
-        $totalFRE = 0; // Frete não está no item, pode estar na cotação
+        // Frete do pedido de compra (copiado da cotação)
+        $totalFRE = $order->freight_value ?? 0;
         $totalDES = 0; // Despesas
         $totalSEG = 0; // Seguro
         $totalDEC = 0; // Desconto

@@ -687,7 +687,7 @@
                 <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
             </div>
             <div class="totals-line">
-                <div><strong>TIPO FRETE:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE' }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
+                <div><strong>TIPO FRETE:</strong> {{ $order->freight_type ? ($order->freight_type == 'F' ? 'FOB' : ($order->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : ($order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE') }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
             </div>
             <div class="totals-line-values">
                 <div>IPI: {{ number_format($totalIPI, 2, ',', '.') }}</div>

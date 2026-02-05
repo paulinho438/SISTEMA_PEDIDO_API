@@ -149,6 +149,8 @@ class PurchaseOrderService
                     'vendor_phone' => $supplier->vendor_phone,
                     'vendor_email' => $supplier->vendor_email,
                     'proposal_number' => $supplier->proposal_number,
+                    'freight_type' => $supplier->freight_type,
+                    'freight_value' => $supplier->freight_value,
                     'total_amount' => 0, // Será calculado
                     'status' => 'pendente', // Comprador precisa encaminhar para PROTHEUS manualmente
                     'observation' => $quote->observation, // Observação da cotação (que vem da solicitação)
@@ -193,6 +195,12 @@ class PurchaseOrderService
 
                     // Total do pedido: soma do total por linha (total_price = quantidade × preço unit.)
                     $totalAmount += $totalPrice;
+                }
+
+                // Adicionar frete ao total do pedido (se houver)
+                $freightValue = $supplier->freight_value ?? 0;
+                if ($freightValue > 0) {
+                    $totalAmount += $freightValue;
                 }
 
                 // Atualizar total do pedido usando helper para timestamps como strings
@@ -384,6 +392,12 @@ class PurchaseOrderService
                     $totalAmount += $totalPrice;
                 }
 
+                // Adicionar frete ao total do pedido (se houver)
+                $freightValue = $supplier->freight_value ?? 0;
+                if ($freightValue > 0) {
+                    $totalAmount += $freightValue;
+                }
+
                 // Remover itens do pedido que não estão mais na cotação para este fornecedor
                 if (!empty($existingItemIds)) {
                     PurchaseOrderItem::where('purchase_order_id', $order->id)
@@ -391,9 +405,11 @@ class PurchaseOrderService
                         ->delete();
                 }
 
-                // Atualizar total do pedido
+                // Atualizar total do pedido e frete
                 $this->updateModelWithStringTimestamps($order, [
                     'total_amount' => $totalAmount,
+                    'freight_type' => $supplier->freight_type,
+                    'freight_value' => $supplier->freight_value,
                     'observation' => $quote->observation, // Atualizar observação também
                 ]);
             }
