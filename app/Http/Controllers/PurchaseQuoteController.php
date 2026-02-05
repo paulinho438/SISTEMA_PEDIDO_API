@@ -276,6 +276,15 @@ class PurchaseQuoteController extends Controller
 
         $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
+        // Filtrar rascunhos: só mostrar para quem criou (requester_id)
+        $query->where(function ($q) {
+            $q->where('current_status_slug', '!=', 'rascunho')
+              ->orWhere(function ($subQ) {
+                  $subQ->where('current_status_slug', 'rascunho')
+                       ->where('requester_id', auth()->id());
+              });
+        });
+
         if ($request->filled('status_in')) {
             $slugs = array_map('trim', explode(',', $request->get('status_in')));
             $slugs = array_filter($slugs);
@@ -911,6 +920,7 @@ class PurchaseQuoteController extends Controller
             'local' => 'nullable|string|max:191',
             'work_front' => 'nullable|string|max:191',
             'observacao' => 'nullable|string',
+            'rascunho' => 'nullable|boolean', // Flag para salvar como rascunho
             'itens' => 'required|array|min:1',
             'itens.*.codigo' => 'nullable|string|max:100',
             'itens.*.referencia' => 'nullable|string|max:100',
@@ -933,11 +943,13 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_FORBIDDEN);
         }
 
-        $status = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
+        // Se for rascunho, usar status "rascunho", senão usar "aguardando"
+        $statusSlug = ($validated['rascunho'] ?? false) ? 'rascunho' : 'aguardando';
+        $status = PurchaseQuoteStatus::where('slug', $statusSlug)->first();
 
         if (!$status) {
             return response()->json([
-                'message' => 'Status padrão não encontrado. Execute as migrations novamente.',
+                'message' => "Status '{$statusSlug}' não encontrado. Execute as migrations novamente.",
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
@@ -1194,6 +1206,7 @@ class PurchaseQuoteController extends Controller
             'local' => 'nullable|string|max:191',
             'work_front' => 'nullable|string|max:191',
             'observacao' => 'nullable|string',
+            'rascunho' => 'nullable|boolean', // Flag para salvar como rascunho
             'itens' => 'required|array|min:1',
             'itens.*.id' => 'nullable|integer|exists:purchase_quote_items,id',
             'itens.*.codigo' => 'nullable|string|max:100',
@@ -1208,6 +1221,16 @@ class PurchaseQuoteController extends Controller
             'itens.*.centro_custo.descricao' => 'nullable|string',
             'itens.*.centro_custo.classe' => 'nullable|string|max:20',
         ]);
+
+        // Se for rascunho, não validar observação obrigatória
+        $isRascunho = ($validated['rascunho'] ?? false);
+        
+        // Se não for rascunho e não for edição master, validar observação obrigatória
+        if (!$isRascunho && !$isMasterEdit && (!$validated['observacao'] || trim($validated['observacao']) === '')) {
+            return response()->json([
+                'message' => 'Justificativa / Motivo é obrigatório.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         // Garantir que requested_at seja uma string no formato Y-m-d
         $requestedAt = null;
@@ -1336,9 +1359,26 @@ class PurchaseQuoteController extends Controller
                 ]);
             }
 
+            // Gerenciar status de rascunho
+            if ($isRascunho) {
+                // Se for salvar como rascunho, garantir que está com status rascunho
+                $statusRascunho = PurchaseQuoteStatus::where('slug', 'rascunho')->first();
+                if ($statusRascunho && $quote->current_status_slug !== 'rascunho') {
+                    $this->transitionStatus($quote, $statusRascunho, 'Solicitação salva como rascunho.');
+                }
+            } else {
+                // Se não for rascunho e estava em rascunho, mudar para aguardando
+                if ($quote->current_status_slug === 'rascunho') {
+                    $statusAguardando = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
+                    if ($statusAguardando) {
+                        $this->transitionStatus($quote, $statusAguardando, 'Rascunho finalizado e encaminhado para análise.');
+                    }
+                }
+            }
+
             // Se estava reprovada, mudar para "aguardando"
-            // Só altera status automaticamente se NÃO for edição master
-            if (!$isMasterEdit && $statusNovo) {
+            // Só altera status automaticamente se NÃO for edição master e NÃO for rascunho
+            if (!$isMasterEdit && !$isRascunho && $statusNovo) {
                 $this->transitionStatus($quote, $statusNovo, 'Solicitação editada e retornada para aguardando autorização.');
             }
 
@@ -2642,6 +2682,68 @@ class PurchaseQuoteController extends Controller
 
             return response()->json([
                 'message' => 'Não foi possível reprovar a solicitação.',
+                'error' => $exception->getMessage(),
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function finalizarRascunho(Request $request, PurchaseQuote $quote)
+    {
+        $user = auth()->user();
+
+        // Verificar se a solicitação está em rascunho
+        if ($quote->current_status_slug !== 'rascunho') {
+            return response()->json([
+                'message' => 'Somente solicitações em rascunho podem ser finalizadas.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Verificar se o usuário é o criador da solicitação
+        if ($quote->requester_id !== $user->id) {
+            return response()->json([
+                'message' => 'Você não tem permissão para finalizar este rascunho.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Validar que a observação está preenchida
+        if (!$quote->observacao || trim($quote->observacao) === '') {
+            return response()->json([
+                'message' => 'Preencha a Justificativa / Motivo antes de finalizar a solicitação.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        // Buscar status "aguardando"
+        $statusAguardando = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
+        if (!$statusAguardando) {
+            return response()->json([
+                'message' => 'Status "aguardando" não configurado. Execute as migrations novamente.',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // Mudar status de rascunho para aguardando
+            $this->transitionStatus($quote, $statusAguardando, 'Rascunho finalizado e encaminhado para análise.');
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Rascunho finalizado com sucesso. Solicitação encaminhada para análise.',
+                'status' => [
+                    'slug' => $statusAguardando->slug,
+                    'label' => $statusAguardando->label,
+                ],
+            ]);
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            Log::error('Falha ao finalizar rascunho', [
+                'quote_id' => $quote->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'message' => 'Não foi possível finalizar o rascunho.',
                 'error' => $exception->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }

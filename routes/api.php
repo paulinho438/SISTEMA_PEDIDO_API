@@ -304,6 +304,7 @@ Route::middleware('auth:api')->group(function () {
     Route::post('/cotacoes/{quote}/assign-engineer', [PurchaseQuoteController::class, 'assignEngineer']);
     Route::post('/cotacoes/{quote}/approve', [PurchaseQuoteController::class, 'approve']);
     Route::post('/cotacoes/{quote}/reject', [PurchaseQuoteController::class, 'reject']);
+    Route::post('/cotacoes/{quote}/finalizar-rascunho', [PurchaseQuoteController::class, 'finalizarRascunho']);
     Route::post('/cotacoes/{quote}/finalizar', [PurchaseQuoteController::class, 'finalizeQuote']);
     Route::post('/cotacoes/{quote}/analisar', [PurchaseQuoteController::class, 'analyzeQuote']);
     Route::post('/cotacoes/{quote}/alterar-quantidade', [PurchaseQuoteController::class, 'alterarQuantidadeItens']);
