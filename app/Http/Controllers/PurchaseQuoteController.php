@@ -2271,15 +2271,27 @@ class PurchaseQuoteController extends Controller
                     $defaultNote = 'Cotação encaminhada para análise da diretoria.';
                     $note = $validated['observacao'] ?? $defaultNote;
                 } else {
-                    // Verificar se todos os níveis intermediários foram aprovados
-                    // Como ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL têm a mesma ordem (2),
-                    // não há "último" - todos são simultâneos
-                    $allIntermediateApproved = $intermediateApprovals->every(function ($approval) {
-                        return $approval->approved;
+                    // Verificar se GERENTE_LOCAL e GERENTE_GERAL foram aprovados
+                    // Independentemente do ENGENHEIRO ter assinado ou não
+                    $gerenteLocalApproval = $intermediateApprovals->first(function ($approval) {
+                        return $approval->approval_level === 'GERENTE_LOCAL';
+                    });
+                    $gerenteGeralApproval = $intermediateApprovals->first(function ($approval) {
+                        return $approval->approval_level === 'GERENTE_GERAL';
                     });
                     
-                    // Se todos os níveis intermediários foram aprovados, mudar status para DIRETOR
-                    if ($allIntermediateApproved) {
+                    // Verificar se ambos os gerentes aprovaram (se forem requeridos)
+                    $gerentesAprovaram = true;
+                    if ($gerenteLocalApproval && !$gerenteLocalApproval->approved) {
+                        $gerentesAprovaram = false;
+                    }
+                    if ($gerenteGeralApproval && !$gerenteGeralApproval->approved) {
+                        $gerentesAprovaram = false;
+                    }
+                    
+                    // Se GERENTE_LOCAL e GERENTE_GERAL aprovaram, mudar status para DIRETOR
+                    // Independentemente do ENGENHEIRO ter assinado ou não
+                    if ($gerentesAprovaram) {
                         $nextStatusSlug = 'analise_gerencia';
                         $defaultNote = 'Cotação encaminhada para análise da diretoria.';
                         $note = $validated['observacao'] ?? $defaultNote;
@@ -2991,18 +3003,26 @@ class PurchaseQuoteController extends Controller
                     $quote->refresh();
                     $quote->load(['approvals.approver']);
                     
-                    // Verificar se há GERENTE_LOCAL pendente e avançar para ele
-                    $localManagerApprovalAfterEngineer = $quote->approvals()
+                    // Verificar se GERENTE_LOCAL e GERENTE_GERAL aprovaram para avançar para análise de diretoria
+                    // Independentemente do ENGENHEIRO ter assinado ou não
+                    $gerenteLocalApproval = $quote->approvals()
                         ->byLevel('GERENTE_LOCAL')
                         ->required()
-                        ->where('approved', false)
+                        ->first();
+                    $gerenteGeralApproval = $quote->approvals()
+                        ->byLevel('GERENTE_GERAL')
+                        ->required()
                         ->first();
                     
-                    if ($localManagerApprovalAfterEngineer) {
-                        // Avançar para análise de diretoria (onde o Gerente Local vai aprovar)
+                    // Verificar se ambos os gerentes aprovaram (se forem requeridos)
+                    $gerenteLocalAprovou = !$gerenteLocalApproval || $gerenteLocalApproval->approved;
+                    $gerenteGeralAprovou = !$gerenteGeralApproval || $gerenteGeralApproval->approved;
+                    
+                    // Se ambos os gerentes aprovaram, avançar para análise de diretoria
+                    if ($gerenteLocalAprovou && $gerenteGeralAprovou) {
                         $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
                         if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
-                            $this->transitionStatus($quote, $statusGerencia, 'Engenheiro aprovou. Aguardando análise do Gerente Local.');
+                            $this->transitionStatus($quote, $statusGerencia, 'Gerentes de compras aprovaram. Aguardando análise da Diretoria.');
                         }
                     }
                 }
@@ -3448,12 +3468,33 @@ class PurchaseQuoteController extends Controller
 
             // Transições de status baseadas no nível aprovado
             $quote->refresh();
-            if ($level === 'GERENTE_LOCAL') {
-                // Quando Gerente Local aprova, muda para análise de diretoria
-                $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
-                if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
-                    $this->transitionStatus($quote, $statusGerencia, 'Gerente Local aprovou. Aguardando análise da Gerência Geral.');
+            
+            // Verificar se GERENTE_LOCAL e GERENTE_GERAL aprovaram para mudar para análise de diretoria
+            // Independentemente do ENGENHEIRO ter assinado ou não
+            if (in_array($level, ['GERENTE_LOCAL', 'GERENTE_GERAL'])) {
+                $gerenteLocalApproval = $quote->approvals()
+                    ->byLevel('GERENTE_LOCAL')
+                    ->required()
+                    ->first();
+                $gerenteGeralApproval = $quote->approvals()
+                    ->byLevel('GERENTE_GERAL')
+                    ->required()
+                    ->first();
+                
+                // Verificar se ambos os gerentes aprovaram (se forem requeridos)
+                // Se não forem requeridos, considerar como aprovados
+                $gerenteLocalAprovou = !$gerenteLocalApproval || $gerenteLocalApproval->approved;
+                $gerenteGeralAprovou = !$gerenteGeralApproval || $gerenteGeralApproval->approved;
+                
+                // Se ambos os gerentes aprovaram (ou não são requeridos), mudar status para análise de diretoria
+                // Independentemente do ENGENHEIRO ter assinado ou não
+                if ($gerenteLocalAprovou && $gerenteGeralAprovou) {
+                    $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
+                    if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
+                        $this->transitionStatus($quote, $statusGerencia, 'Gerentes de compras aprovaram. Aguardando análise da Diretoria.');
+                    }
                 }
+                // Se apenas um aprovou, não mudar o status ainda - aguardar o outro
             }
 
             // Verificar se todas as aprovações foram concluídas

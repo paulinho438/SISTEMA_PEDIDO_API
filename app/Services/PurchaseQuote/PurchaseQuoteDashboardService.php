@@ -280,10 +280,8 @@ class PurchaseQuoteDashboardService
 
             $aguardando = (int) ($buyerCounts['compra_em_andamento'] ?? 0);
 
-            $cotacao = 0;
-            foreach ($this->finalStatuses as $status) {
-                $cotacao += (int) ($buyerCounts[$status] ?? 0);
-            }
+            // Contar apenas o status "cotacao", não todos os status finais
+            $cotacao = (int) ($buyerCounts['cotacao'] ?? 0);
 
             $total = $aguardando + $cotacao;
 
@@ -315,15 +313,14 @@ class PurchaseQuoteDashboardService
 
     /**
      * Consolida contagem por status para o resumo geral.
+     * Mostra TODOS os status que têm cotações associadas.
      */
     protected function computeStatusResumo(?int $companyId = null): array
     {
-        $relevantStatuses = array_merge(['compra_em_andamento'], $this->finalStatuses);
-
+        // Buscar todos os status que têm cotações associadas (com buyer_id)
         $statusCounts = PurchaseQuote::query()
             ->select('current_status_slug', DB::raw('COUNT(*) as total'))
             ->whereNotNull('buyer_id')
-            ->whereIn('current_status_slug', $relevantStatuses)
             ->when($companyId, function ($query) use ($companyId) {
                 $query->where(function ($builder) use ($companyId) {
                     $builder
