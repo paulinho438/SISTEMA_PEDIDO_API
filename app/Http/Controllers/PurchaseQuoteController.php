@@ -2176,7 +2176,7 @@ class PurchaseQuoteController extends Controller
                 ], Response::HTTP_FORBIDDEN);
             }
             $nextStatusSlug = 'aprovado';
-            $defaultNote = 'Cotação aprovada pela gerência.';
+            $defaultNote = 'Cotação aprovada pela diretoria.';
         } else {
             return response()->json([
                 'message' => 'O status atual da solicitação não permite aprovação.',
@@ -2268,7 +2268,7 @@ class PurchaseQuoteController extends Controller
                 // Se não há níveis intermediários, pode ir direto para DIRETOR
                 if ($intermediateApprovals->isEmpty()) {
                     $nextStatusSlug = 'analise_gerencia';
-                    $defaultNote = 'Cotação encaminhada para análise da gerência.';
+                    $defaultNote = 'Cotação encaminhada para análise da diretoria.';
                     $note = $validated['observacao'] ?? $defaultNote;
                 } else {
                     // Verificar se todos os níveis intermediários foram aprovados
@@ -2281,7 +2281,7 @@ class PurchaseQuoteController extends Controller
                     // Se todos os níveis intermediários foram aprovados, mudar status para DIRETOR
                     if ($allIntermediateApproved) {
                         $nextStatusSlug = 'analise_gerencia';
-                        $defaultNote = 'Cotação encaminhada para análise da gerência.';
+                        $defaultNote = 'Cotação encaminhada para análise da diretoria.';
                         $note = $validated['observacao'] ?? $defaultNote;
                     } else {
                         // Manter o status atual - não mudar status, apenas a assinatura já foi salva
@@ -2689,7 +2689,7 @@ class PurchaseQuoteController extends Controller
                 'requires_response' => false,
             ]);
 
-            $observacao = $validated['observacao'] ?? ($hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da gerência.' : 'Cotação finalizada.');
+            $observacao = $validated['observacao'] ?? ($hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da diretoria.' : 'Cotação finalizada.');
             $this->transitionStatus($quote, $statusToUse, $observacao);
 
             // Se foi direto para "analise_gerencia", garantir que as aprovações estejam configuradas corretamente
@@ -2741,7 +2741,7 @@ class PurchaseQuoteController extends Controller
                             'approved_by_name' => 'Sistema',
                             'approved_at' => now()->format('Y-m-d H:i:s'),
                             'order' => $order[$level] ?? 2,
-                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da gerência.',
+                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da diretoria.',
                         ]);
                     } elseif (!$approval->approved) {
                         $this->updateModelWithStringTimestamps($approval, [
@@ -2749,7 +2749,7 @@ class PurchaseQuoteController extends Controller
                             'approved_by' => null,
                             'approved_by_name' => 'Sistema',
                             'approved_at' => now()->format('Y-m-d H:i:s'),
-                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da gerência.',
+                            'notes' => 'Aprovado automaticamente ao encaminhar para análise da diretoria.',
                         ]);
                     }
                 }
@@ -2802,7 +2802,7 @@ class PurchaseQuoteController extends Controller
             $quote->refresh();
 
             return response()->json([
-                'message' => $hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da gerência.' : 'Cotação finalizada com sucesso.',
+                'message' => $hasBeenApproved ? 'Cotação ajustada e encaminhada para análise da diretoria.' : 'Cotação finalizada com sucesso.',
                 'status' => [
                     'slug' => $statusToUse->slug,
                     'label' => $statusToUse->label,
@@ -2999,7 +2999,7 @@ class PurchaseQuoteController extends Controller
                         ->first();
                     
                     if ($localManagerApprovalAfterEngineer) {
-                        // Avançar para análise de gerência (onde o Gerente Local vai aprovar)
+                        // Avançar para análise de diretoria (onde o Gerente Local vai aprovar)
                         $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
                         if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
                             $this->transitionStatus($quote, $statusGerencia, 'Engenheiro aprovou. Aguardando análise do Gerente Local.');
@@ -3035,7 +3035,7 @@ class PurchaseQuoteController extends Controller
                         ->first();
                     
                     if ($localManagerApproval && $approvalService->canApproveLevel($quote, 'GERENTE_LOCAL', $user)) {
-                        // Aprovar o nível GERENTE_LOCAL quando encaminha para análise de gerência
+                        // Aprovar o nível GERENTE_LOCAL quando encaminha para análise de diretoria
                         $approvalService->approveLevel($quote, 'GERENTE_LOCAL', $user, $validated['observacao'] ?? null);
                         
                         // Recarregar a cotação com os relacionamentos atualizados para garantir que a assinatura apareça
@@ -3051,7 +3051,7 @@ class PurchaseQuoteController extends Controller
                         ->first();
                     
                     if ($generalManagerApproval && $approvalService->canApproveLevel($quote, 'GERENTE_GERAL', $user)) {
-                        // Aprovar o nível GERENTE_GERAL quando encaminha para análise de gerência
+                        // Aprovar o nível GERENTE_GERAL quando encaminha para análise de diretoria
                         $approvalService->approveLevel($quote, 'GERENTE_GERAL', $user, $validated['observacao'] ?? null);
                         
                         // Recarregar a cotação com os relacionamentos atualizados para garantir que a assinatura apareça
@@ -3449,7 +3449,7 @@ class PurchaseQuoteController extends Controller
             // Transições de status baseadas no nível aprovado
             $quote->refresh();
             if ($level === 'GERENTE_LOCAL') {
-                // Quando Gerente Local aprova, muda para análise de gerência
+                // Quando Gerente Local aprova, muda para análise de diretoria
                 $statusGerencia = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
                 if ($statusGerencia && $quote->current_status_slug !== 'analise_gerencia') {
                     $this->transitionStatus($quote, $statusGerencia, 'Gerente Local aprovou. Aguardando análise da Gerência Geral.');
