@@ -1160,16 +1160,20 @@ class PurchaseQuoteController extends Controller
 
     public function update(Request $request, PurchaseQuote $quote)
     {
+        $user = auth()->user();
+
         // Verificar se o usuário pode editar esta cotação
-        if (!$this->canUserEditQuote($quote, auth()->user())) {
+        if (!$this->canUserEditQuote($quote, $user)) {
             return response()->json([
                 'message' => 'Você não tem permissão para editar esta solicitação.',
             ], Response::HTTP_FORBIDDEN);
         }
 
-        // Se a solicitação estiver reprovada, voltar para "aguardando" ao salvar
+        $isMasterEdit = $this->userCanMasterEdit($user);
+
+        // Se NÃO for edição master e a solicitação estiver reprovada, voltar para "aguardando" ao salvar
         $statusNovo = null;
-        if ($quote->current_status_slug === 'reprovado') {
+        if (!$isMasterEdit && $quote->current_status_slug === 'reprovado') {
             $statusAguardando = PurchaseQuoteStatus::where('slug', 'aguardando')->first();
             if (!$statusAguardando) {
                 return response()->json([
@@ -1332,8 +1336,22 @@ class PurchaseQuoteController extends Controller
             }
 
             // Se estava reprovada, mudar para "aguardando"
-            if ($statusNovo) {
+            // Só altera status automaticamente se NÃO for edição master
+            if (!$isMasterEdit && $statusNovo) {
                 $this->transitionStatus($quote, $statusNovo, 'Solicitação editada e retornada para aguardando autorização.');
+            }
+
+            // Se for edição master e existirem pedidos de compra, sincronizar
+            if ($isMasterEdit) {
+                try {
+                    app(\App\Services\PurchaseOrderService::class)->sincronizarPedidoComCotacao($quote);
+                } catch (\Exception $e) {
+                    \Log::warning('Falha ao sincronizar pedidos após edição master', [
+                        'quote_id' => $quote->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    // Não bloqueia a edição da cotação se a sincronização falhar
+                }
             }
 
             DB::commit();
@@ -1342,7 +1360,7 @@ class PurchaseQuoteController extends Controller
             $quote->load(['items', 'status']);
 
             return response()->json([
-                'message' => 'Solicitação atualizada com sucesso.',
+                'message' => 'Solicitação atualizada com sucesso.' . ($isMasterEdit ? ' Pedidos de compra sincronizados.' : ''),
                 'data' => [
                     'id' => $quote->id,
                     'numero' => $quote->quote_number,
@@ -1360,6 +1378,64 @@ class PurchaseQuoteController extends Controller
                 'error' => $exception->getMessage(),
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
+    }
+
+    /**
+     * Listagem administrativa de cotações para edição master.
+     */
+    public function indexAdmin(Request $request): JsonResponse
+    {
+        $user = auth()->user();
+        if (!$user || !$user->hasPermission('edit_cotacoes_master')) {
+            return response()->json([
+                'message' => 'Você não tem permissão para edição master de cotações.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        // Reaproveita a lógica principal de index(), mas sem filtros de my_requests / my_approvals.
+        $query = PurchaseQuote::query()
+            ->with(['status', 'items'])
+            ->orderByDesc('id');
+
+        if ($request->filled('status')) {
+            $query->where('current_status_slug', $request->get('status'));
+        }
+
+        if ($request->filled('search')) {
+            $term = mb_strtoupper(trim($request->get('search')));
+            $query->where(function ($q) use ($term) {
+                $q->whereRaw('UPPER(quote_number) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('UPPER(requester_name) LIKE ?', ["%{$term}%"])
+                    ->orWhereRaw('UPPER(location) LIKE ?', ["%{$term}%"]);
+            });
+        }
+
+        $perPage = (int) $request->get('per_page', 10);
+        $perPage = $perPage > 0 && $perPage <= 100 ? $perPage : 10;
+        $quotes = $query->paginate($perPage);
+
+        $data = $quotes->getCollection()->map(function (PurchaseQuote $quote) {
+            return [
+                'id' => $quote->id,
+                'numero' => $quote->quote_number,
+                'data' => optional($quote->requested_at)->format('d/m/Y'),
+                'solicitante' => $quote->requester_name,
+                'centro_custo' => $quote->cost_center_description ?? null,
+                'local' => $quote->location,
+                'status' => $quote->status ? $quote->status->label : null,
+                'statusSlug' => $quote->current_status_slug,
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+            'pagination' => [
+                'current_page' => $quotes->currentPage(),
+                'per_page' => $quotes->perPage(),
+                'total' => $quotes->total(),
+                'last_page' => $quotes->lastPage(),
+            ],
+        ]);
     }
 
     /**
@@ -3742,7 +3818,12 @@ class PurchaseQuoteController extends Controller
             return false;
         }
 
-        // Verificar se o usuário tem permissão para editar cotações
+        // Permissão master: pode editar qualquer cotação, independente do status
+        if ($this->userCanMasterEdit($user)) {
+            return true;
+        }
+
+        // Verificar se o usuário tem permissão “normal” para editar cotações
         if (!$user->hasPermission('edit_cotacoes')) {
             return false;
         }
@@ -3754,6 +3835,16 @@ class PurchaseQuoteController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Verifica se o usuário tem permissão de edição master de cotações.
+     * Essa permissão ignora restrições de status na edição.
+     */
+    private function userCanMasterEdit(?User $user = null): bool
+    {
+        $user = $user ?? auth()->user();
+        return $user && $user->hasPermission('edit_cotacoes_master');
     }
 
     /**

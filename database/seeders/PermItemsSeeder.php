@@ -389,6 +389,15 @@ class PermItemsSeeder extends Seeder
             ]
         );
 
+        // Edição master: pode editar qualquer cotação, em qualquer status
+        DB::table("permitems")->insert(
+            [
+                "name"             => "Edição master de Cotações",
+                "slug"             => "edit_cotacoes_master",
+                "group"            => "cotacoes_edicao"
+            ]
+        );
+        
         DB::table("permitems")->insert(
             [
                 "name"             => "Imprimir Cotação",

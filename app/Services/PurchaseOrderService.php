@@ -283,5 +283,126 @@ class PurchaseOrderService
 
         return $query->orderByDesc('order_date')->paginate($perPage);
     }
+
+    /**
+     * Sincronizar pedidos de compra existentes com a cotação editada (modo master).
+     * Atualiza itens e valores dos pedidos quando a cotação é editada.
+     */
+    public function sincronizarPedidoComCotacao(PurchaseQuote $quote): void
+    {
+        DB::beginTransaction();
+
+        try {
+            // Buscar todos os pedidos vinculados a esta cotação
+            $orders = PurchaseOrder::where('purchase_quote_id', $quote->id)
+                ->with(['items', 'quoteSupplier'])
+                ->get();
+
+            if ($orders->isEmpty()) {
+                DB::commit();
+                return; // Não há pedidos para sincronizar
+            }
+
+            // Recarregar cotação com relacionamentos necessários
+            $quote->refresh();
+            $quote->load(['items.selectedSupplier', 'items.selectedSupplier.items']);
+
+            foreach ($orders as $order) {
+                $supplier = $order->quoteSupplier;
+                if (!$supplier) {
+                    continue;
+                }
+
+                // Buscar itens da cotação que pertencem a este fornecedor
+                $quoteItems = $quote->items()
+                    ->where('selected_supplier_id', $supplier->id)
+                    ->get();
+
+                if ($quoteItems->isEmpty()) {
+                    // Se não há mais itens para este fornecedor, pode deletar o pedido ou apenas limpar itens
+                    // Por segurança, vamos apenas limpar os itens e zerar o total
+                    PurchaseOrderItem::where('purchase_order_id', $order->id)->delete();
+                    $this->updateModelWithStringTimestamps($order, ['total_amount' => 0]);
+                    continue;
+                }
+
+                $totalAmount = 0;
+                $existingItemIds = [];
+
+                // Atualizar ou criar itens do pedido
+                foreach ($quoteItems as $quoteItem) {
+                    $supplierItem = $supplier->items()
+                        ->where('purchase_quote_item_id', $quoteItem->id)
+                        ->first();
+
+                    $unitPrice = $quoteItem->selected_unit_cost ?? ($supplierItem->unit_cost ?? 0);
+                    $quantity = $quoteItem->quantity ?? 1;
+                    $totalPrice = $unitPrice * $quantity;
+                    $finalCostUnit = $supplierItem->final_cost ?? $unitPrice;
+
+                    // Buscar item do pedido existente vinculado a este item da cotação
+                    $orderItem = PurchaseOrderItem::where('purchase_order_id', $order->id)
+                        ->where('purchase_quote_item_id', $quoteItem->id)
+                        ->first();
+
+                    if ($orderItem) {
+                        // Atualizar item existente
+                        $this->updateModelWithStringTimestamps($orderItem, [
+                            'product_code' => $quoteItem->product_code,
+                            'product_description' => $quoteItem->description,
+                            'quantity' => $quantity,
+                            'unit' => $quoteItem->unit ?? 'UN',
+                            'unit_price' => $unitPrice,
+                            'total_price' => $totalPrice,
+                            'ipi' => $supplierItem->ipi ?? null,
+                            'icms' => $supplierItem->icms ?? null,
+                            'final_cost' => $finalCostUnit,
+                            'observation' => $quoteItem->application ?? null,
+                        ]);
+                        $existingItemIds[] = $orderItem->id;
+                    } else {
+                        // Criar novo item do pedido
+                        $itemId = $this->insertWithStringTimestamps('purchase_order_items', [
+                            'purchase_order_id' => $order->id,
+                            'purchase_quote_id' => $quote->id,
+                            'purchase_quote_item_id' => $quoteItem->id,
+                            'purchase_quote_supplier_item_id' => $supplierItem?->id,
+                            'product_code' => $quoteItem->product_code,
+                            'product_description' => $quoteItem->description,
+                            'quantity' => $quantity,
+                            'unit' => $quoteItem->unit ?? 'UN',
+                            'unit_price' => $unitPrice,
+                            'total_price' => $totalPrice,
+                            'ipi' => $supplierItem->ipi ?? null,
+                            'icms' => $supplierItem->icms ?? null,
+                            'final_cost' => $finalCostUnit,
+                            'observation' => $quoteItem->application ?? null,
+                        ]);
+                        $existingItemIds[] = $itemId;
+                    }
+
+                    $totalAmount += $totalPrice;
+                }
+
+                // Remover itens do pedido que não estão mais na cotação para este fornecedor
+                if (!empty($existingItemIds)) {
+                    PurchaseOrderItem::where('purchase_order_id', $order->id)
+                        ->whereNotIn('id', $existingItemIds)
+                        ->delete();
+                }
+
+                // Atualizar total do pedido
+                $this->updateModelWithStringTimestamps($order, [
+                    'total_amount' => $totalAmount,
+                    'observation' => $quote->observation, // Atualizar observação também
+                ]);
+            }
+
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            throw $e;
+        }
+    }
 }
 

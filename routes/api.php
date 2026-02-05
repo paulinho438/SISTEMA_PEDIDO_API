@@ -291,6 +291,7 @@ Route::middleware('auth:api')->group(function () {
     Route::get('/protheus/naturezas-operacao', [ProtheusDataController::class, 'naturezasOperacao']);
     Route::get('/protheus/tes', [ProtheusDataController::class, 'tes']);
     Route::get('/cotacoes', [PurchaseQuoteController::class, 'index']);
+    Route::get('/cotacoes/admin/list', [PurchaseQuoteController::class, 'indexAdmin']);
     Route::get('/cotacoes/buyers', [PurchaseQuoteController::class, 'listBuyers']);
     Route::get('/cotacoes/requesters', [PurchaseQuoteController::class, 'listRequesters']);
     Route::post('/cotacoes', [PurchaseQuoteController::class, 'store']);
