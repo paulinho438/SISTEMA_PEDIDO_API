@@ -3972,9 +3972,14 @@ class PurchaseQuoteController extends Controller
             return false;
         }
 
-        // Só pode editar se o status for "reprovado" ou "aguardando"
-        $statusPermitidos = ['reprovado', 'aguardando'];
+        // Só pode editar se o status for "rascunho", "reprovado" ou "aguardando"
+        $statusPermitidos = ['rascunho', 'reprovado', 'aguardando'];
         if (!in_array($quote->current_status_slug, $statusPermitidos)) {
+            return false;
+        }
+
+        // Se for rascunho, apenas o criador pode editar
+        if ($quote->current_status_slug === 'rascunho' && $quote->requester_id !== $user->id) {
             return false;
         }
 
