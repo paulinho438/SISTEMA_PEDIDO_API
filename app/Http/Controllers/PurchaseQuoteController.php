@@ -276,12 +276,15 @@ class PurchaseQuoteController extends Controller
 
         $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
-        // Filtrar rascunhos: só mostrar para quem criou (requester_id)
+        // Filtrar rascunhos: mostrar para quem criou (created_by) OU para quem foi criada (requester_id)
         $query->where(function ($q) {
             $q->where('current_status_slug', '!=', 'rascunho')
               ->orWhere(function ($subQ) {
                   $subQ->where('current_status_slug', 'rascunho')
-                       ->where('requester_id', auth()->id());
+                       ->where(function ($rascunhoQ) {
+                           $rascunhoQ->where('created_by', auth()->id())
+                                     ->orWhere('requester_id', auth()->id());
+                       });
               });
         });
 
@@ -2698,8 +2701,10 @@ class PurchaseQuoteController extends Controller
             ], Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
-        // Verificar se o usuário é o criador da solicitação
-        if ($quote->requester_id !== $user->id) {
+        // Verificar se o usuário é quem criou (created_by) OU para quem foi criada (requester_id)
+        $isCreator = $quote->created_by === $user->id;
+        $isRequester = $quote->requester_id === $user->id;
+        if (!$isCreator && !$isRequester) {
             return response()->json([
                 'message' => 'Você não tem permissão para finalizar este rascunho.',
             ], Response::HTTP_FORBIDDEN);
@@ -3978,9 +3983,13 @@ class PurchaseQuoteController extends Controller
             return false;
         }
 
-        // Se for rascunho, apenas o criador pode editar
-        if ($quote->current_status_slug === 'rascunho' && $quote->requester_id !== $user->id) {
-            return false;
+        // Se for rascunho, apenas quem criou (created_by) OU para quem foi criada (requester_id) pode editar
+        if ($quote->current_status_slug === 'rascunho') {
+            $isCreator = $quote->created_by === $user->id;
+            $isRequester = $quote->requester_id === $user->id;
+            if (!$isCreator && !$isRequester) {
+                return false;
+            }
         }
 
         return true;

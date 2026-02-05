@@ -58,7 +58,12 @@ class PurchaseOrderController extends Controller
                 }
                 return (float) $lineTotal;
             });
-            $order->setAttribute('total_amount', $totalFromItems);
+            
+            // Adicionar frete ao total se houver
+            $freightValue = $order->freight_value ?? 0;
+            $totalWithFreight = $totalFromItems + $freightValue;
+            
+            $order->setAttribute('total_amount', $totalWithFreight);
             return $order;
         })->all();
 
