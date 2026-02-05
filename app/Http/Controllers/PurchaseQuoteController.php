@@ -3973,23 +3973,24 @@ class PurchaseQuoteController extends Controller
         }
 
         // Verificar se o usuário tem permissão “normal” para editar cotações
+        // Rascunho: quem criou ou para quem foi criada pode salvar/finalizar com create_cotacoes ou edit_cotacoes
+        if ($quote->current_status_slug === 'rascunho') {
+            $isCreator = (int) $quote->created_by === (int) $user->id;
+            $isRequester = (int) $quote->requester_id === (int) $user->id;
+            if ($isCreator || $isRequester) {
+                return $user->hasPermission('create_cotacoes') || $user->hasPermission('edit_cotacoes');
+            }
+            return false;
+        }
+
         if (!$user->hasPermission('edit_cotacoes')) {
             return false;
         }
 
-        // Só pode editar se o status for "rascunho", "reprovado" ou "aguardando"
-        $statusPermitidos = ['rascunho', 'reprovado', 'aguardando'];
+        // Só pode editar se o status for "reprovado" ou "aguardando"
+        $statusPermitidos = ['reprovado', 'aguardando'];
         if (!in_array($quote->current_status_slug, $statusPermitidos)) {
             return false;
-        }
-
-        // Se for rascunho, apenas quem criou (created_by) OU para quem foi criada (requester_id) pode editar
-        if ($quote->current_status_slug === 'rascunho') {
-            $isCreator = $quote->created_by === $user->id;
-            $isRequester = $quote->requester_id === $user->id;
-            if (!$isCreator && !$isRequester) {
-                return false;
-            }
         }
 
         return true;
