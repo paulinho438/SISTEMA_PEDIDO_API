@@ -341,7 +341,7 @@ class PurchaseOrderController extends Controller
 
         // Chunking: 5 itens por página (itens com texto longo na aplicação quebram em 4+ linhas)
         $itemsArray = $order->items->values()->all();
-        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 5);
+        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 7);
 
         // Preparar dados para a view
         $dados = [
