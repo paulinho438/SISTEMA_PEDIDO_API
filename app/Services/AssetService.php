@@ -12,6 +12,36 @@ use Carbon\Carbon;
 class AssetService
 {
     /**
+     * Valida se o número do ativo é único (não pode repetir no sistema para mesma empresa/filial)
+     *
+     * @throws \Exception
+     */
+    private function validateAssetNumberUnique(string $assetNumber, int $companyId, ?int $branchId, ?int $excludeAssetId): void
+    {
+        $assetNumber = trim($assetNumber);
+        if ($assetNumber === '') {
+            return;
+        }
+
+        $query = Asset::where('company_id', $companyId)
+            ->where('asset_number', $assetNumber);
+
+        if ($branchId !== null) {
+            $query->where('branch_id', $branchId);
+        } else {
+            $query->whereNull('branch_id');
+        }
+
+        if ($excludeAssetId !== null) {
+            $query->where('id', '!=', $excludeAssetId);
+        }
+
+        if ($query->exists()) {
+            throw new \Exception('O número do ativo "' . $assetNumber . '" já existe no sistema. Informe outro número.');
+        }
+    }
+
+    /**
      * Gera número do ativo sequencial por filial
      */
     public function generateAssetNumber(int $companyId, ?int $branchId = null): string
@@ -99,7 +129,7 @@ class AssetService
         ])->findOrFail($id);
     }
 
-    public function create(array $data, int $companyId, ?int $userId = null): Asset
+    public function create(array $data, int $companyId, ?int $userId = null, bool $allowAutoGenerate = false): Asset
     {
         $validator = Validator::make($data, [
             'acquisition_date' => 'required|date',
@@ -111,9 +141,17 @@ class AssetService
             throw new \Exception($validator->errors()->first());
         }
 
-        // Gerar número do ativo se não fornecido
-        if (empty($data['asset_number'])) {
-            $data['asset_number'] = $this->generateAssetNumber($companyId, $data['branch_id'] ?? null);
+        // Número do ativo: obrigatório no formulário manual; em fluxos programáticos pode ser gerado
+        $assetNumber = trim((string) ($data['asset_number'] ?? ''));
+        if ($assetNumber === '') {
+            if ($allowAutoGenerate) {
+                $data['asset_number'] = $this->generateAssetNumber($companyId, $data['branch_id'] ?? null);
+            } else {
+                throw new \Exception('O número do ativo é obrigatório.');
+            }
+        } else {
+            $data['asset_number'] = $assetNumber;
+            $this->validateAssetNumberUnique($data['asset_number'], $companyId, $data['branch_id'] ?? null, null);
         }
 
         $data['company_id'] = $companyId;
@@ -158,6 +196,12 @@ class AssetService
         $data = array_intersect_key($data, array_flip($fillable));
         $data['updated_by'] = $userId ?? auth()->id();
         $data = $this->normalizeCostCenterForAsset($data);
+
+        // Se número do ativo foi alterado, validar unicidade
+        if (array_key_exists('asset_number', $data) && !empty(trim((string) $data['asset_number']))) {
+            $branchId = $data['branch_id'] ?? $asset->branch_id;
+            $this->validateAssetNumberUnique($data['asset_number'], $asset->company_id, $branchId, $asset->id);
+        }
 
         // Usar método auxiliar para garantir compatibilidade com SQL Server
         $this->updateModelWithStringTimestamps($asset, $data);

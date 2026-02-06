@@ -68,7 +68,7 @@ class AssetPurchaseService
                         'observation' => "Criado a partir da cotação #{$quote->id}",
                     ];
 
-                    $asset = $this->assetService->create($assetData, $companyId, auth()->id());
+                    $asset = $this->assetService->create($assetData, $companyId, auth()->id(), true);
 
                     // Criar movimentação de cadastro via compra
                     AssetMovement::where('asset_id', $asset->id)

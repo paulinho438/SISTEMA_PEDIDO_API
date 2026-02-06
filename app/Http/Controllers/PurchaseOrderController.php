@@ -339,16 +339,16 @@ class PurchaseOrderController extends Controller
             }
         }
 
-        // Paginar itens: no máximo 17 itens por página na impressão
+        // Itens em lista única: a paginação é feita pelo DomPDF conforme o espaço disponível
+        // (itens com texto longo na aplicação/descrição quebram linha e consomem mais espaço)
         $itemsArray = $order->items->values()->all();
-        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 17);
 
         // Preparar dados para a view
         $dados = [
             'order' => $order,
             'company' => $order->company,
             'items' => $order->items,
-            'itemChunks' => $itemChunks,
+            'itemsArray' => $itemsArray,
             'quote' => $order->quote,
             'buyer' => $buyer,
             'totalIten' => $totalIten,

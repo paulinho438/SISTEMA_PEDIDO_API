@@ -861,8 +861,8 @@ class StockService
             // Remover cost_center_selected dos dados antes de criar o ativo (não é campo do banco)
             unset($assetData['cost_center_selected']);
 
-            // 5. Criar ativo
-            $asset = $this->assetService->create($assetData, $companyId, auth()->id());
+            // 5. Criar ativo (asset_number vem do formulário "Dar Saída e Criar Ativo")
+            $asset = $this->assetService->create($assetData, $companyId, auth()->id(), false);
 
             // 6. Criar movimentação inicial do ativo (INSERT com CAST para SQL Server)
             $movementDate = $asset->acquisition_date

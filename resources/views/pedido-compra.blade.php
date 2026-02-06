@@ -23,7 +23,7 @@
             color: #000;
             padding-top: 352px;
             padding-left: 10px;
-            padding-bottom: 285px;
+            padding-bottom: 40px;
         }
 
         /* Topo fixo em todas as páginas: mesmo layout de "Estava assim" (logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA) */
@@ -80,7 +80,7 @@
         }
         
         .print-header .page-info::after {
-            content: "Página " counter(page);
+            content: "";
         }
         
         /* FORNECEDOR e FATURAR A: mesmo estilo do layout original (borda preta, 8pt) */
@@ -172,20 +172,19 @@
         }
         
         .print-footer .footer-page::after {
-            content: "Página " counter(page);
+            content: "";
         }
 
-        /* Totais + Observações fixos em todas as páginas */
+        /* Totais + Observações no fluxo normal (após a tabela, na última página) */
         .print-summary {
-            position: fixed;
-            bottom: 132px;
-            left: 0;
             width: 100%;
             box-sizing: border-box;
             background: #fff;
-            z-index: 9997;
             border-top: 1px solid #ccc;
             padding: 6px 8px 6px 8px;
+            margin-top: 15px;
+            page-break-inside: avoid;
+            page-break-before: avoid;
         }
         
         .print-summary .totals-section {
@@ -222,17 +221,16 @@
             margin-bottom: 2px;
         }
 
-        /* Assinaturas fixas em todas as páginas */
+        /* Assinaturas no fluxo normal (após totais, na última página) */
         .print-signatures {
-            position: fixed;
-            bottom: 32px;
-            left: 0;
             width: 100%;
             box-sizing: border-box;
             background: #fff;
-            z-index: 9998;
             border-top: 1px solid #ccc;
             padding: 8px 5px 5px 5px;
+            margin-top: 15px;
+            page-break-inside: avoid;
+            page-break-before: avoid;
         }
         
         .print-signatures .signatures {
@@ -504,15 +502,6 @@
             margin-top: 5px;
         }
         
-        /* Quebra de página após cada bloco de itens (máx. 17 por página) */
-        .page-break-after {
-            page-break-after: always;
-        }
-        
-        .items-page {
-            page-break-inside: avoid;
-        }
-        
         /* Observations Styles */
         .observations {
             border: 1px solid #000;
@@ -678,45 +667,95 @@
         </div>
     </div>
 
-
-    <!-- Totais + Observações fixos: repetidos em todas as páginas -->
-    <div class="print-summary">
-        <div class="totals-section">
-            <div class="totals-line">
-                <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
-                <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
-            </div>
-            <div class="totals-line">
-                <div><strong>TIPO FRETE:</strong> {{ $order->freight_type ? ($order->freight_type == 'F' ? 'FOB' : ($order->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : ($order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE') }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
-            </div>
-            <div class="totals-line-values">
-                <div>IPI: {{ number_format($totalIPI, 2, ',', '.') }}</div>
-                <div>ICMS RETIDO: {{ number_format($totalICM, 2, ',', '.') }}</div>
-                <div>FRETE: {{ number_format($totalFRE, 2, ',', '.') }}</div>
-                <div>DESPESAS: {{ number_format($totalDES, 2, ',', '.') }}</div>
-                <div>SEGURO: {{ number_format($totalSEG, 2, ',', '.') }}</div>
-                <div>DESCONTO: {{ number_format($totalDEC, 2, ',', '.') }}</div>
-            </div>
-            <div class="totals-line total-final">
-                <div><strong>COMPRADOR:</strong> @if($buyer){{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}@endif</div>
-                <div class="totals-value-right"><strong>VALOR TOTAL:</strong> {{ number_format($valorTotal, 2, ',', '.') }}</div>
-            </div>
-        </div>
-        @if($order->observation)
-        <div class="observations">
-            <div class="observations-title">OBSERVACOES</div>
-            <div class="text-small">{!! nl2br(e(strtoupper($order->observation))) !!}</div>
-        </div>
-        @else
-        <div class="observations">
-            <div class="observations-title">OBSERVACOES</div>
-            <div class="text-small">&nbsp;</div>
-        </div>
-        @endif
+    <!-- Rodapé fixo em todas as páginas -->
+    <div class="print-footer">
+        <div class="footer-order"></div>
+        <div class="footer-page"></div>
     </div>
 
-    <!-- Assinaturas fixas: repetidas em todas as páginas -->
-    <div class="print-signatures">
+    <!-- Conteúdo Principal: tabela de itens + totais + assinaturas no fluxo normal -->
+    <div class="top">
+        <!-- Linha separadora e tabela de itens: paginação natural conforme espaço (itens com texto longo ocupam mais linhas) -->
+        <div class="table-separator-line"></div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">Item</th>
+                    <th style="width: 8%;">Cod.</th>
+                    <th style="width: 25%;">Descrição do Material / Serviço</th>
+                    <th style="width: 15%;">Aplicação</th>
+                    <th style="width: 10%;">Marca</th>
+                    <th style="width: 5%;">Unid.</th>
+                    <th style="width: 7%;">Qtd.</th>
+                    <th style="width: 12%;">Vlr Unit.</th>
+                    <th style="width: 14%;">Vlr Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($itemsArray ?? [] as $index => $item)
+                    @php
+                        $globalIndex = $index + 1;
+                        $quoteItem = $item->quoteItem;
+                        $description = $item->product_description ?? '';
+                        $application = $quoteItem ? ($quoteItem->application ?? '') : '';
+                        $brand = '';
+                        if ($quoteItem && $quoteItem->tag) {
+                            $brand = $quoteItem->tag;
+                        }
+                    @endphp
+                    <tr>
+                        <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>
+                        <td>{{ $item->product_code ?? '' }}</td>
+                        <td>{{ strtoupper($description) }}</td>
+                        <td>{{ strtoupper($application) }}</td>
+                        <td>{{ strtoupper($brand) }}</td>
+                        <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
+                        <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
+                        <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
+                        <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <!-- Totais + Observações (após a tabela) -->
+        <div class="print-summary">
+            <div class="totals-section">
+                <div class="totals-line">
+                    <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+                    <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
+                </div>
+                <div class="totals-line">
+                    <div><strong>TIPO FRETE:</strong> {{ $order->freight_type ? ($order->freight_type == 'F' ? 'FOB' : ($order->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : ($order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : 'SEM FRETE')) : 'SEM FRETE') }}@if($order->quote && $order->quote->requester_name) - <strong>SOLICITANTE:</strong> {{ strtoupper($order->quote->requester_name) }}@endif</div>
+                </div>
+                <div class="totals-line-values">
+                    <div>IPI: {{ number_format($totalIPI, 2, ',', '.') }}</div>
+                    <div>ICMS RETIDO: {{ number_format($totalICM, 2, ',', '.') }}</div>
+                    <div>FRETE: {{ number_format($totalFRE, 2, ',', '.') }}</div>
+                    <div>DESPESAS: {{ number_format($totalDES, 2, ',', '.') }}</div>
+                    <div>SEGURO: {{ number_format($totalSEG, 2, ',', '.') }}</div>
+                    <div>DESCONTO: {{ number_format($totalDEC, 2, ',', '.') }}</div>
+                </div>
+                <div class="totals-line total-final">
+                    <div><strong>COMPRADOR:</strong> @if($buyer){{ strtolower($buyer->login ?? $buyer->nome_completo ?? '') }}@endif</div>
+                    <div class="totals-value-right"><strong>VALOR TOTAL:</strong> {{ number_format($valorTotal, 2, ',', '.') }}</div>
+                </div>
+            </div>
+            @if($order->observation)
+            <div class="observations">
+                <div class="observations-title">OBSERVACOES</div>
+                <div class="text-small">{!! nl2br(e(strtoupper($order->observation))) !!}</div>
+            </div>
+            @else
+            <div class="observations">
+                <div class="observations-title">OBSERVACOES</div>
+                <div class="text-small">&nbsp;</div>
+            </div>
+            @endif
+        </div>
+
+        <!-- Assinaturas (após totais) -->
+        <div class="print-signatures">
         <div class="signatures">
             <div class="signature-box">
                 <div class="signature-line">
@@ -821,59 +860,18 @@
             </div>
         </div>
     </div>
-
-    <!-- Conteúdo Principal: apenas tabelas de itens (topo e fundo estão nos blocos fixos) -->
-    <div class="top">
-        <!-- Linha separadora: acompanha a tabela (fica logo acima) -->
-        <div class="table-separator-line"></div>
-        <!-- Tabela de Itens: no máximo 17 itens por página -->
-        @foreach($itemChunks as $chunkIndex => $chunk)
-        <div class="items-page">
-            <table class="items-table">
-                <thead>
-                    <tr>
-                        <th style="width: 4%;">Item</th>
-                        <th style="width: 8%;">Cod.</th>
-                        <th style="width: 25%;">Descrição do Material / Serviço</th>
-                        <th style="width: 15%;">Aplicação</th>
-                        <th style="width: 10%;">Marca</th>
-                        <th style="width: 5%;">Unid.</th>
-                        <th style="width: 7%;">Qtd.</th>
-                        <th style="width: 12%;">Vlr Unit.</th>
-                        <th style="width: 14%;">Vlr Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($chunk as $indexInChunk => $item)
-                        @php
-                            $globalIndex = $chunkIndex * 17 + $indexInChunk + 1;
-                            $quoteItem = $item->quoteItem;
-                            $description = $item->product_description ?? '';
-                            $application = $quoteItem ? ($quoteItem->application ?? '') : '';
-                            $brand = '';
-                            if ($quoteItem && $quoteItem->tag) {
-                                $brand = $quoteItem->tag;
-                            }
-                        @endphp
-                        <tr>
-                            <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>
-                            <td>{{ $item->product_code ?? '' }}</td>
-                            <td>{{ strtoupper($description) }}</td>
-                            <td>{{ strtoupper($application) }}</td>
-                            <td>{{ strtoupper($brand) }}</td>
-                            <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
-                            <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
-                            <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                            <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-        @if(!$loop->last)
-        <div class="page-break-after"></div>
-        @endif
-        @endforeach
     </div>
+
+    <script type="text/php">
+        if (isset($pdf)) {
+            $text = "Página {PAGE_NUM} de {PAGE_COUNT}";
+            $size = 8;
+            $font = $fontMetrics->getFont("Courier");
+            $width = $fontMetrics->get_text_width($text, $font, $size);
+            $x = $pdf->get_width() - $width - 40;
+            $y = $pdf->get_height() - 20;
+            $pdf->page_text($x, $y, $text, $font, $size);
+        }
+    </script>
 </body>
 </html>
