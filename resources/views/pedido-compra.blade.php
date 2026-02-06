@@ -282,7 +282,7 @@
         
         .items-page {
             page-break-inside: avoid;
-            margin-top: 35px;
+            margin-top: 40px;
         }
         
         .table-separator-line + .items-page {
