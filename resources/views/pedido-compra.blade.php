@@ -107,7 +107,7 @@
         
         /* ENDEREÇO DE ENTREGA: mesmo estilo do layout original (borda preta, 8pt, espaço acima); na frente de tudo */
         .print-header .delivery-block {
-            margin-top: 10px;
+            margin-top: 0;
             margin-bottom: 0;
             border: 1px solid #000;
             padding: 5px;
@@ -599,6 +599,12 @@
     </style>
 </head>
 <body>
+    @if(!empty($asHtml))
+    <div style="position: fixed; top: 0; left: 0; right: 0; background: #fef3c7; color: #92400e; padding: 8px 16px; font-size: 12px; z-index: 99999; border-bottom: 1px solid #f59e0b;">
+        <strong>Modo Debug:</strong> Visualização HTML para inspecionar o layout. Use F12 (Inspecionar) para debugar. Este banner não aparece no PDF.
+    </div>
+    <div style="height: 36px;"></div>
+    @endif
     <!-- Topo fixo: repetido em todas as páginas (logo, título, dados, fornecedor, faturar a, endereço) -->
     <div class="print-header">
         <div class="print-header-row">
@@ -886,6 +892,7 @@
         @endforeach
     </div>
 
+    @if(empty($asHtml))
     <script type="text/php">
         if (isset($pdf)) {
             $text = "Página {PAGE_NUM} de {PAGE_COUNT}";
@@ -897,5 +904,6 @@
             $pdf->page_text($x, $y, $text, $font, $size);
         }
     </script>
+    @endif
 </body>
 </html>

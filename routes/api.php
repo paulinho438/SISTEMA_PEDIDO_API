@@ -332,6 +332,7 @@ Route::middleware('auth:api')->group(function () {
         Route::post('/cotacao/{quoteId}/gerar', [PurchaseOrderController::class, 'gerarPedidosCotacao']);
         Route::get('/{id}', [PurchaseOrderController::class, 'show']);
         Route::get('/{id}/imprimir', [PurchaseOrderController::class, 'imprimir']);
+        Route::get('/{id}/visualizar-html', [PurchaseOrderController::class, 'visualizarHtml']);
         Route::put('/{id}/status', [PurchaseOrderController::class, 'updateStatus']);
     });
     

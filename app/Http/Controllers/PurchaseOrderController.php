@@ -206,163 +206,12 @@ class PurchaseOrderController extends Controller
      */
     public function imprimir(Request $request, $id)
     {
-        $companyId = $request->header('company-id');
-        
-        $order = PurchaseOrder::with([
-            'items.quoteItem',
-            'company',
-            'quote.buyer',
-            'quote.approvals.approver',
-            'quote.approvals' => function ($query) {
-                $query->where('required', true);
-            },
-            'createdBy',
-            'quoteSupplier'
-        ])->findOrFail($id);
-        
-        // Garantir que o relacionamento approver está carregado para todas as aprovações
-        if ($order->quote && $order->quote->approvals) {
-            $order->quote->load(['approvals.approver']);
+        $dados = $this->getDadosParaImpressao($request, $id);
+        if ($dados instanceof \Illuminate\Http\JsonResponse) {
+            return $dados;
         }
 
-        // Verificar se o pedido pertence à empresa
-        if ($order->company_id != $companyId) {
-            return response()->json([
-                'message' => 'Pedido não encontrado ou não pertence à empresa.',
-            ], Response::HTTP_FORBIDDEN);
-        }
-
-        // Comprador só pode imprimir pedidos em que é o comprador da cotação
-        $user = auth()->user();
-        if ($user && $this->isOnlyBuyer($user, $companyId)) {
-            $quoteBuyerId = $order->quote ? $order->quote->buyer_id : null;
-            if ((int) $quoteBuyerId !== (int) $user->id) {
-                return response()->json([
-                    'message' => 'Você não tem permissão para imprimir este pedido.',
-                ], Response::HTTP_FORBIDDEN);
-            }
-        }
-
-        // Calcular totais
-        $totalIten = $order->items->sum('total_price');
-        $totalIPI = $order->items->sum('ipi');
-        $totalICM = $order->items->sum('icms');
-        // Frete do pedido de compra (copiado da cotação)
-        $totalFRE = $order->freight_value ?? 0;
-        $totalDES = 0; // Despesas
-        $totalSEG = 0; // Seguro
-        $totalDEC = 0; // Desconto
-        $valorTotal = $totalIten + $totalICM + $totalIPI + $totalSEG + $totalDES + $totalFRE - $totalDEC;
-
-        // Recarregar a cotação para garantir que as aprovações mais recentes sejam consideradas
-        if ($order->quote) {
-            $order->quote->refresh();
-            $order->quote->load(['approvals.approver']);
-        }
-        
-        // Buscar assinaturas - usar aprovações da cotação se disponível
-        $signatures = $this->getSignaturesByProfile($request, $companyId, $order->quote);
-
-        // COMPRADOR: sempre usar o comprador da cotação (buyer), não quem aprovou nem quem criou o pedido
-        if ($order->quote && $order->quote->buyer_id) {
-            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
-            if ($quoteBuyer) {
-                $signatures['COMPRADOR'] = [
-                    'user_id' => $quoteBuyer->id,
-                    'user_name' => $quoteBuyer->nome_completo ?? $order->quote->buyer_name,
-                    'signature_path' => $quoteBuyer->signature_path ?? null,
-                    'signature_url' => $quoteBuyer->signature_path
-                        ? $request->getSchemeAndHttpHost() . '/storage/' . $quoteBuyer->signature_path
-                        : null,
-                ];
-            }
-        }
-
-        // Fallback: Se não houver comprador na cotação, usar assinatura do usuário que criou o pedido
-        if ((!isset($signatures['COMPRADOR']) || !$signatures['COMPRADOR']) && $order->createdBy && $order->createdBy->signature_path) {
-            $signatures['COMPRADOR'] = [
-                'user_id' => $order->createdBy->id,
-                'user_name' => $order->createdBy->nome_completo,
-                'signature_path' => $order->createdBy->signature_path,
-                'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $order->createdBy->signature_path
-            ];
-        }
-        
-        // Converter URLs de assinaturas para base64 para o PDF
-        foreach ($signatures as $key => $signature) {
-            if ($signature && isset($signature['signature_path'])) {
-                // Caminho correto do arquivo
-                $signaturePath = storage_path('app/public/' . $signature['signature_path']);
-                
-                if (file_exists($signaturePath)) {
-                    try {
-                        $imageData = file_get_contents($signaturePath);
-                        if ($imageData !== false && strlen($imageData) > 0) {
-                            // Detectar tipo de imagem pela extensão
-                            $extension = strtolower(pathinfo($signaturePath, PATHINFO_EXTENSION));
-                            $mimeType = 'image/png'; // padrão
-                            
-                            switch ($extension) {
-                                case 'jpg':
-                                case 'jpeg':
-                                    $mimeType = 'image/jpeg';
-                                    break;
-                                case 'png':
-                                    $mimeType = 'image/png';
-                                    break;
-                                case 'gif':
-                                    $mimeType = 'image/gif';
-                                    break;
-                                case 'webp':
-                                    $mimeType = 'image/webp';
-                                    break;
-                            }
-                            
-                            $base64 = base64_encode($imageData);
-                            // Remover quebras de linha do base64 para evitar problemas no PDF
-                            $base64 = str_replace(["\r", "\n"], '', $base64);
-                            $signatures[$key]['signature_base64'] = 'data:' . $mimeType . ';base64,' . $base64;
-                        }
-                    } catch (\Exception $e) {
-                        // Se falhar, deixa sem base64
-                    }
-                }
-            }
-        }
-
-        // Comprador: usar o comprador da cotação (buyer), não quem criou o pedido
-        $buyer = $order->createdBy;
-        if ($order->quote && $order->quote->buyer_id) {
-            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
-            if ($quoteBuyer) {
-                $buyer = $quoteBuyer;
-            }
-        }
-
-        // Chunking: 5 itens por página (itens com texto longo na aplicação quebram em 4+ linhas)
-        $itemsArray = $order->items->values()->all();
-        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 7);
-
-        // Preparar dados para a view
-        $dados = [
-            'order' => $order,
-            'company' => $order->company,
-            'items' => $order->items,
-            'itemChunks' => $itemChunks,
-            'quote' => $order->quote,
-            'buyer' => $buyer,
-            'totalIten' => $totalIten,
-            'totalIPI' => $totalIPI,
-            'totalICM' => $totalICM,
-            'totalFRE' => $totalFRE,
-            'totalDES' => $totalDES,
-            'totalSEG' => $totalSEG,
-            'totalDEC' => $totalDEC,
-            'valorTotal' => $valorTotal,
-            'pageNumber' => 1,
-            'totalPages' => 1,
-            'signatures' => $signatures,
-        ];
+        $order = $dados['order'];
 
         // Gerar PDF com opções para suportar imagens base64
         $options = new Options();
@@ -381,6 +230,164 @@ class PurchaseOrderController extends Controller
         
         // Opção 2: Retornar visualização
         return $pdf->stream('pedido-compra-' . $order->order_number . '.pdf');
+    }
+
+    /**
+     * Visualizar pedido de compra como HTML (para debug e inspecionar layout)
+     */
+    public function visualizarHtml(Request $request, $id)
+    {
+        $dados = $this->getDadosParaImpressao($request, $id);
+        if ($dados instanceof \Illuminate\Http\JsonResponse) {
+            return $dados;
+        }
+        $dados['asHtml'] = true;
+        return response()->view('pedido-compra', $dados)->header('Content-Type', 'text/html; charset=UTF-8');
+    }
+
+    /**
+     * Preparar dados para impressão do pedido (reutilizado por imprimir e visualizarHtml)
+     */
+    private function getDadosParaImpressao(Request $request, $id)
+    {
+        $companyId = $request->header('company-id');
+
+        $order = PurchaseOrder::with([
+            'items.quoteItem',
+            'company',
+            'quote.buyer',
+            'quote.approvals.approver',
+            'quote.approvals' => function ($query) {
+                $query->where('required', true);
+            },
+            'createdBy',
+            'quoteSupplier'
+        ])->findOrFail($id);
+
+        if ($order->quote && $order->quote->approvals) {
+            $order->quote->load(['approvals.approver']);
+        }
+
+        if ($order->company_id != $companyId) {
+            return response()->json([
+                'message' => 'Pedido não encontrado ou não pertence à empresa.',
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $user = auth()->user();
+        if ($user && $this->isOnlyBuyer($user, $companyId)) {
+            $quoteBuyerId = $order->quote ? $order->quote->buyer_id : null;
+            if ((int) $quoteBuyerId !== (int) $user->id) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para imprimir este pedido.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+        }
+
+        $totalIten = $order->items->sum('total_price');
+        $totalIPI = $order->items->sum('ipi');
+        $totalICM = $order->items->sum('icms');
+        $totalFRE = $order->freight_value ?? 0;
+        $totalDES = 0;
+        $totalSEG = 0;
+        $totalDEC = 0;
+        $valorTotal = $totalIten + $totalICM + $totalIPI + $totalSEG + $totalDES + $totalFRE - $totalDEC;
+
+        if ($order->quote) {
+            $order->quote->refresh();
+            $order->quote->load(['approvals.approver']);
+        }
+
+        $signatures = $this->getSignaturesByProfile($request, $companyId, $order->quote);
+
+        if ($order->quote && $order->quote->buyer_id) {
+            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
+            if ($quoteBuyer) {
+                $signatures['COMPRADOR'] = [
+                    'user_id' => $quoteBuyer->id,
+                    'user_name' => $quoteBuyer->nome_completo ?? $order->quote->buyer_name,
+                    'signature_path' => $quoteBuyer->signature_path ?? null,
+                    'signature_url' => $quoteBuyer->signature_path
+                        ? $request->getSchemeAndHttpHost() . '/storage/' . $quoteBuyer->signature_path
+                        : null,
+                ];
+            }
+        }
+
+        if ((!isset($signatures['COMPRADOR']) || !$signatures['COMPRADOR']) && $order->createdBy && $order->createdBy->signature_path) {
+            $signatures['COMPRADOR'] = [
+                'user_id' => $order->createdBy->id,
+                'user_name' => $order->createdBy->nome_completo,
+                'signature_path' => $order->createdBy->signature_path,
+                'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $order->createdBy->signature_path
+            ];
+        }
+
+        foreach ($signatures as $key => $signature) {
+            if ($signature && isset($signature['signature_path'])) {
+                $signaturePath = storage_path('app/public/' . $signature['signature_path']);
+                if (file_exists($signaturePath)) {
+                    try {
+                        $imageData = file_get_contents($signaturePath);
+                        if ($imageData !== false && strlen($imageData) > 0) {
+                            $extension = strtolower(pathinfo($signaturePath, PATHINFO_EXTENSION));
+                            $mimeType = 'image/png';
+                            switch ($extension) {
+                                case 'jpg':
+                                case 'jpeg':
+                                    $mimeType = 'image/jpeg';
+                                    break;
+                                case 'png':
+                                    $mimeType = 'image/png';
+                                    break;
+                                case 'gif':
+                                    $mimeType = 'image/gif';
+                                    break;
+                                case 'webp':
+                                    $mimeType = 'image/webp';
+                                    break;
+                            }
+                            $base64 = base64_encode($imageData);
+                            $base64 = str_replace(["\r", "\n"], '', $base64);
+                            $signatures[$key]['signature_base64'] = 'data:' . $mimeType . ';base64,' . $base64;
+                        }
+                    } catch (\Exception $e) {
+                        // ignorar
+                    }
+                }
+            }
+        }
+
+        $buyer = $order->createdBy;
+        if ($order->quote && $order->quote->buyer_id) {
+            $quoteBuyer = $order->quote->relationLoaded('buyer') ? $order->quote->buyer : $order->quote->load('buyer')->buyer;
+            if ($quoteBuyer) {
+                $buyer = $quoteBuyer;
+            }
+        }
+
+        $itemsArray = $order->items->values()->all();
+        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 5);
+
+        return [
+            'order' => $order,
+            'company' => $order->company,
+            'items' => $order->items,
+            'itemChunks' => $itemChunks,
+            'quote' => $order->quote,
+            'buyer' => $buyer,
+            'totalIten' => $totalIten,
+            'totalIPI' => $totalIPI,
+            'totalICM' => $totalICM,
+            'totalFRE' => $totalFRE,
+            'totalDES' => $totalDES,
+            'totalSEG' => $totalSEG,
+            'totalDEC' => $totalDEC,
+            'valorTotal' => $valorTotal,
+            'pageNumber' => 1,
+            'totalPages' => 1,
+            'signatures' => $signatures,
+        ];
     }
 
     /**
