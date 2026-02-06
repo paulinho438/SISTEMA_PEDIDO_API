@@ -32,7 +32,7 @@
             top: 0;
             left: 0;
             width: 100%;
-            height: 318px;
+            height: 340px;
             box-sizing: border-box;
             background: #fff;
             z-index: 9999;
