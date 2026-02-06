@@ -450,10 +450,6 @@
             break-inside: avoid;
             page-break-after: auto;
         }
-
-        .signature-line.no-signature {
-    margin-top: 20px;
-}
         
         .items-table td {
             border: 1px solid #000;
@@ -763,10 +759,7 @@
                 </div>
             </div>
             <div class="signature-box">
-            <div class="signature-line {{ 
-    (empty($signatures['GERENTE LOCAL']['signature_base64'] ?? null) 
-     && empty($buyer?->signature_path)) ? 'no-signature' : '' 
-}}">
+                <div class="signature-line">
                     @if(isset($signatures['GERENTE LOCAL']) && $signatures['GERENTE LOCAL'] && !empty($signatures['GERENTE LOCAL']['signature_base64']))
                         <img src="{!! $signatures['GERENTE LOCAL']['signature_base64'] !!}" alt="Assinatura Gerente Local Compras" class="signature-image" />
                     @endif
@@ -780,10 +773,7 @@
                 </div>
             </div>
             <div class="signature-box">
-            <div class="signature-line {{ 
-    (empty($signatures['ENGENHEIRO']['signature_base64'] ?? null) 
-     && empty($buyer?->signature_path)) ? 'no-signature' : '' 
-}}">
+                <div class="signature-line">
                     @if(isset($signatures['ENGENHEIRO']) && $signatures['ENGENHEIRO'] && !empty($signatures['ENGENHEIRO']['signature_base64']))
                         <img src="{!! $signatures['ENGENHEIRO']['signature_base64'] !!}" alt="Assinatura Engenheiro" class="signature-image" />
                     @endif
@@ -797,10 +787,7 @@
                 </div>
             </div>
             <div class="signature-box">
-            <div class="signature-line {{ 
-    (empty($signatures['GERENTE GERAL']['signature_base64'] ?? null) 
-     && empty($buyer?->signature_path)) ? 'no-signature' : '' 
-}}">
+                <div class="signature-line">
                     @if(isset($signatures['GERENTE GERAL']) && $signatures['GERENTE GERAL'] && !empty($signatures['GERENTE GERAL']['signature_base64']))
                         <img src="{!! $signatures['GERENTE GERAL']['signature_base64'] !!}" alt="Assinatura Gerente Geral Compras" class="signature-image" />
                     @endif
@@ -814,10 +801,7 @@
                 </div>
             </div>
             <div class="signature-box">
-            <div class="signature-line {{ 
-    (empty($signatures['DIRETOR']['signature_base64'] ?? null) 
-     && empty($buyer?->signature_path)) ? 'no-signature' : '' 
-}}">
+                <div class="signature-line">
                     @if(isset($signatures['DIRETOR']) && $signatures['DIRETOR'] && !empty($signatures['DIRETOR']['signature_base64']))
                         <img src="{!! $signatures['DIRETOR']['signature_base64'] !!}" alt="Assinatura Diretor" class="signature-image" />
                     @endif
@@ -831,10 +815,7 @@
                 </div>
             </div>
             <div class="signature-box">
-            <div class="signature-line {{ 
-    (empty($signatures['PRESIDENTE']['signature_base64'] ?? null) 
-     && empty($buyer?->signature_path)) ? 'no-signature' : '' 
-}}">
+                <div class="signature-line">
                     @if(isset($signatures['PRESIDENTE']) && $signatures['PRESIDENTE'] && !empty($signatures['PRESIDENTE']['signature_base64']))
                         <img src="{!! $signatures['PRESIDENTE']['signature_base64'] !!}" alt="Assinatura Presidente" class="signature-image" />
                     @endif
