@@ -192,6 +192,7 @@ class StockTransferController extends Controller
                     'codigo' => $item->product->code ?? '-',
                     'referencia' => $item->product->reference ?? '-',
                     'descricao' => $item->product->description ?? '-',
+                    'unidade' => $item->product->unit ?? '-',
                     'quantidade' => (float) $item->quantity, // Passar como float para a view formatar
                     'preco_unitario' => 0.00,
                     'preco_total' => 0.00,
@@ -279,6 +280,7 @@ class StockTransferController extends Controller
                     'codigo' => $stock->product->code ?? '-',
                     'referencia' => $stock->product->reference ?? '-',
                     'descricao' => $stock->product->description ?? '-',
+                    'unidade' => $stock->product->unit ?? '-',
                     'quantidade' => (float) $itemData['quantidade'],
                     'preco_unitario' => 0.00,
                     'preco_total' => 0.00,

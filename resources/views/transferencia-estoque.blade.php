@@ -215,13 +215,14 @@
     <table class="items-table">
         <thead>
             <tr>
-                <th style="width: 8%;">Código</th>
-                <th style="width: 8%;">Referência</th>
-                <th style="width: 40%;">Mercadoria</th>
-                <th style="width: 8%;">Marca</th>
-                <th style="width: 8%;">Modelo</th>
-                <th style="width: 8%;">Observação</th>
-                <th style="width: 10%;">Quantidade</th>
+                <th style="width: 7%;">Código</th>
+                <th style="width: 7%;">Referência</th>
+                <th style="width: 35%;">Mercadoria</th>
+                <th style="width: 7%;">Marca</th>
+                <th style="width: 7%;">Modelo</th>
+                <th style="width: 7%;">Observação</th>
+                <th style="width: 8%;">Quantidade</th>
+                <th style="width: 6%;">Unidade</th>
                 <th style="width: 5%;">Preço Unitário</th>
                 <th style="width: 5%;">Preço Total</th>
             </tr>
@@ -239,6 +240,7 @@
                     <td></td>
                     <td></td>
                     <td class="numero">{{ number_format((float)($item['quantidade'] ?? 0), 2, ',', '.') }}</td>
+                    <td class="centro">{{ $item['unidade'] ?? '-' }}</td>
                     <td class="numero">{{ number_format((float)($item['preco_unitario'] ?? 0), 2, ',', '.') }}</td>
                     <td class="numero">{{ number_format((float)($item['preco_total'] ?? 0), 2, ',', '.') }}</td>
                 </tr>
