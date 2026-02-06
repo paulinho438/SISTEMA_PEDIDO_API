@@ -37,7 +37,6 @@
             background: #fff;
             z-index: 9999;
             padding: 8px 10px 10px 10px;
-            border-bottom: 1px solid #ccc;
             overflow: hidden;
         }
         
