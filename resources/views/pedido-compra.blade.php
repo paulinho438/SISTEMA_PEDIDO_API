@@ -21,9 +21,9 @@
             margin: 0;
             padding: 0;
             color: #000;
-            padding-top: 320px;
+            padding-top: 310px;
             padding-left: 10px;
-            padding-bottom: 250px;
+            padding-bottom: 220px;
         }
 
         /* Topo fixo em todas as páginas: mesmo layout de "Estava assim" (logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA) */
@@ -178,7 +178,7 @@
         /* Totais + Observações fixos em todas as páginas */
         .print-summary {
             position: fixed;
-            bottom: 132px;
+            bottom: 118px;
             left: 0;
             width: 100%;
             box-sizing: border-box;
@@ -190,32 +190,32 @@
         
         .print-summary .totals-section {
             margin-top: 0;
-            padding: 5px 6px;
-            font-size: 7pt;
+            padding: 3px 5px;
+            font-size: 6.5pt;
             line-height: 1.3;
         }
         
         .print-summary .totals-line {
-            padding: 2px 0;
-            min-height: 1.2em;
+            padding: 1px 0;
+            min-height: 1.1em;
         }
         
         .print-summary .totals-line-values {
-            padding: 2px 0;
-            font-size: 7pt;
+            padding: 1px 0;
+            font-size: 6.5pt;
         }
         
         .print-summary .total-final {
-            font-size: 9pt;
+            font-size: 8pt;
             padding-top: 3px;
             margin-top: 3px;
         }
         
         .print-summary .observations {
-            margin-top: 6px;
-            padding: 4px 5px;
-            min-height: 36px;
-            font-size: 7pt;
+            margin-top: 3px;
+            padding: 2px 4px;
+            min-height: 28px;
+            font-size: 6.5pt;
         }
         
         .print-summary .observations-title {
@@ -232,7 +232,7 @@
             background: #fff;
             z-index: 9998;
             border-top: 1px solid #ccc;
-            padding: 8px 5px 5px 5px;
+            padding: 4px 5px 4px 5px;
         }
         
         .print-signatures .signatures {
@@ -241,7 +241,7 @@
         }
         
         .print-signatures .signature-line {
-            min-height: 36px;
+            min-height: 28px;
             padding-top: 0;
             margin-bottom: -20px;
             display: flex;
@@ -259,7 +259,7 @@
         }
         
         .print-signatures .signature-name-line {
-            min-height: 14px;
+            min-height: 10px;
             margin-top: 0;
             padding-top: 2px;
             padding-bottom: 2px;
@@ -278,7 +278,7 @@
         .table-separator-line {
             border-top: 1px solid #000;
             margin-top: 0;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .bottom {
@@ -403,9 +403,10 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 8pt;
+            margin: 6px 0;
+            font-size: 7.5pt;
             page-break-inside: auto;
+            break-inside: auto;
         }
         
         .items-table thead {
@@ -414,12 +415,12 @@
         
         .items-table thead th {
             border: 1px solid #000;
-            padding: 4px 3px;
+            padding: 3px 2px;
             background-color: #f0f0f0;
             font-weight: bold;
             text-align: center;
             vertical-align: bottom;
-            line-height: 1.2;
+            line-height: 1.15;
         }
         
         .items-table tbody {
@@ -427,13 +428,14 @@
         }
         
         .items-table tbody td {
-            padding: 4px 3px;
+            padding: 3px 2px;
             vertical-align: top;
-            line-height: 1.25;
+            line-height: 1.15;
         }
         
         .items-table tr {
             page-break-inside: avoid;
+            break-inside: avoid;
             page-break-after: auto;
         }
         
