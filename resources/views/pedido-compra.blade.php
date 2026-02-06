@@ -23,7 +23,7 @@
             color: #000;
             padding-top: 310px;
             padding-left: 10px;
-            padding-bottom: 220px;
+            padding-bottom: 230px;
         }
 
         /* Topo fixo em todas as páginas: mesmo layout de "Estava assim" (logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA) */
