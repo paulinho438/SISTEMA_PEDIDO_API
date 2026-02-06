@@ -248,7 +248,7 @@
         }
         
         .print-signatures .signature-image {
-            max-height: 36px;
+            height: 60px;
             vertical-align: bottom;
         }
         
@@ -560,7 +560,6 @@
         
         .signature-image {
             max-width: 90%;
-            max-height: 50px;
             height: auto;
             width: auto;
             display: inline-block;
