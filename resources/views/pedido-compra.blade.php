@@ -271,7 +271,7 @@
         /* Conteúdo em fluxo normal: tabela em chunks com quebra de página */
         .top {
             margin-bottom: 0;
-            /* margin-top: 30px; */
+            margin-top: 50px;
         }
         
         /* Linha horizontal logo acima da tabela de itens */
