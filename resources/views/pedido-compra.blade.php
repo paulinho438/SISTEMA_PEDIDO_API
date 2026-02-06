@@ -277,7 +277,6 @@
         
         /* Linha horizontal logo acima da tabela de itens */
         .table-separator-line {
-            border-top: 1px solid #000;
             margin-top: 0;
             margin-bottom: 8px;
         }
