@@ -243,14 +243,14 @@
             height: 36px;
             min-height: 36px;
             padding-top: 0;
-            margin-bottom: 0;
+            margin-bottom: -14px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
         }
         
         .print-signatures .signature-image {
-            max-height: 36px;
+            max-height: 41px;
             height: auto;
             vertical-align: bottom;
         }
