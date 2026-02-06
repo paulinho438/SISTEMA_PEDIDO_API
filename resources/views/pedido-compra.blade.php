@@ -23,7 +23,7 @@
             color: #000;
             padding-top: 310px;
             padding-left: 10px;
-            padding-bottom: 230px;
+            padding-bottom: 220px;
         }
 
         /* Topo fixo em todas as páginas: mesmo layout de "Estava assim" (logo, título, dados, FORNECEDOR, FATURAR A, ENDEREÇO DE ENTREGA) */
@@ -107,7 +107,7 @@
         
         /* ENDEREÇO DE ENTREGA: mesmo estilo do layout original (borda preta, 8pt, espaço acima); na frente de tudo */
         .print-header .delivery-block {
-            margin-top: 0;
+            margin-top: 10px;
             margin-bottom: 0;
             border: 1px solid #000;
             padding: 5px;
