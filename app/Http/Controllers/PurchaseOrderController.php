@@ -339,16 +339,16 @@ class PurchaseOrderController extends Controller
             }
         }
 
-        // Itens em lista única: a paginação é feita pelo DomPDF conforme o espaço disponível
-        // (itens com texto longo na aplicação/descrição quebram linha e consomem mais espaço)
+        // Chunking: 5 itens por página (itens com texto longo na aplicação quebram em 4+ linhas)
         $itemsArray = $order->items->values()->all();
+        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 5);
 
         // Preparar dados para a view
         $dados = [
             'order' => $order,
             'company' => $order->company,
             'items' => $order->items,
-            'itemsArray' => $itemsArray,
+            'itemChunks' => $itemChunks,
             'quote' => $order->quote,
             'buyer' => $buyer,
             'totalIten' => $totalIten,

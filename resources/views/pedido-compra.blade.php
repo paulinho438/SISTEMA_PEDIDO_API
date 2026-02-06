@@ -269,16 +269,25 @@
             font-size: 6pt;
         }
 
-        /* Conteúdo em fluxo normal: tabela pode ocupar várias páginas, totais/observações vêm depois */
+        /* Conteúdo em fluxo normal: tabela em chunks com quebra de página */
         .top {
             margin-bottom: 0;
+            margin-top: 15px;
         }
         
-        /* Linha horizontal logo acima da tabela de itens (igual 3ª foto: separação clara) */
+        /* Linha horizontal logo acima da tabela de itens */
         .table-separator-line {
             border-top: 1px solid #000;
             margin-top: 0;
             margin-bottom: 4px;
+        }
+        
+        .items-page {
+            page-break-inside: avoid;
+        }
+        
+        .page-break-after {
+            page-break-after: always;
         }
 
         .bottom {
@@ -403,8 +412,8 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin: 6px 0;
-            font-size: 7.5pt;
+            margin: 8px 0;
+            font-size: 8pt;
             page-break-inside: auto;
             break-inside: auto;
         }
@@ -415,7 +424,7 @@
         
         .items-table thead th {
             border: 1px solid #000;
-            padding: 3px 2px;
+            padding: 4px 3px;
             background-color: #f0f0f0;
             font-weight: bold;
             text-align: center;
@@ -428,7 +437,7 @@
         }
         
         .items-table tbody td {
-            padding: 3px 2px;
+            padding: 4px 3px;
             vertical-align: top;
             line-height: 1.15;
         }
@@ -820,50 +829,56 @@
         <div class="footer-page"></div>
     </div>
 
-    <!-- Conteúdo Principal: apenas tabela de itens (header, totais, assinaturas e footer são fixos) -->
+    <!-- Conteúdo Principal: tabela em chunks de 5 itens (header, totais, assinaturas e footer são fixos) -->
     <div class="top">
-        <!-- Linha separadora e tabela de itens: paginação natural conforme espaço (itens com texto longo ocupam mais linhas) -->
         <div class="table-separator-line"></div>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width: 4%;">Item</th>
-                    <th style="width: 8%;">Cod.</th>
-                    <th style="width: 25%;">Descrição do Material / Serviço</th>
-                    <th style="width: 15%;">Aplicação</th>
-                    <th style="width: 10%;">Marca</th>
-                    <th style="width: 5%;">Unid.</th>
-                    <th style="width: 7%;">Qtd.</th>
-                    <th style="width: 12%;">Vlr Unit.</th>
-                    <th style="width: 14%;">Vlr Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($itemsArray ?? [] as $index => $item)
-                    @php
-                        $globalIndex = $index + 1;
-                        $quoteItem = $item->quoteItem;
-                        $description = $item->product_description ?? '';
-                        $application = $quoteItem ? ($quoteItem->application ?? '') : '';
-                        $brand = '';
-                        if ($quoteItem && $quoteItem->tag) {
-                            $brand = $quoteItem->tag;
-                        }
-                    @endphp
+        @foreach($itemChunks as $chunkIndex => $chunk)
+        <div class="items-page">
+            <table class="items-table">
+                <thead>
                     <tr>
-                        <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>
-                        <td>{{ $item->product_code ?? '' }}</td>
-                        <td>{{ strtoupper($description) }}</td>
-                        <td>{{ strtoupper($application) }}</td>
-                        <td>{{ strtoupper($brand) }}</td>
-                        <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
-                        <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
-                        <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
-                        <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
+                        <th style="width: 4%;">Item</th>
+                        <th style="width: 8%;">Cod.</th>
+                        <th style="width: 25%;">Descrição do Material / Serviço</th>
+                        <th style="width: 15%;">Aplicação</th>
+                        <th style="width: 10%;">Marca</th>
+                        <th style="width: 5%;">Unid.</th>
+                        <th style="width: 7%;">Qtd.</th>
+                        <th style="width: 12%;">Vlr Unit.</th>
+                        <th style="width: 14%;">Vlr Total</th>
                     </tr>
-                @endforeach
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach($chunk as $indexInChunk => $item)
+                        @php
+                            $globalIndex = $chunkIndex * 5 + $indexInChunk + 1;
+                            $quoteItem = $item->quoteItem;
+                            $description = $item->product_description ?? '';
+                            $application = $quoteItem ? ($quoteItem->application ?? '') : '';
+                            $brand = '';
+                            if ($quoteItem && $quoteItem->tag) {
+                                $brand = $quoteItem->tag;
+                            }
+                        @endphp
+                        <tr>
+                            <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>
+                            <td>{{ $item->product_code ?? '' }}</td>
+                            <td>{{ strtoupper($description) }}</td>
+                            <td>{{ strtoupper($application) }}</td>
+                            <td>{{ strtoupper($brand) }}</td>
+                            <td class="center">{{ strtoupper($item->unit ?? '') }}</td>
+                            <td class="number">{{ number_format($item->quantity, 2, ',', '.') }}</td>
+                            <td class="number">{{ number_format($item->unit_price, 2, ',', '.') }}</td>
+                            <td class="number">{{ number_format($item->total_price, 2, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @if(!$loop->last)
+        <div class="page-break-after"></div>
+        @endif
+        @endforeach
     </div>
 
     <script type="text/php">
