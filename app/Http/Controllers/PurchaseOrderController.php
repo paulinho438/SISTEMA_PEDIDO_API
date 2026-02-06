@@ -254,6 +254,7 @@ class PurchaseOrderController extends Controller
 
         $order = PurchaseOrder::with([
             'items.quoteItem',
+            'items.quoteSupplierItem',
             'company',
             'quote.buyer',
             'quote.approvals.approver',

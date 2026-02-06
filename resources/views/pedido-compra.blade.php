@@ -864,12 +864,12 @@
                         @php
                             $globalIndex = $chunkIndex * 5 + $indexInChunk + 1;
                             $quoteItem = $item->quoteItem;
+                            $quoteSupplierItem = $item->quoteSupplierItem;
                             $description = $item->product_description ?? '';
                             $application = $quoteItem ? ($quoteItem->application ?? '') : '';
-                            $brand = '';
-                            if ($quoteItem && $quoteItem->tag) {
-                                $brand = $quoteItem->tag;
-                            }
+                            $brand = $quoteSupplierItem && !empty(trim($quoteSupplierItem->brand ?? ''))
+                                ? $quoteSupplierItem->brand
+                                : ($quoteItem && $quoteItem->tag ? $quoteItem->tag : '');
                         @endphp
                         <tr>
                             <td class="center">{{ str_pad($globalIndex, 4, '0', STR_PAD_LEFT) }}</td>

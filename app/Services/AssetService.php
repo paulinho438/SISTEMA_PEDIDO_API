@@ -12,13 +12,14 @@ use Carbon\Carbon;
 class AssetService
 {
     /**
-     * Valida se o número do ativo é único (não pode repetir no sistema para mesma empresa/filial)
+     * Valida se o número do ativo é único na empresa (não pode repetir)
+     * Considera company_id + asset_number (único por empresa, independente da filial)
      *
      * @throws \Exception
      */
-    private function validateAssetNumberUnique(string $assetNumber, int $companyId, ?int $branchId, ?int $excludeAssetId): void
+    private function validateAssetNumberUnique(string $assetNumber, int $companyId, $branchId, ?int $excludeAssetId): void
     {
-        $assetNumber = trim($assetNumber);
+        $assetNumber = trim((string) $assetNumber);
         if ($assetNumber === '') {
             return;
         }
@@ -26,18 +27,12 @@ class AssetService
         $query = Asset::where('company_id', $companyId)
             ->where('asset_number', $assetNumber);
 
-        if ($branchId !== null) {
-            $query->where('branch_id', $branchId);
-        } else {
-            $query->whereNull('branch_id');
-        }
-
         if ($excludeAssetId !== null) {
             $query->where('id', '!=', $excludeAssetId);
         }
 
         if ($query->exists()) {
-            throw new \Exception('O número do ativo "' . $assetNumber . '" já existe no sistema. Informe outro número.');
+            throw new \Exception('O número do ativo "' . $assetNumber . '" já está cadastrado. Informe outro número.');
         }
     }
 
@@ -151,7 +146,8 @@ class AssetService
             }
         } else {
             $data['asset_number'] = $assetNumber;
-            $this->validateAssetNumberUnique($data['asset_number'], $companyId, $data['branch_id'] ?? null, null);
+            $branchId = $data['branch_id'] ?? null;
+            $this->validateAssetNumberUnique($assetNumber, $companyId, $branchId, null);
         }
 
         $data['company_id'] = $companyId;
@@ -197,10 +193,11 @@ class AssetService
         $data['updated_by'] = $userId ?? auth()->id();
         $data = $this->normalizeCostCenterForAsset($data);
 
-        // Se número do ativo foi alterado, validar unicidade
-        if (array_key_exists('asset_number', $data) && !empty(trim((string) $data['asset_number']))) {
+        // Validar unicidade do número do ativo sempre que vier no payload (criar e editar)
+        $assetNumber = trim((string) ($data['asset_number'] ?? ''));
+        if ($assetNumber !== '') {
             $branchId = $data['branch_id'] ?? $asset->branch_id;
-            $this->validateAssetNumberUnique($data['asset_number'], $asset->company_id, $branchId, $asset->id);
+            $this->validateAssetNumberUnique($assetNumber, $asset->company_id, $branchId, $asset->id);
         }
 
         // Usar método auxiliar para garantir compatibilidade com SQL Server
