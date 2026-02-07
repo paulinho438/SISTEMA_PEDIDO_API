@@ -4271,7 +4271,7 @@ class PurchaseQuoteController extends Controller
             'approvals',
             'buyer',
             'items',
-            'orders'
+            'orders.statusHistory'
         ])
         ->when($companyId, function ($query) use ($companyId) {
             $query->where(function ($q) use ($companyId) {
@@ -4348,6 +4348,24 @@ class PurchaseQuoteController extends Controller
                 $dataLiberacaoColeta = $ultimaAprovacao?->approved_at ?? null;
             }
             
+            // Buscar data de coleta e atendimento (almoxarifado) no histórico dos pedidos de compra
+            if ($quote->orders && $quote->orders->isNotEmpty()) {
+                $pedidoMaisRecente = $quote->orders->sortByDesc('created_at')->first();
+                if ($pedidoMaisRecente && $pedidoMaisRecente->statusHistory && $pedidoMaisRecente->statusHistory->isNotEmpty()) {
+                    $historicoColeta = $pedidoMaisRecente->statusHistory
+                        ->where('new_status', PurchaseOrder::STATUS_COLETA)
+                        ->sortBy('created_at')
+                        ->first();
+                    $dataColeta = $historicoColeta?->created_at ?? null;
+
+                    $historicoAtendimento = $pedidoMaisRecente->statusHistory
+                        ->whereIn('new_status', [PurchaseOrder::STATUS_ATENDIDO, PurchaseOrder::STATUS_ATENDIDO_PARCIAL])
+                        ->sortBy('created_at')
+                        ->first();
+                    $dataAtendimento = $historicoAtendimento?->created_at ?? null;
+                }
+            }
+            
             // Calcular diferenças em dias
             $diasComRM = null;
             if ($dataSolicitacao) {
@@ -4368,7 +4386,7 @@ class PurchaseQuoteController extends Controller
             
             $tempoSolicitacao = null;
             if ($dataSolicitacao) {
-                $dataFim = $dataFinalizacao ?? $dataAprovacaoDiretor ?? now();
+                $dataFim = $dataAtendimento ?? $dataFinalizacao ?? $dataAprovacaoDiretor ?? now();
                 $tempoSolicitacao = $dataSolicitacao->diffInDays($dataFim);
             }
             
