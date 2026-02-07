@@ -23,6 +23,8 @@ class AssetAuxiliarySeeder extends Seeder
             ['code' => 'REMOVIDO', 'name' => 'Removido', 'description' => 'Item removido ou desmontado', 'active' => true],
             ['code' => 'MANUTENCAO', 'name' => 'Em Manutenção', 'description' => 'Item em manutenção', 'active' => true],
             ['code' => 'OBSOLETO', 'name' => 'Obsoleto', 'description' => 'Item obsoleto', 'active' => true],
+            ['code' => 'DESCARTE', 'name' => 'Descarte', 'description' => 'Item para descarte', 'active' => true],
+            ['code' => 'DANIFICADO', 'name' => 'Danificado', 'description' => 'Item danificado', 'active' => true],
         ];
 
         $useConditionIds = [];
