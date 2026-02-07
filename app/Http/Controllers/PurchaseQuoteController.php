@@ -4348,10 +4348,18 @@ class PurchaseQuoteController extends Controller
                 $dataLiberacaoColeta = $ultimaAprovacao?->approved_at ?? null;
             }
             
-            // Buscar data de coleta e atendimento (almoxarifado) no histórico dos pedidos de compra
+            // Buscar data de coleta, atendimento e liberação para coleta no histórico dos pedidos de compra
             if ($quote->orders && $quote->orders->isNotEmpty()) {
                 $pedidoMaisRecente = $quote->orders->sortByDesc('created_at')->first();
                 if ($pedidoMaisRecente && $pedidoMaisRecente->statusHistory && $pedidoMaisRecente->statusHistory->isNotEmpty()) {
+                    $historicoLinkAprovado = $pedidoMaisRecente->statusHistory
+                        ->where('new_status', PurchaseOrder::STATUS_LINK_APROVADO)
+                        ->sortBy('created_at')
+                        ->first();
+                    if ($historicoLinkAprovado) {
+                        $dataLiberacaoColeta = $historicoLinkAprovado->created_at;
+                    }
+
                     $historicoColeta = $pedidoMaisRecente->statusHistory
                         ->where('new_status', PurchaseOrder::STATUS_COLETA)
                         ->sortBy('created_at')
