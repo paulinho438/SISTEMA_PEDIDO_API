@@ -685,7 +685,7 @@
             </div>
             <div class="dates-row">
                 <div><strong>PRAZO DE ENTREGA:</strong> {{ $order->expected_delivery_date ? $order->expected_delivery_date->format('d/m/Y') : '' }}</div>
-                <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+                <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quoteSupplier && $order->quoteSupplier->payment_condition_description ? $order->quoteSupplier->payment_condition_description : ($order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '') }}</div>
                 <div style="text-align: right;"><strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}</div>
             </div>
         </div>
@@ -695,7 +695,7 @@
     <div class="print-summary">
         <div class="totals-section">
             <div class="totals-line">
-                <div><strong>COND. PGTO:</strong> {{ $order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '' }}</div>
+                <div><strong>COND. PGTO:</strong> {{ $order->quoteSupplier && $order->quoteSupplier->payment_condition_description ? $order->quoteSupplier->payment_condition_description : ($order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '') }}</div>
                 <div class="totals-value-right"><strong>VALOR BRUTO:</strong> {{ number_format($totalIten, 2, ',', '.') }}</div>
             </div>
             <div class="totals-line">
