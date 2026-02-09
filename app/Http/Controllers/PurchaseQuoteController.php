@@ -400,15 +400,11 @@ class PurchaseQuoteController extends Controller
                 $intermediateLevels = ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'];
                 $isIntermediate = !empty(array_intersect($userLevels, $intermediateLevels));
                 
-                // Se é DIRETOR: mostrar APENAS cotações com status "analise_gerencia"
+                // Se é DIRETOR: mostrar TODAS as cotações com status "analise_gerencia"
+                // Não exigir que já exista registro de aprovação pendente, pois pode ser criado dinamicamente
+                // Se o status é "analise_gerencia", significa que está pronto para aprovação do diretor
                 if ($isDirector) {
                     $query->where('current_status_slug', 'analise_gerencia')
-                        ->whereHas('approvals', function ($approvalQ) {
-                            // Verificar se DIRETOR tem aprovação pendente
-                            $approvalQ->where('approval_level', 'DIRETOR')
-                                ->where('required', true)
-                                ->where('approved', false);
-                        })
                         // Garantir que TODAS as assinaturas anteriores ao DIRETOR foram aprovadas
                         // (COMPRADOR ordem 1, ENGENHEIRO/GERENTE_LOCAL/GERENTE_GERAL ordem 2)
                         // Não verificar PRESIDENTE (ordem 4) pois vem depois do DIRETOR
@@ -416,6 +412,19 @@ class PurchaseQuoteController extends Controller
                             $approvalQ->whereIn('approval_level', ['COMPRADOR', 'ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'])
                                 ->where('required', true)
                                 ->where('approved', false);
+                        })
+                        // Se já existe aprovação do DIRETOR, mostrar apenas se estiver pendente ou não aprovada
+                        // Se não existe registro de aprovação do DIRETOR, mostrar também (será criada quando necessário)
+                        ->where(function ($q) {
+                            $q->whereDoesntHave('approvals', function ($approvalQ) {
+                                $approvalQ->where('approval_level', 'DIRETOR')
+                                    ->where('required', true);
+                            })
+                            ->orWhereHas('approvals', function ($approvalQ) {
+                                $approvalQ->where('approval_level', 'DIRETOR')
+                                    ->where('required', true)
+                                    ->where('approved', false);
+                            });
                         });
                 }
                 // Se é ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (e não é DIRETOR): mostrar APENAS cotações com status "finalizada" ou "analisada"
