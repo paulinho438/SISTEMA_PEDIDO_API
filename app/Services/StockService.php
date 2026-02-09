@@ -33,8 +33,12 @@ class StockService
         $query = Stock::where('stocks.company_id', $companyId)
             ->with(['product', 'location']);
 
-        // Aplicar filtro de acesso
-        $this->accessService->applyLocationFilter($query, $user, $companyId, 'stock_location_id');
+        // Se location_id específico foi informado (ex: transferência em lote), não aplicar filtro de acesso
+        // O usuário está explicitamente selecionando um local, então deve ver todos os produtos daquele local
+        if (!$request->filled('location_id')) {
+            // Aplicar filtro de acesso apenas quando não há location_id específico
+            $this->accessService->applyLocationFilter($query, $user, $companyId, 'stock_location_id');
+        }
 
         // Filtro de busca por produto (código, referência ou descrição)
         if ($request->filled('search')) {
