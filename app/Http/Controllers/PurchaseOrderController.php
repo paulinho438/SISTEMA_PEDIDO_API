@@ -368,7 +368,7 @@ class PurchaseOrderController extends Controller
         }
 
         $itemsArray = $order->items->values()->all();
-        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 10);
+        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 15);
 
         return [
             'order' => $order,
