@@ -29,6 +29,7 @@ class PurchaseQuoteSupplier extends Model
         'protheus_last_error',
         'payment_condition_code',
         'payment_condition_description',
+        'delivery_time',
         'freight_type',
         'freight_value',
         'discount',
