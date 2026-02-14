@@ -12,6 +12,70 @@ use Symfony\Component\HttpFoundation\Response;
 
 class AssetStandardDescriptionController extends Controller
 {
+    /**
+     * Helper para inserir registros com timestamps como strings (compatível com SQL Server).
+     * Usa CAST para evitar erro "conversão de nvarchar em datetime resultou em valor fora do intervalo".
+     */
+    private function insertWithStringTimestamps(string $table, array $data): int
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+
+        $columns = array_keys($data);
+        $placeholders = array_fill(0, count($data), '?');
+        $values = array_values($data);
+
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+
+        $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
+        $sql = "INSERT INTO [{$table}] (" . implode(', ', $columnsBracketed) . ") VALUES (" . implode(', ', $placeholders) . ")";
+
+        DB::statement($sql, $values);
+
+        $id = DB::getPdo()->lastInsertId();
+        if ($id === '' || $id === false) {
+            $id = (int) DB::table($table)->orderByDesc('id')->value('id');
+        }
+        return (int) $id;
+    }
+
+    /**
+     * Helper para atualizar modelos com timestamps como strings (compatível com SQL Server).
+     */
+    private function updateModelWithStringTimestamps(AssetStandardDescription $model, array $data): void
+    {
+        unset($data['id'], $data['created_at']);
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+
+        $columns = array_keys($data);
+        $placeholders = [];
+        $values = [];
+
+        foreach ($columns as $column) {
+            if ($column === 'updated_at') {
+                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = "[{$column}] = ?";
+            }
+            $values[] = $data[$column];
+        }
+
+        $values[] = $id;
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $placeholders) . " WHERE [{$idColumn}] = ?";
+        DB::statement($sql, $values);
+        $model->refresh();
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -80,24 +144,29 @@ class AssetStandardDescriptionController extends Controller
         }
 
         $companyId = $request->header('company-id');
-        $item = null;
+        $userId = auth()->id();
 
-        DB::transaction(function () use ($request, $companyId, &$item) {
+        $newId = DB::transaction(function () use ($request, $companyId, $userId) {
             $code = trim((string) $request->input('code', ''));
             if ($code === '') {
                 $maxId = AssetStandardDescription::where('company_id', $companyId)->lockForUpdate()->max('id');
                 $code = 'DESC-' . (($maxId ?? 0) + 1);
             }
 
-            $item = AssetStandardDescription::create([
+            $data = [
                 'code' => $code,
                 'name' => $request->input('name'),
                 'description' => $request->input('description'),
                 'active' => $request->boolean('active', true),
                 'company_id' => $companyId,
-            ]);
+                'created_by' => $userId,
+                'updated_by' => $userId,
+            ];
+
+            return $this->insertWithStringTimestamps('asset_standard_descriptions', $data);
         });
 
+        $item = AssetStandardDescription::findOrFail($newId);
         return new AssetStandardDescriptionResource($item);
     }
 
@@ -109,7 +178,7 @@ class AssetStandardDescriptionController extends Controller
         }
 
         $item = AssetStandardDescription::findOrFail($id);
-        
+
         $validator = Validator::make($request->all(), [
             'code' => 'sometimes|required|string|max:50',
             'name' => 'sometimes|required|string|max:255',
@@ -119,7 +188,11 @@ class AssetStandardDescriptionController extends Controller
             return response()->json(['message' => $validator->errors()->first()], Response::HTTP_BAD_REQUEST);
         }
 
-        $item->update($request->only(['code', 'name', 'description', 'active']));
+        $updateData = array_merge(
+            $request->only(['code', 'name', 'description', 'active']),
+            ['updated_by' => auth()->id()]
+        );
+        $this->updateModelWithStringTimestamps($item, $updateData);
 
         return new AssetStandardDescriptionResource($item->fresh());
     }
