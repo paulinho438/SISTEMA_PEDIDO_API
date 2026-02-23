@@ -250,7 +250,7 @@ class PurchaseQuote extends Model
      */
     public static function generateNextNumber(): string
     {
-        $driver = self::getConnection()->getDriverName();
+        $driver = (new static)->getConnection()->getDriverName();
         $maxNum = 0;
 
         if ($driver === 'sqlsrv') {
