@@ -2249,6 +2249,22 @@ class PurchaseQuoteController extends Controller
         DB::beginTransaction();
 
         try {
+            // Se a cotação está em Análise Diretoria e o usuário é ENGENHEIRO: apenas registra a assinatura, status permanece
+            if ($currentStatus === 'analise_gerencia' && $nextLevel === 'ENGENHEIRO') {
+                $approvalService->approveLevel($quote, 'ENGENHEIRO', $user, $note);
+                $quote->refresh();
+                $statusObj = PurchaseQuoteStatus::where('slug', 'analise_gerencia')->first();
+                DB::commit();
+                $quote->load(['approvals.approver']);
+                return response()->json([
+                    'message' => 'Assinatura do engenheiro registrada. O status permanece em Análise Diretoria até a aprovação do diretor.',
+                    'status' => [
+                        'slug' => 'analise_gerencia',
+                        'label' => $statusObj ? $statusObj->label : 'Análise Diretoria',
+                    ],
+                ], Response::HTTP_OK);
+            }
+
             // Se tem permissão de editar na aprovação e foram enviados dados de edição, aplicar as mudanças primeiro
             $hasEditData = $hasEditPermission && (
                 !empty($validated['itens']) ||
@@ -2968,12 +2984,29 @@ class PurchaseQuoteController extends Controller
         $currentStatus = $quote->current_status_slug;
         $requestedStatus = $validated['status'];
         
-        // Se está tentando aprovar como Diretor (status atual é analise_gerencia e status desejado é aprovado)
+        // Se está tentando aprovar com status "aprovado" e a cotação está em Análise Diretoria
         if ($currentStatus === 'analise_gerencia' && $requestedStatus === 'aprovado') {
-            // Verificar através do ApprovalService se o usuário pode aprovar como DIRETOR
             $approvalService = app(PurchaseQuoteApprovalService::class);
-            
-            // Verificar se pode aprovar o nível DIRETOR através do ApprovalService
+
+            // Se o usuário é ENGENHEIRO e tem aprovação pendente: apenas registra a assinatura, status permanece analise_gerencia
+            $nextPendingLevel = $approvalService->getNextPendingLevelForUser($quote, $user);
+            $engineerApprovalPending = $quote->approvals()->byLevel('ENGENHEIRO')->required()->where('approved', false)->exists();
+            $isAssignedEngineer = $quote->engineer_id && (int) $quote->engineer_id === (int) $user->id;
+            $canApproveEngineer = $approvalService->canApproveLevel($quote, 'ENGENHEIRO', $user);
+            if (($nextPendingLevel === 'ENGENHEIRO' || ($engineerApprovalPending && ($isAssignedEngineer || $user->hasPermission('cotacoes_aprovar_engenheiro')))) && $canApproveEngineer) {
+                $note = $validated['observacao'] ?? 'Assinatura do engenheiro registrada.';
+                $approvalService->approveLevel($quote, 'ENGENHEIRO', $user, $note);
+                $quote->load(['approvals.approver']);
+                return response()->json([
+                    'message' => 'Assinatura do engenheiro registrada. O status permanece em Análise Diretoria até a aprovação do diretor.',
+                    'status' => [
+                        'slug' => 'analise_gerencia',
+                        'label' => $quote->current_status_label ?? 'Análise Diretoria',
+                    ],
+                ], Response::HTTP_OK);
+            }
+
+            // Verificar se pode aprovar como DIRETOR
             $directorApproval = $quote->approvals()
                 ->byLevel('DIRETOR')
                 ->required()
@@ -2981,11 +3014,9 @@ class PurchaseQuoteController extends Controller
                 ->first();
             
             if ($directorApproval) {
-                // Se há aprovação pendente, verificar se pode aprovar através do ApprovalService
                 $canApproveLevel = $approvalService->canApproveLevel($quote, 'DIRETOR', $user);
                 
                 if (!$canApproveLevel) {
-                    // Se não pode aprovar através do ApprovalService, verificar permissões diretas como fallback
                     $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
                     $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
                     
@@ -2996,7 +3027,6 @@ class PurchaseQuoteController extends Controller
                     }
                 }
             } else {
-                // Se não há aprovação pendente, verificar permissões diretas
                 $hasDirectorPermission = $user->hasPermission('cotacoes_aprovar_diretor');
                 $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
                 
