@@ -56,7 +56,10 @@ class ResponsibilityTermService
             ->findOrFail($id);
 
         $companyId = (int) request()->header('company-id');
-        if (!$this->accessService->canAccessLocation($user, $term->stock_location_id, $companyId)) {
+        $canByLocation = $this->accessService->canAccessLocation($user, $term->stock_location_id, $companyId);
+        $canByPermission = $companyId && (int) $term->company_id === $companyId
+            && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_almoxarifes'));
+        if (!$canByLocation && !$canByPermission) {
             throw new \Exception('Acesso negado a este termo.');
         }
 
@@ -157,7 +160,10 @@ class ResponsibilityTermService
         }
 
         $companyId = (int) request()->header('company-id');
-        if (!$this->accessService->canAccessLocation($user, $term->stock_location_id, $companyId)) {
+        $canByLocation = $this->accessService->canAccessLocation($user, $term->stock_location_id, $companyId);
+        $canByPermission = $companyId && (int) $term->company_id === $companyId
+            && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_almoxarifes'));
+        if (!$canByLocation && !$canByPermission) {
             throw new \Exception('Acesso negado a este termo.');
         }
 

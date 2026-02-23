@@ -33,12 +33,11 @@ class StockAccessService
             return true;
         }
 
-        // Quem pode ver movimentações ou almoxarifes ou locais pode acessar qualquer local ativo da empresa (ex.: termos de responsabilidade)
+        // Quem pode ver movimentações ou almoxarifes ou locais pode acessar qualquer local da empresa (ex.: termos de responsabilidade); não exige active para permitir ver termos cujo local foi inativado depois
         if ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_almoxarifes') || $user->hasPermission('view_estoque_locais')) {
             return DB::table('stock_locations')
                 ->where('id', $locationId)
                 ->where('company_id', $companyId)
-                ->where('active', true)
                 ->exists();
         }
 
