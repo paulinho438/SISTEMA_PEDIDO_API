@@ -33,8 +33,16 @@ class StockAccessService
             return true;
         }
 
+        // Quem pode ver movimentações ou almoxarifes ou locais pode acessar qualquer local ativo da empresa (ex.: termos de responsabilidade)
+        if ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_almoxarifes') || $user->hasPermission('view_estoque_locais')) {
+            return DB::table('stock_locations')
+                ->where('id', $locationId)
+                ->where('company_id', $companyId)
+                ->where('active', true)
+                ->exists();
+        }
+
         // Se usuário é almoxarife ou está associado a locais, verifica associação
-        // Verifica se está associado na tabela stock_almoxarife_locations
         $isAssociated = DB::table('stock_almoxarife_locations')
             ->where('user_id', $user->id)
             ->where('stock_location_id', $locationId)
@@ -90,8 +98,8 @@ class StockAccessService
             return $associatedLocations;
         }
 
-        // Se usuário tem permissão para visualizar locais, retorna todos os locais ativos
-        if ($user->hasPermission('view_estoque_locais')) {
+        // view_estoque_locais, view_estoque_movimentacoes ou view_estoque_almoxarifes: todos os locais ativos da empresa (ex.: listar/acessar termos de responsabilidade)
+        if ($user->hasPermission('view_estoque_locais') || $user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_almoxarifes')) {
             return DB::table('stock_locations')
                 ->where('company_id', $companyId)
                 ->where('active', true)
