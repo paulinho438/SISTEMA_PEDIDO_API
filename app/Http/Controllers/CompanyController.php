@@ -50,7 +50,6 @@ class CompanyController extends Controller
 
         $validator = Validator::make($request->all(), [
             'company' => 'required',
-            'email' => 'required|unique:companies,email',
         ]);
 
         $dados = $request->all();

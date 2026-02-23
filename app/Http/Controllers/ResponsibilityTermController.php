@@ -21,11 +21,12 @@ class ResponsibilityTermController extends Controller
 
     /**
      * Listar termos de responsabilidade (ferramentas).
+     * Permite: view_estoque_movimentacoes ou view_estoque_almoxarifes (ex.: Supervisor Almoxarifado).
      */
     public function index(Request $request): JsonResponse
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
+        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_almoxarifes'))) {
             return response()->json(['message' => 'Sem permissão.'], Response::HTTP_FORBIDDEN);
         }
 
@@ -48,11 +49,12 @@ class ResponsibilityTermController extends Controller
 
     /**
      * Exibir um termo.
+     * Permite: view_estoque_movimentacoes ou view_estoque_almoxarifes.
      */
     public function show(int $id): JsonResponse
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
+        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_almoxarifes'))) {
             return response()->json(['message' => 'Sem permissão.'], Response::HTTP_FORBIDDEN);
         }
 
@@ -66,11 +68,13 @@ class ResponsibilityTermController extends Controller
 
     /**
      * Criar termo de responsabilidade (saída de estoque).
+     * Permite: view_estoque_movimentacoes, view_estoque_movimentacoes_create ou view_estoque_almoxarifes.
      */
     public function store(Request $request): JsonResponse
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+        $can = $user && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create') || $user->hasPermission('view_estoque_almoxarifes'));
+        if (!$can) {
             return response()->json(['message' => 'Sem permissão.'], Response::HTTP_FORBIDDEN);
         }
 
@@ -87,11 +91,13 @@ class ResponsibilityTermController extends Controller
 
     /**
      * Devolver itens do termo (entrada no estoque).
+     * Permite: view_estoque_movimentacoes, view_estoque_movimentacoes_create ou view_estoque_almoxarifes.
      */
     public function devolver(int $id): JsonResponse
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes_create')) {
+        $can = $user && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create') || $user->hasPermission('view_estoque_almoxarifes'));
+        if (!$can) {
             return response()->json(['message' => 'Sem permissão.'], Response::HTTP_FORBIDDEN);
         }
 
@@ -108,11 +114,12 @@ class ResponsibilityTermController extends Controller
 
     /**
      * Gerar PDF do termo.
+     * Permite: view_estoque_movimentacoes ou view_estoque_almoxarifes.
      */
     public function pdf(int $id): Response|StreamedResponse|JsonResponse
     {
         $user = auth()->user();
-        if (!$user || !$user->hasPermission('view_estoque_movimentacoes')) {
+        if (!$user || (!$user->hasPermission('view_estoque_movimentacoes') && !$user->hasPermission('view_estoque_almoxarifes'))) {
             return response()->json(['message' => 'Sem permissão.'], Response::HTTP_FORBIDDEN);
         }
 

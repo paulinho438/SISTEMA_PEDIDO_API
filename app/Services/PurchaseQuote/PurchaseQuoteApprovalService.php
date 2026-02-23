@@ -193,11 +193,22 @@ class PurchaseQuoteApprovalService
             return $this->checkUserHasLevelPermission($user, $level);
         }
         
-        // Se o status é "analise_gerencia", DIRETOR e PRESIDENTE podem aprovar diretamente
-        // (todos os níveis anteriores já foram aprovados quando chegou nesse status)
-        if ($currentStatus === 'analise_gerencia' && in_array($level, ['DIRETOR', 'PRESIDENTE'], true)) {
-            // Verificar apenas se o usuário tem a permissão específica para o nível
-            return $this->checkUserHasLevelPermission($user, $level);
+        // Se o status é "analise_gerencia", DIRETOR e PRESIDENTE podem aprovar diretamente.
+        // ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL também podem aprovar nesse status (não exigir
+        // que o diretor aprove antes): o engenheiro pode assinar mesmo com a cotação aguardando o diretor.
+        if ($currentStatus === 'analise_gerencia') {
+            if (in_array($level, ['DIRETOR', 'PRESIDENTE'], true)) {
+                return $this->checkUserHasLevelPermission($user, $level);
+            }
+            if (in_array($level, $simultaneousLevels, true)) {
+                if ($level === 'ENGENHEIRO') {
+                    if ($quote->engineer_id) {
+                        return (int) $quote->engineer_id === (int) $user->id;
+                    }
+                    return $this->checkUserHasLevelPermission($user, $level);
+                }
+                return $this->checkUserHasLevelPermission($user, $level);
+            }
         }
 
         // Para outros casos, verificar se todos os níveis anteriores foram aprovados
@@ -466,8 +477,17 @@ class PurchaseQuoteApprovalService
                         }
                     }
                 } elseif ($currentStatus === 'analise_gerencia') {
-                    // Para status "analise_gerencia", verificar apenas se o usuário tem a permissão específica
-                    // (todos os níveis anteriores já foram aprovados quando chegou nesse status)
+                    // Em "analise_gerencia", DIRETOR/PRESIDENTE e também ENGENHEIRO/GERENTE_LOCAL/GERENTE_GERAL
+                    // podem aprovar (engenheiro pode assinar mesmo sem aprovação do diretor)
+                    if ($approval->approval_level === 'ENGENHEIRO') {
+                        if ($quote->engineer_id && (int) $quote->engineer_id === (int) $user->id) {
+                            return 'ENGENHEIRO';
+                        }
+                        if (!$quote->engineer_id && $this->checkUserHasLevelPermission($user, 'ENGENHEIRO')) {
+                            return 'ENGENHEIRO';
+                        }
+                        continue;
+                    }
                     if ($this->checkUserHasLevelPermission($user, $approval->approval_level)) {
                         return $approval->approval_level;
                     }

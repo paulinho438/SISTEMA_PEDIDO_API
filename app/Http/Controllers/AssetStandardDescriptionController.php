@@ -14,7 +14,7 @@ class AssetStandardDescriptionController extends Controller
 {
     /**
      * Helper para inserir registros com timestamps como strings (compatível com SQL Server).
-     * Usa CAST para evitar erro "conversão de nvarchar em datetime resultou em valor fora do intervalo".
+     * Usa CONVERT(..., 120) para evitar erro "conversão de nvarchar em datetime resultou em valor fora do intervalo".
      */
     private function insertWithStringTimestamps(string $table, array $data): int
     {
@@ -26,11 +26,11 @@ class AssetStandardDescriptionController extends Controller
         $values = array_values($data);
 
         $columns[] = 'created_at';
-        $placeholders[] = "CAST(? AS DATETIME2)";
+        $placeholders[] = "CONVERT(DATETIME2, ?, 120)";
         $values[] = $createdAt;
 
         $columns[] = 'updated_at';
-        $placeholders[] = "CAST(? AS DATETIME2)";
+        $placeholders[] = "CONVERT(DATETIME2, ?, 120)";
         $values[] = $updatedAt;
 
         $columnsBracketed = array_map(fn($col) => "[{$col}]", $columns);
@@ -63,7 +63,7 @@ class AssetStandardDescriptionController extends Controller
 
         foreach ($columns as $column) {
             if ($column === 'updated_at') {
-                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+                $placeholders[] = "[{$column}] = CONVERT(DATETIME2, ?, 120)";
             } else {
                 $placeholders[] = "[{$column}] = ?";
             }

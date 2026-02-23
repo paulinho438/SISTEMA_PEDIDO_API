@@ -131,45 +131,32 @@ class PurchaseQuote extends Model
             // Qualquer outro tipo, converter para string
             $this->attributes['requested_at'] = (string) $value;
         }
-        
-        // Log para debug (remover depois)
-        \Log::info('setRequestedAtAttribute chamado', [
-            'input_type' => gettype($value),
-            'input_value' => $value,
-            'output_value' => $this->attributes['requested_at'] ?? null,
-            'output_type' => gettype($this->attributes['requested_at'] ?? null),
-        ]);
     }
 
     /**
-     * Accessor para converter string Y-m-d de volta para Carbon quando ler do banco
-     * IMPORTANTE: Usar createFromFormat para evitar problemas de timezone
-     * Quando parseamos uma data sem hora, o Carbon pode interpretar como UTC
-     * e converter para o timezone local, resultando em um dia anterior
+     * Accessor para converter string Y-m-d de volta para Carbon quando ler do banco.
+     * A data é apenas dia (sem hora); deve ser interpretada no timezone da aplicação
+     * sem conversão, para não exibir dia anterior (ex: 11/02 virar 09/02).
      */
     public function getRequestedAtAttribute($value)
     {
         if ($value) {
             try {
-                // Se já é Carbon, retornar como está
                 if ($value instanceof \Carbon\Carbon) {
                     return $value->copy()->startOfDay();
                 }
-                
-                // Se é string no formato Y-m-d, criar diretamente no timezone local
+                $tz = config('app.timezone', 'America/Sao_Paulo');
+                // Criar a data já no timezone da aplicação (3º parâmetro) para não converter e mudar o dia
                 if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
-                    return \Carbon\Carbon::createFromFormat('Y-m-d', $value)
-                        ->setTimezone(config('app.timezone'))
-                        ->startOfDay();
+                    return \Carbon\Carbon::createFromFormat('Y-m-d', $value, $tz)->startOfDay();
                 }
-                
-                // Para outros formatos, usar parse mas garantir timezone local
-                $carbon = \Carbon\Carbon::parse($value);
-                // Se a data não tem hora, garantir que seja meia-noite no timezone local
-                if ($carbon->format('H:i:s') === '00:00:00') {
-                    return $carbon->setTimezone(config('app.timezone'))->startOfDay();
+                // Valor com hora (ex: retorno do SQL Server): tratar como data apenas no timezone da app
+                if (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}/', $value)) {
+                    $dateOnly = substr($value, 0, 10);
+                    return \Carbon\Carbon::createFromFormat('Y-m-d', $dateOnly, $tz)->startOfDay();
                 }
-                return $carbon->setTimezone(config('app.timezone'));
+                $carbon = \Carbon\Carbon::parse($value, $tz);
+                return $carbon->startOfDay();
             } catch (\Exception $e) {
                 return $value;
             }
@@ -256,10 +243,32 @@ class PurchaseQuote extends Model
         return $required > 0 && $required === $approved;
     }
 
+    /**
+     * Gera o próximo número de solicitação (ex.: SOL-0343).
+     * Usa o maior número já existente em quote_number (parte numérica) + 1,
+     * para evitar saltos na numeração quando o ID da tabela (auto-increment) pula.
+     */
     public static function generateNextNumber(): string
     {
-        $nextId = (int) self::max('id') + 1;
+        $driver = self::getConnection()->getDriverName();
+        $maxNum = 0;
 
-        return 'SOL-' . str_pad((string) $nextId, 4, '0', STR_PAD_LEFT);
+        if ($driver === 'sqlsrv') {
+            $raw = self::whereNotNull('quote_number')
+                ->where('quote_number', 'like', 'SOL-%')
+                ->selectRaw("MAX(TRY_CAST(SUBSTRING(quote_number, 5, 50) AS INT)) as max_num")
+                ->value('max_num');
+            $maxNum = (int) $raw;
+        } else {
+            $raw = self::whereNotNull('quote_number')
+                ->where('quote_number', 'like', 'SOL-%')
+                ->selectRaw("MAX(CAST(SUBSTRING(quote_number, 5, 50) AS UNSIGNED)) as max_num")
+                ->value('max_num');
+            $maxNum = (int) $raw;
+        }
+
+        $next = $maxNum + 1;
+
+        return 'SOL-' . str_pad((string) $next, 4, '0', STR_PAD_LEFT);
     }
 }
