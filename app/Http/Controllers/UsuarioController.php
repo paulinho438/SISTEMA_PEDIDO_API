@@ -558,10 +558,24 @@ class UsuarioController extends Controller
             // Processar permissão se fornecida
             if (isset($dados['permissao']) && !empty($dados['permissao'])) {
                 $companyId = $request->header('company-id');
-                // Remover o usuário de todos os grupos da empresa atual (evita permissão antiga + nova)
-                $groupsDaEmpresa = $EditUser->groups()->where('company_id', $companyId)->get();
-                foreach ($groupsDaEmpresa as $grupo) {
-                    $grupo->users()->detach($EditUser->id);
+                $isAlmoxarife = isset($dados['permissao']['name'])
+                    && trim((string) $dados['permissao']['name']) === 'Almoxarife';
+
+                if ($isAlmoxarife) {
+                    // Almoxarife: sempre excluir todas as permissões (grupos) da empresa e salvar só o que o front manda
+                    $groupIdsDaEmpresa = Permgroup::where('company_id', $companyId)->pluck('id');
+                    if ($groupIdsDaEmpresa->isNotEmpty()) {
+                        DB::table('permgroup_user')
+                            ->where('user_id', $EditUser->id)
+                            ->whereIn('permgroup_id', $groupIdsDaEmpresa)
+                            ->delete();
+                    }
+                } else {
+                    // Demais perfis: remover apenas os grupos da empresa atual e anexar o novo
+                    $groupsDaEmpresa = $EditUser->groups()->where('company_id', $companyId)->get();
+                    foreach ($groupsDaEmpresa as $grupo) {
+                        $grupo->users()->detach($EditUser->id);
+                    }
                 }
 
                 $group = Permgroup::findOrFail($dados['permissao']['id']);
