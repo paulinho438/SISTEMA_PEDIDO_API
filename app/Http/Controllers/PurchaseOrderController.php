@@ -394,12 +394,12 @@ class PurchaseOrderController extends Controller
 
     /**
      * Estima quantas linhas um item ocupa na impressão (descrição e aplicação quebram em várias linhas).
-     * Baseado na largura aproximada das colunas na view (25% descrição, 15% aplicação, fonte 8pt).
+     * A coluna Aplicação é estreita (~15%): texto longo (ex.: ~65 caracteres) ocupa ~6 linhas na impressão.
      */
     private function estimateLinesForItem($item): int
     {
         $descriptionCharsPerLine = 35;
-        $applicationCharsPerLine = 20;
+        $applicationCharsPerLine = 11; // ~65 chars = 6 linhas na impressão (coluna estreita)
 
         $description = (string) ($item->product_description ?? '');
         $application = '';
@@ -414,14 +414,14 @@ class PurchaseOrderController extends Controller
     }
 
     /**
-     * Agrupa itens em páginas por orçamento de linhas: cada página tem no máximo LINES_PER_PAGE linhas.
+     * Agrupa itens em páginas por orçamento de linhas: cada página tem no máximo 34 linhas.
      * Itens com descrição/aplicação longas ocupam mais linhas e reduzem a quantidade de itens por página.
      *
      * @return array{0: array<int, array>, 1: array<int, int>} [itemChunks, chunkStartIndex]
      */
     private function chunkItemsByLineBudget(array $items): array
     {
-        $linesPerPage = 30;
+        $linesPerPage = 34;
 
         if (empty($items)) {
             return [[[]], [0]];
