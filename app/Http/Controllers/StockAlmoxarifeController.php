@@ -143,6 +143,12 @@ class StockAlmoxarifeController extends Controller
         $locationIds = $validator['location_ids'];
         $now = now()->format('Y-m-d H:i:s');
 
+        // Sempre excluir todos os locais do almoxarife nesta empresa e salvar só o que o front manda
+        DB::table('stock_almoxarife_locations')
+            ->where('user_id', $userId)
+            ->where('company_id', $companyId)
+            ->delete();
+
         foreach ($locationIds as $locationId) {
             // Verificar se local pertence à empresa
             $location = StockLocation::where('id', $locationId)
@@ -153,25 +159,16 @@ class StockAlmoxarifeController extends Controller
                 continue;
             }
 
-            // Verificar se associação já existe
-            $exists = DB::table('stock_almoxarife_locations')
-                ->where('user_id', $userId)
-                ->where('stock_location_id', $locationId)
-                ->where('company_id', $companyId)
-                ->exists();
-
-            if (!$exists) {
-                // Usar timestamps como string para compatibilidade com SQL Server
-                DB::statement(
-                    "INSERT INTO [stock_almoxarife_locations] ([user_id], [stock_location_id], [company_id], [created_at], [updated_at]) 
-                     VALUES (?, ?, ?, CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
-                    [$userId, $locationId, $companyId, $now, $now]
-                );
-            }
+            // Usar timestamps como string para compatibilidade com SQL Server
+            DB::statement(
+                "INSERT INTO [stock_almoxarife_locations] ([user_id], [stock_location_id], [company_id], [created_at], [updated_at]) 
+                 VALUES (?, ?, ?, CAST(? AS DATETIME2), CAST(? AS DATETIME2))",
+                [$userId, $locationId, $companyId, $now, $now]
+            );
         }
 
         return response()->json([
-            'message' => 'Associações criadas com sucesso.',
+            'message' => 'Associações atualizadas com sucesso.',
         ]);
     }
 
