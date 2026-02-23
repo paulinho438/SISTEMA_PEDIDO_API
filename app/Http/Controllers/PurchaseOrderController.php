@@ -368,13 +368,14 @@ class PurchaseOrderController extends Controller
         }
 
         $itemsArray = $order->items->values()->all();
-        $itemChunks = empty($itemsArray) ? [[]] : array_chunk($itemsArray, 5);
+        [$itemChunks, $chunkStartIndex] = $this->chunkItemsByLineBudget($itemsArray);
 
         return [
             'order' => $order,
             'company' => $order->company,
             'items' => $order->items,
             'itemChunks' => $itemChunks,
+            'chunkStartIndex' => $chunkStartIndex,
             'quote' => $order->quote,
             'buyer' => $buyer,
             'totalIten' => $totalIten,
@@ -389,6 +390,67 @@ class PurchaseOrderController extends Controller
             'totalPages' => 1,
             'signatures' => $signatures,
         ];
+    }
+
+    /**
+     * Estima quantas linhas um item ocupa na impressão (descrição e aplicação quebram em várias linhas).
+     * Baseado na largura aproximada das colunas na view (25% descrição, 15% aplicação, fonte 8pt).
+     */
+    private function estimateLinesForItem($item): int
+    {
+        $descriptionCharsPerLine = 35;
+        $applicationCharsPerLine = 20;
+
+        $description = (string) ($item->product_description ?? '');
+        $application = '';
+        if ($item->relationLoaded('quoteItem') && $item->quoteItem) {
+            $application = (string) ($item->quoteItem->application ?? '');
+        }
+
+        $linesDesc = $description === '' ? 1 : max(1, (int) ceil(mb_strlen($description) / $descriptionCharsPerLine));
+        $linesApp = $application === '' ? 1 : max(1, (int) ceil(mb_strlen($application) / $applicationCharsPerLine));
+
+        return max(1, $linesDesc, $linesApp);
+    }
+
+    /**
+     * Agrupa itens em páginas por orçamento de linhas: cada página tem no máximo LINES_PER_PAGE linhas.
+     * Itens com descrição/aplicação longas ocupam mais linhas e reduzem a quantidade de itens por página.
+     *
+     * @return array{0: array<int, array>, 1: array<int, int>} [itemChunks, chunkStartIndex]
+     */
+    private function chunkItemsByLineBudget(array $items): array
+    {
+        $linesPerPage = 30;
+
+        if (empty($items)) {
+            return [[[]], [0]];
+        }
+
+        $chunks = [];
+        $chunkStartIndex = [0];
+        $currentChunk = [];
+        $currentLines = 0;
+
+        foreach ($items as $item) {
+            $itemLines = $this->estimateLinesForItem($item);
+
+            if ($currentChunk !== [] && $currentLines + $itemLines > $linesPerPage) {
+                $chunks[] = $currentChunk;
+                $chunkStartIndex[] = $chunkStartIndex[count($chunkStartIndex) - 1] + count($currentChunk);
+                $currentChunk = [];
+                $currentLines = 0;
+            }
+
+            $currentChunk[] = $item;
+            $currentLines += $itemLines;
+        }
+
+        if ($currentChunk !== []) {
+            $chunks[] = $currentChunk;
+        }
+
+        return [$chunks, $chunkStartIndex];
     }
 
     /**

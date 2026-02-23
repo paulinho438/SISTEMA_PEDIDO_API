@@ -840,7 +840,7 @@
         <div class="footer-page"></div>
     </div>
 
-    <!-- Conteúdo Principal: tabela em chunks de 5 itens (header, totais, assinaturas e footer são fixos) -->
+    <!-- Conteúdo Principal: tabela em chunks por orçamento de linhas (itens com descrição/aplicação longas ocupam mais linhas e reduzem itens por página) -->
     <div class="top">
         <div class="table-separator-line"></div>
         @foreach($itemChunks as $chunkIndex => $chunk)
@@ -862,7 +862,8 @@
                 <tbody>
                     @foreach($chunk as $indexInChunk => $item)
                         @php
-                            $globalIndex = $chunkIndex * 5 + $indexInChunk + 1;
+                            $startIndex = $chunkStartIndex[$chunkIndex] ?? ($chunkIndex * 15);
+                            $globalIndex = $startIndex + $indexInChunk + 1;
                             $quoteItem = $item->quoteItem;
                             $quoteSupplierItem = $item->quoteSupplierItem;
                             $description = $item->product_description ?? '';
