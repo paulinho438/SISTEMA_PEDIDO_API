@@ -557,10 +557,11 @@ class UsuarioController extends Controller
 
             // Processar permissão se fornecida
             if (isset($dados['permissao']) && !empty($dados['permissao'])) {
-                // Obter o grupo
-                $t = $EditUser->getGroupByEmpresaId($request->header('company-id'));
-                if ($t) {
-                    $t->users()->detach($EditUser->id);
+                $companyId = $request->header('company-id');
+                // Remover o usuário de todos os grupos da empresa atual (evita permissão antiga + nova)
+                $groupsDaEmpresa = $EditUser->groups()->where('company_id', $companyId)->get();
+                foreach ($groupsDaEmpresa as $grupo) {
+                    $grupo->users()->detach($EditUser->id);
                 }
 
                 $group = Permgroup::findOrFail($dados['permissao']['id']);
