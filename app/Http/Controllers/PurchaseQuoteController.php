@@ -639,11 +639,22 @@ class PurchaseQuoteController extends Controller
         }
         $query->orderBy('requester_name');
 
-        $requesters = $query->get()->map(fn ($row) => [
+        $list = $query->get()->map(fn ($row) => [
             'id' => (int) $row->requester_id,
             'name' => trim((string) $row->requester_name),
             'label' => trim((string) $row->requester_name),
         ])->values()->all();
+
+        // Deduplicar por nome normalizado (mesmo nome em vários requester_id aparece só uma vez no filtro)
+        $byName = [];
+        foreach ($list as $item) {
+            $key = mb_strtoupper(trim($item['name']));
+            if ($key !== '' && !isset($byName[$key])) {
+                $byName[$key] = $item;
+            }
+        }
+        $requesters = array_values($byName);
+        usort($requesters, fn ($a, $b) => strcasecmp($a['name'], $b['name']));
 
         return response()->json(['data' => $requesters], Response::HTTP_OK);
     }
