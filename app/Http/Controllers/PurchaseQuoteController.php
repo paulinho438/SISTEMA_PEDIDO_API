@@ -406,23 +406,37 @@ class PurchaseQuoteController extends Controller
                 if ($isDirector) {
                     $query->where('current_status_slug', 'analise_gerencia');
                 }
-                // Se é ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (e não é DIRETOR): mostrar APENAS cotações com status "finalizada" ou "analisada"
+                // Se é ENGENHEIRO, GERENTE_LOCAL ou GERENTE_GERAL (e não é DIRETOR): mostrar cotações pendentes do nível OU
+                // (só para engenheiro) cotações em "Análise Diretoria" que ainda não têm assinatura do engenheiro
                 elseif ($isIntermediate) {
-                    $query->whereIn('current_status_slug', ['finalizada', 'analisada', 'analisada_aguardando'])
-                        ->whereHas('approvals', function ($approvalQ) use ($userLevels, $intermediateLevels) {
-                            // Verificar se tem aprovação pendente para algum dos níveis intermediários do usuário
-                            $approvalQ->whereIn('approval_level', array_intersect($userLevels, $intermediateLevels))
-                                ->where('required', true)
-                                ->where('approved', false);
+                    $query->where(function ($q) use ($userLevels, $intermediateLevels, $user) {
+                        // (A) Status finalizada/analisada/analisada_aguardando com aprovação pendente do nível do usuário
+                        $q->where(function ($sub) use ($userLevels, $intermediateLevels, $user) {
+                            $sub->whereIn('current_status_slug', ['finalizada', 'analisada', 'analisada_aguardando'])
+                                ->whereHas('approvals', function ($approvalQ) use ($userLevels, $intermediateLevels) {
+                                    $approvalQ->whereIn('approval_level', array_intersect($userLevels, $intermediateLevels))
+                                        ->where('required', true)
+                                        ->where('approved', false);
+                                });
+                            if (in_array('ENGENHEIRO', $userLevels)) {
+                                $sub->where('engineer_id', $user->id);
+                            }
                         });
-                    
-                    // Se o usuário é ENGENHEIRO, filtrar apenas cotações onde ele é o engenheiro atribuído
-                    if (in_array('ENGENHEIRO', $userLevels)) {
-                        $query->where(function ($q) use ($user) {
-                            // Mostrar apenas cotações onde o engenheiro atribuído é o usuário atual
-                            $q->where('engineer_id', $user->id);
-                        });
-                    }
+                        // (B) OU status "Análise Diretoria" e engenheiro ainda não assinou (só cadastra assinatura, status permanece)
+                        if (in_array('ENGENHEIRO', $userLevels)) {
+                            $q->orWhere(function ($sub) use ($user) {
+                                $sub->where('current_status_slug', 'analise_gerencia')
+                                    ->whereHas('approvals', function ($aq) {
+                                        $aq->where('approval_level', 'ENGENHEIRO')
+                                            ->where('required', true)
+                                            ->where('approved', false);
+                                    })
+                                    ->where(function ($eq) use ($user) {
+                                        $eq->where('engineer_id', $user->id)->orWhereNull('engineer_id');
+                                    });
+                            });
+                        }
+                    });
                 }
                 // Se não é DIRETOR nem intermediário, seguir lógica normal de hierarquia
                 else {
@@ -3569,6 +3583,22 @@ class PurchaseQuoteController extends Controller
 
             // Transições de status baseadas no nível aprovado
             $quote->refresh();
+
+            // Se a cotação está em "Análise Diretoria" e quem aprovou foi o ENGENHEIRO: apenas registra a assinatura, status permanece analise_gerencia
+            if ($quote->current_status_slug === 'analise_gerencia' && $level === 'ENGENHEIRO') {
+                DB::commit();
+                $quote->load(['approvals.approver']);
+                return response()->json([
+                    'message' => 'Assinatura do engenheiro registrada. O status permanece em Análise Diretoria até a aprovação do diretor.',
+                    'approval' => [
+                        'level' => $approval->approval_level,
+                        'approved_by' => $approval->approved_by_name,
+                        'approved_at' => $approval->approved_at,
+                    ],
+                    'all_approved' => $approvalService->checkAllApproved($quote),
+                    'next_level' => $approvalService->getNextApprovalLevel($quote)?->approval_level,
+                ], Response::HTTP_OK);
+            }
             
             // Verificar se GERENTE_LOCAL e GERENTE_GERAL aprovaram para mudar para análise de diretoria
             // Independentemente do ENGENHEIRO ter assinado ou não
