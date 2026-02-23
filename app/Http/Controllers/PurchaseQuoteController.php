@@ -619,28 +619,31 @@ class PurchaseQuoteController extends Controller
 
     /**
      * Lista solicitantes (usuários que criaram ao menos uma solicitação) para filtros.
-     * Um único registro por requester_id para evitar nomes duplicados (ex.: mesmo usuário com requester_name diferente em várias cotações).
+     * Agrupa por requester_id na query para garantir um único registro por usuário (evita duplicatas mesmo com requester_name diferente).
      */
     public function listRequesters(Request $request)
     {
         $companyId = $request->header('company-id');
-        $requesters = PurchaseQuote::query()
-            ->select('requester_id', 'requester_name')
+        $driver = DB::getDriverName();
+        $query = PurchaseQuote::query()
             ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->whereNotNull('requester_id')
-            ->whereNotNull('requester_name')
-            ->orderBy('requester_name')
-            ->get()
-            ->unique('requester_id')
-            ->values()
-            ->map(fn ($row) => [
-                'id' => (int) $row->requester_id,
-                'name' => trim($row->requester_name),
-                'label' => trim($row->requester_name),
-            ])
-            ->sortBy('name')
-            ->values()
-            ->all();
+            ->whereNotNull('requester_name');
+
+        if ($driver === 'sqlsrv') {
+            $query->selectRaw('requester_id, MAX(RTRIM(LTRIM(requester_name))) as requester_name')
+                ->groupBy('requester_id');
+        } else {
+            $query->selectRaw('requester_id, MAX(TRIM(requester_name)) as requester_name')
+                ->groupBy('requester_id');
+        }
+        $query->orderBy('requester_name');
+
+        $requesters = $query->get()->map(fn ($row) => [
+            'id' => (int) $row->requester_id,
+            'name' => trim((string) $row->requester_name),
+            'label' => trim((string) $row->requester_name),
+        ])->values()->all();
 
         return response()->json(['data' => $requesters], Response::HTTP_OK);
     }
