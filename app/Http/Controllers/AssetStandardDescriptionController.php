@@ -197,14 +197,24 @@ class AssetStandardDescriptionController extends Controller
         return new AssetStandardDescriptionResource($item->fresh());
     }
 
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
-        $user = request()->user();
+        $user = $request->user();
         if (!$user || !$user->hasPermission('view_ativos_descricoes_padrao_delete')) {
             return response()->json(['message' => 'Acesso negado.'], Response::HTTP_FORBIDDEN);
         }
 
-        $item = AssetStandardDescription::findOrFail($id);
+        $companyId = $request->header('company-id');
+        $item = AssetStandardDescription::where('id', $id)
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
+            ->first();
+
+        if (!$item) {
+            return response()->json([
+                'message' => 'Registro não encontrado ou não pertence à empresa atual. Pode já ter sido excluído.',
+            ], Response::HTTP_NOT_FOUND);
+        }
+
         $item->delete();
         return response()->json(['message' => 'Item excluído com sucesso.']);
     }

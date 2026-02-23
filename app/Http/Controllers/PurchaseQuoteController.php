@@ -605,22 +605,26 @@ class PurchaseQuoteController extends Controller
 
     /**
      * Lista solicitantes (usuários que criaram ao menos uma solicitação) para filtros.
+     * Um único registro por requester_id para evitar nomes duplicados (ex.: mesmo usuário com requester_name diferente em várias cotações).
      */
     public function listRequesters(Request $request)
     {
+        $companyId = $request->header('company-id');
         $requesters = PurchaseQuote::query()
             ->select('requester_id', 'requester_name')
+            ->when($companyId, fn ($q) => $q->where('company_id', $companyId))
             ->whereNotNull('requester_id')
             ->whereNotNull('requester_name')
-            ->distinct()
             ->orderBy('requester_name')
             ->get()
+            ->unique('requester_id')
+            ->values()
             ->map(fn ($row) => [
                 'id' => (int) $row->requester_id,
-                'name' => $row->requester_name,
-                'label' => $row->requester_name,
+                'name' => trim($row->requester_name),
+                'label' => trim($row->requester_name),
             ])
-            ->unique('id')
+            ->sortBy('name')
             ->values()
             ->all();
 
