@@ -862,7 +862,7 @@
                 <tbody>
                     @foreach($chunk as $indexInChunk => $item)
                         @php
-                            $globalIndex = $chunkIndex * 10 + $indexInChunk + 1;
+                            $globalIndex = $chunkIndex * 5 + $indexInChunk + 1;
                             $quoteItem = $item->quoteItem;
                             $quoteSupplierItem = $item->quoteSupplierItem;
                             $description = $item->product_description ?? '';
