@@ -277,12 +277,49 @@ class CompanyController extends Controller
                 ], Response::HTTP_NOT_FOUND);
             }
 
+            DB::beginTransaction();
+
+            // Remover vínculos antes de excluir (evita erro de FK)
+            if (Schema::hasTable('company_user')) {
+                DB::table('company_user')->where('company_id', $id)->delete();
+            }
+            if (Schema::hasTable('permgroups')) {
+                $permgroupIds = DB::table('permgroups')->where('company_id', $id)->pluck('id');
+                if ($permgroupIds->isNotEmpty()) {
+                    if (Schema::hasTable('permgroup_user')) {
+                        DB::table('permgroup_user')->whereIn('permgroup_id', $permgroupIds)->delete();
+                    }
+                    if (Schema::hasTable('permgroup_permitem')) {
+                        DB::table('permgroup_permitem')->whereIn('permgroup_id', $permgroupIds)->delete();
+                    }
+                    DB::table('permgroups')->where('company_id', $id)->delete();
+                }
+            }
+            if (Schema::hasTable('costcenter')) {
+                DB::table('costcenter')->where('company_id', $id)->delete();
+            }
+            if (Schema::hasTable('juros')) {
+                DB::table('juros')->where('company_id', $id)->delete();
+            }
+            if (Schema::hasTable('bancos')) {
+                DB::table('bancos')->where('company_id', $id)->delete();
+            }
+            if (Schema::hasTable('categories')) {
+                DB::table('categories')->where('company_id', $id)->delete();
+            }
+            if (Schema::hasTable('clients')) {
+                DB::table('clients')->where('company_id', $id)->delete();
+            }
+
             $company->delete();
+
+            DB::commit();
 
             return response()->json([
                 "message" => "Empresa excluída com sucesso."
             ], Response::HTTP_OK);
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 "message" => "Erro ao excluir empresa.",
                 "error" => $e->getMessage()
