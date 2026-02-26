@@ -56,7 +56,9 @@ class CompanyController extends Controller
         $dados = $request->all();
         if (!$validator->fails()) {
 
-            $empresa = Company::create($dados);
+            // Apenas campos permitidos no model (evita campos extras do front)
+            $empresaData = array_intersect_key($dados, array_flip((new Company)->getFillable()));
+            $empresa = Company::create($empresaData);
 
             // Garantir que exista um usuário MASTERGERAL (evita "Attempt to read property 'id' on null")
             $masterGeral = User::firstOrCreate(
@@ -76,8 +78,10 @@ class CompanyController extends Controller
                 ]
             );
 
-            $usuario = User::create(
-                [
+            // Tabelas de módulo legado (usuários, permissões) - podem não existir
+            $usuario = null;
+            if (Schema::hasTable('company_user')) {
+                $usuario = User::create([
                     "nome_completo"             => "MASTER" . $empresa->id,
                     "cpf"                       => "MASTER" . $empresa->id,
                     "rg"                        => "MASTER" . $empresa->id,
@@ -90,22 +94,17 @@ class CompanyController extends Controller
                     "status_motivo"             => "",
                     "tentativas"                => "0",
                     "password"                  => bcrypt("1234")
-                ]
-            );
+                ]);
 
-            DB::table("company_user")->insert(
-                [
-                    "company_id"                => $empresa->id,
-                    "user_id"                   => $usuario->id,
-                ]
-            );
-
-            DB::table("company_user")->insert(
-                [
-                    "company_id"                => $empresa->id,
-                    "user_id"                   => $masterGeral->id,
-                ]
-            );
+                DB::table("company_user")->insert([
+                    "company_id" => $empresa->id,
+                    "user_id"    => $usuario->id,
+                ]);
+                DB::table("company_user")->insert([
+                    "company_id" => $empresa->id,
+                    "user_id"    => $masterGeral->id,
+                ]);
+            }
 
             // Alguns ambientes não possuem a tabela 'costcenter' (módulo legado).
             // Evitar erro "Nome de objeto inválido".
@@ -127,100 +126,83 @@ class CompanyController extends Controller
                 ]);
             }
 
-            $id = DB::table('permgroups')->insertGetId([
-                'name' => 'Super Administrador',
-                'company_id' => $empresa->id,
-            ]);
+            if (Schema::hasTable('permgroups')) {
+                $id = DB::table('permgroups')->insertGetId([
+                    'name' => 'Super Administrador',
+                    'company_id' => $empresa->id,
+                ]);
 
-            // Vincular permissões existentes ao Super Administrador.
-            // Evita erro de FK quando o banco não tem permitems com IDs fixos (1..44).
-            if (Schema::hasTable('permitems') && Schema::hasTable('permgroup_permitem')) {
-                $permitemIds = DB::table('permitems')->pluck('id')->all();
-                if (!empty($permitemIds)) {
-                    $rows = [];
-                    foreach ($permitemIds as $permitemId) {
-                        $rows[] = [
-                            'permgroup_id' => $id,
-                            'permitem_id' => (int) $permitemId,
-                        ];
-                    }
-                    foreach (array_chunk($rows, 500) as $chunk) {
-                        DB::table('permgroup_permitem')->insert($chunk);
+                if (Schema::hasTable('permitems') && Schema::hasTable('permgroup_permitem')) {
+                    $permitemIds = DB::table('permitems')->pluck('id')->all();
+                    if (!empty($permitemIds)) {
+                        $rows = [];
+                        foreach ($permitemIds as $permitemId) {
+                            $rows[] = [
+                                'permgroup_id' => $id,
+                                'permitem_id' => (int) $permitemId,
+                            ];
+                        }
+                        foreach (array_chunk($rows, 500) as $chunk) {
+                            DB::table('permgroup_permitem')->insert($chunk);
+                        }
                     }
                 }
+
+                if (Schema::hasTable('permgroup_user') && $usuario) {
+                    DB::table("permgroup_user")->insert([
+                        "permgroup_id" => $id,
+                        "user_id"      => $usuario->id,
+                    ]);
+                    DB::table("permgroup_user")->insert([
+                        "permgroup_id" => $id,
+                        "user_id"      => $masterGeral->id,
+                    ]);
+                }
+
+                DB::table("permgroups")->insert(["name" => "Administrador", "company_id" => $empresa->id]);
+                DB::table("permgroups")->insert(["name" => "Gerente", "company_id" => $empresa->id]);
+                DB::table("permgroups")->insert(["name" => "Operador", "company_id" => $empresa->id]);
+                DB::table("permgroups")->insert(["name" => "Consultor", "company_id" => $empresa->id]);
             }
 
-            DB::table("permgroup_user")->insert(
-                [
-                    "permgroup_id"     => $id,
-                    "user_id"      => $usuario->id
-
-                ]
-            );
-
-            DB::table("permgroup_user")->insert(
-                [
-                    "permgroup_id"     => $id,
-                    "user_id"      => $masterGeral->id
-
-                ]
-            );
-
-            DB::table("permgroups")->insert(
-                ["name" => "Administrador", "company_id" => $empresa->id]
-            );
-
-            DB::table("permgroups")->insert(
-                ["name" => "Gerente", "company_id" => $empresa->id]
-            );
-
-            DB::table("permgroups")->insert(
-                ["name" => "Operador", "company_id" => $empresa->id]
-            );
-
-            DB::table("permgroups")->insert(
-                ["name" => "Consultor", "company_id" => $empresa->id]
-            );
 
 
-
-            DB::table("bancos")->insert(
-                [
-                    "name" => "Banco ITAU",
-                    "agencia" => "1234-1",
-                    "conta" => "1234-2",
-                    "saldo" => 10000,
-                    "company_id" => $empresa->id,
-                    "created_at" => now(),
-                ]
-            );
-
-            DB::table("categories")->insert(
-                [
-                    "name" => "PIX",
-                    "description" => "Pagamento Pix",
-                    "company_id" => $empresa->id,
-                    "created_at" => now(),
-                    "standard" => true,
-                ]
-            );
-
-            DB::table("clients")->insert(
-                [
-                    "nome_completo" => "Paulo Henrique",
-                    "cpf" => "055.463.561-54",
-                    "rg" => "2.834.868",
-                    "data_nascimento" => "1994-12-09",
-                    "sexo" => "M",
-                    "telefone_celular_1" => "(61) 9330-5267",
-                    "telefone_celular_2" => "(61) 9330-5268",
-                    "email" => "paulo.peixoto@gmail.com",
-                    "limit" => 1000,
-                    "company_id" => $empresa->id,
-                    "created_at" => now(),
-                    "password" => "1234",
-                ]
-            );
+            // Tabelas de módulos legados (podem não existir no Sistema de Pedidos)
+            if (Schema::hasTable('bancos')) {
+                DB::table('bancos')->insert([
+                    'name' => 'Banco ITAU',
+                    'agencia' => '1234-1',
+                    'conta' => '1234-2',
+                    'saldo' => 10000,
+                    'company_id' => $empresa->id,
+                    'created_at' => now()->format('Y-m-d H:i:s'),
+                ]);
+            }
+            if (Schema::hasTable('categories')) {
+                DB::table('categories')->insert([
+                    'name' => 'PIX',
+                    'description' => 'Pagamento Pix',
+                    'company_id' => $empresa->id,
+                    'created_at' => now()->format('Y-m-d H:i:s'),
+                    'standard' => true,
+                ]);
+            }
+            if (Schema::hasTable('clients')) {
+                DB::table('clients')->insert([
+                    'nome_completo' => 'Paulo Henrique',
+                    'cpf' => '055.463.561-54',
+                    'rg' => '2.834.868',
+                    'data_nascimento' => '1994-12-09',
+                    'sexo' => 'M',
+                    'telefone_celular_1' => '(61) 9330-5267',
+                    'telefone_celular_2' => '(61) 9330-5268',
+                    'email' => 'paulo.peixoto@gmail.com',
+                    'limit' => 1000,
+                    'company_id' => $empresa->id,
+                    'created_at' => now()->format('Y-m-d H:i:s'),
+                    'password' => '1234',
+                ]);
+            }
 
 
 
@@ -255,14 +237,20 @@ class CompanyController extends Controller
                 ], Response::HTTP_NOT_FOUND);
             }
 
-            // Atualizar apenas os campos permitidos no fillable
-            $EditCompany->fill($dados);
-            
-            // Garantir que campos específicos sejam atualizados corretamente
-            if (isset($dados['ativo'])) {
-                $EditCompany->ativo = $dados['ativo'];
+            // Apenas campos permitidos no model (evita campos extras do front)
+            $fillable = (new Company)->getFillable();
+            $updateData = array_intersect_key($dados, array_flip($fillable));
+
+            // Normalizar ativo (front pode enviar 0, 1, "0", "1")
+            if (array_key_exists('ativo', $dados)) {
+                $updateData['ativo'] = $dados['ativo'] === 1 || $dados['ativo'] === '1' || $dados['ativo'] === true ? 1 : 0;
             }
-            
+            // plano_id pode ser null se não selecionado
+            if (array_key_exists('plano_id', $dados)) {
+                $updateData['plano_id'] = !empty($dados['plano_id']) ? (int) $dados['plano_id'] : null;
+            }
+
+            $EditCompany->fill($updateData);
             $EditCompany->save();
 
             $array['data'] = $EditCompany;
