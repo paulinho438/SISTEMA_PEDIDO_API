@@ -65,16 +65,14 @@ class CompanyController extends Controller
                     "cpf"                       => "MASTER" . $empresa->id,
                     "rg"                        => "MASTER" . $empresa->id,
                     "login"                     => "MASTER" . $empresa->id,
-                    "data_nascimento"           => Carbon::now()->format("Y-m-d"),
+                    "data_nascimento"           => Carbon::now(),
                     "sexo"                      => "M",
                     "telefone_celular"          => "(61) 9 9999-9999",
                     "email"                     => "MASTER" . $empresa->id . "@rjemprestimos.combr",
                     "status"                    => "A",
                     "status_motivo"             => "",
                     "tentativas"                => "0",
-                    "password"                  => bcrypt("1234"),
-                    "created_at"                => Carbon::now()->format("Y-m-d H:i:s"),
-                    "updated_at"                => Carbon::now()->format("Y-m-d H:i:s")
+                    "password"                  => bcrypt("1234")
                 ]
             );
 

@@ -87,7 +87,7 @@ class AuthController extends Controller
 
             $dados['password'] = password_hash($dados['password'], PASSWORD_DEFAULT);
             $dados['status'] = 'I';
-            $dados['data_nascimento'] = substr($dados['data_nascimento'], 6, 4).'-'.substr($dados['data_nascimento'], 3, 2).'-'.substr($dados['data_nascimento'], 0, 2);
+            // O model faz o parse e salva em formato seguro para SQL Server
             $newUser = User::create($dados);
 
             $token = Auth::attempt([

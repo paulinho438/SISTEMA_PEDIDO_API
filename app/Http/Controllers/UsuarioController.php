@@ -52,13 +52,13 @@ class UsuarioController extends Controller
         $placeholders = array_fill(0, count($filteredData), '?');
         $values = array_values($filteredData);
         
-        // Adicionar campos de data com CAST
+        // Adicionar campos de data com CONVERT (style fixo, independe de DATEFORMAT)
         $columns[] = 'created_at';
-        $placeholders[] = "CAST(? AS DATETIME2)";
+        $placeholders[] = "CONVERT(DATETIME2, ?, 120)";
         $values[] = $createdAt;
         
         $columns[] = 'updated_at';
-        $placeholders[] = "CAST(? AS DATETIME2)";
+        $placeholders[] = "CONVERT(DATETIME2, ?, 120)";
         $values[] = $updatedAt;
         
         // Usar colchetes nos nomes das colunas para evitar problemas com palavras reservadas
@@ -90,9 +90,11 @@ class UsuarioController extends Controller
         $values = [];
         
         foreach ($columns as $column) {
-            // Campos de data precisam de CAST
+            // Campos de data precisam de CONVERT com style fixo
             if ($column === 'updated_at' || $column === 'deleted_at') {
-                $placeholders[] = "[{$column}] = CAST(? AS DATETIME2)";
+                $placeholders[] = "[{$column}] = CONVERT(DATETIME2, ?, 120)";
+            } elseif ($column === 'data_nascimento') {
+                $placeholders[] = "[{$column}] = CONVERT(DATE, ?, 23)";
             } else {
                 $placeholders[] = "[{$column}] = ?";
             }

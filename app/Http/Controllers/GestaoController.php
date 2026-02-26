@@ -94,7 +94,7 @@ class GestaoController extends Controller
 
             $cpf = preg_replace('/[^0-9]/', '', $dados['cpf']);
 
-            $dados['data_nascimento'] = (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d');
+            // O model faz o parse e salva em formato seguro para SQL Server
             $dados['cpf'] = $cpf;
             $dados['password'] = password_hash($dados['password'], PASSWORD_DEFAULT);
 

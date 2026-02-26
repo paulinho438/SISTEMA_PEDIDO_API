@@ -17,48 +17,47 @@ class User extends Authenticatable implements JWTSubject
     use HasFactory, Notifiable, SoftDeletes;
 
     protected $dates = ['deleted_at'];
-
     /**
-     * Eventos do modelo para formatar timestamps como strings
+     * Formato "seguro" para SQL Server (independe de DATEFORMAT).
+     * Ex.: 20260226 103439
      */
-    protected static function boot()
+    protected $dateFormat = 'Ymd H:i:s';
+
+    public function setDataNascimentoAttribute($value): void
     {
-        parent::boot();
+        if ($value === null || $value === '') {
+            $this->attributes['data_nascimento'] = null;
+            return;
+        }
 
-        static::creating(function ($user) {
-            $now = now()->format('Y-m-d H:i:s');
-            if (!isset($user->attributes['created_at']) || empty($user->attributes['created_at'])) {
-                $user->attributes['created_at'] = $now;
-            } else {
-                $user->attributes['created_at'] = is_string($user->attributes['created_at']) 
-                    ? $user->attributes['created_at'] 
-                    : (is_object($user->attributes['created_at']) 
-                        ? $user->attributes['created_at']->format('Y-m-d H:i:s') 
-                        : $now);
+        try {
+            if ($value instanceof \DateTimeInterface) {
+                $this->attributes['data_nascimento'] = $value->format('Ymd'); // seguro no SQL Server
+                return;
             }
-            if (!isset($user->attributes['updated_at']) || empty($user->attributes['updated_at'])) {
-                $user->attributes['updated_at'] = $now;
-            } else {
-                $user->attributes['updated_at'] = is_string($user->attributes['updated_at']) 
-                    ? $user->attributes['updated_at'] 
-                    : (is_object($user->attributes['updated_at']) 
-                        ? $user->attributes['updated_at']->format('Y-m-d H:i:s') 
-                        : $now);
-            }
-        });
 
-        static::updating(function ($user) {
-            $now = now()->format('Y-m-d H:i:s');
-            if (!isset($user->attributes['updated_at']) || empty($user->attributes['updated_at'])) {
-                $user->attributes['updated_at'] = $now;
-            } else {
-                $user->attributes['updated_at'] = is_string($user->attributes['updated_at']) 
-                    ? $user->attributes['updated_at'] 
-                    : (is_object($user->attributes['updated_at']) 
-                        ? $user->attributes['updated_at']->format('Y-m-d H:i:s') 
-                        : $now);
+            if (is_string($value)) {
+                $value = trim($value);
+                // dd/mm/yyyy
+                if (preg_match('/^\d{2}\/\d{2}\/\d{4}$/', $value)) {
+                    $dt = \Carbon\Carbon::createFromFormat('d/m/Y', $value);
+                    $this->attributes['data_nascimento'] = $dt->format('Ymd');
+                    return;
+                }
+                // yyyy-mm-dd
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+                    $dt = \Carbon\Carbon::createFromFormat('Y-m-d', $value);
+                    $this->attributes['data_nascimento'] = $dt->format('Ymd');
+                    return;
+                }
             }
-        });
+
+            $dt = \Carbon\Carbon::parse($value);
+            $this->attributes['data_nascimento'] = $dt->format('Ymd');
+        } catch (\Throwable $e) {
+            // Se vier algo inválido, não derrubar o insert/update
+            $this->attributes['data_nascimento'] = null;
+        }
     }
 
     protected $hidden = [
