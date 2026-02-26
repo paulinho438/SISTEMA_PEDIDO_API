@@ -265,6 +265,31 @@ class CompanyController extends Controller
         }
     }
 
+    public function destroy($id)
+    {
+        try {
+            $company = Company::find($id);
+
+            if (!$company) {
+                return response()->json([
+                    "message" => "Empresa não encontrada.",
+                    "error" => "Company not found"
+                ], Response::HTTP_NOT_FOUND);
+            }
+
+            $company->delete();
+
+            return response()->json([
+                "message" => "Empresa excluída com sucesso."
+            ], Response::HTTP_OK);
+        } catch (\Exception $e) {
+            return response()->json([
+                "message" => "Erro ao excluir empresa.",
+                "error" => $e->getMessage()
+            ], Response::HTTP_FORBIDDEN);
+        }
+    }
+
     public function getEnvioAutomaticoRenovacao(Request $request)
     {
         $company = Company::find($request->header('company-id'));
