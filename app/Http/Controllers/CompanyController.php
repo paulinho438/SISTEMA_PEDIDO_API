@@ -16,6 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
 use App\Http\Resources\EmpresaResource;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 use DateTime;
 
@@ -106,14 +107,17 @@ class CompanyController extends Controller
                 ]
             );
 
-            DB::table("costcenter")->insert(
-                [
-                    "name" => "Default",
-                    "description" => "Default",
-                    "company_id" => $empresa->id,
-                    "created_at" => now(),
-                ]
-            );
+            // Alguns ambientes não possuem a tabela 'costcenter' (módulo legado).
+            // Evitar erro "Nome de objeto inválido".
+            if (Schema::hasTable('costcenter')) {
+                DB::table('costcenter')->insert([
+                    'name' => 'Default',
+                    'description' => 'Default',
+                    'company_id' => $empresa->id,
+                    'created_at' => now()->format('Y-m-d H:i:s'),
+                    'updated_at' => now()->format('Y-m-d H:i:s'),
+                ]);
+            }
 
             DB::table("juros")->insert(
                 [
