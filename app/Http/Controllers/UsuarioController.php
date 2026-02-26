@@ -49,8 +49,18 @@ class UsuarioController extends Controller
         });
         
         $columns = array_keys($filteredData);
-        $placeholders = array_fill(0, count($filteredData), '?');
-        $values = array_values($filteredData);
+        $placeholders = [];
+        $values = [];
+
+        foreach ($columns as $col) {
+            if ($col === 'data_nascimento') {
+                // style 112 = yyyymmdd (independe de DATEFORMAT)
+                $placeholders[] = "CONVERT(DATE, ?, 112)";
+            } else {
+                $placeholders[] = "?";
+            }
+            $values[] = $filteredData[$col];
+        }
         
         // Adicionar campos de data com CONVERT (style fixo, independe de DATEFORMAT)
         $columns[] = 'created_at';
@@ -213,10 +223,11 @@ class UsuarioController extends Controller
                 $dados['cpf'] = null;
             }
 
-            // Processar data_nascimento apenas se fornecido
+            // Processar data_nascimento apenas se fornecido (formato seguro para SQL Server)
             if (!empty($dados['data_nascimento'])) {
                 try {
-                    $dados['data_nascimento'] = (DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']))->format('Y-m-d');
+                    $dt = DateTime::createFromFormat('d/m/Y', $dados['data_nascimento']);
+                    $dados['data_nascimento'] = $dt ? $dt->format('Ymd') : null;
                 } catch (\Exception $e) {
                     // Se falhar ao parsear, manter como está ou definir como null
                     $dados['data_nascimento'] = null;
