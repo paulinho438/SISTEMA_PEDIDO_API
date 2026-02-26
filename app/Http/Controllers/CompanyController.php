@@ -119,12 +119,13 @@ class CompanyController extends Controller
                 ]);
             }
 
-            DB::table("juros")->insert(
-                [
-                    "juros" => 0.3,
-                    "company_id" => $empresa->id,
-                ]
-            );
+            // Alguns ambientes não possuem a tabela 'juros' (módulo legado).
+            if (Schema::hasTable('juros')) {
+                DB::table('juros')->insert([
+                    'juros' => 0.3,
+                    'company_id' => $empresa->id,
+                ]);
+            }
 
             $id = DB::table("permgroups")->insertGetId(
                 ["name" => "Super Administrador", "company_id" => $empresa->id]
