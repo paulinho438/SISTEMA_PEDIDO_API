@@ -57,7 +57,23 @@ class CompanyController extends Controller
 
             $empresa = Company::create($dados);
 
-            $masterGeral = User::where('login', 'MASTERGERAL')->first();
+            // Garantir que exista um usuário MASTERGERAL (evita "Attempt to read property 'id' on null")
+            $masterGeral = User::firstOrCreate(
+                ['login' => 'MASTERGERAL'],
+                [
+                    'nome_completo' => 'MASTER GERAL',
+                    'cpf' => null,
+                    'rg' => null,
+                    'data_nascimento' => null,
+                    'sexo' => null,
+                    'telefone_celular' => '(00) 0 0000-0000',
+                    'email' => 'mastergeral@sistema.local',
+                    'status' => 'A',
+                    'status_motivo' => null,
+                    'tentativas' => 0,
+                    'password' => bcrypt('1234'),
+                ]
+            );
 
             $usuario = User::create(
                 [
