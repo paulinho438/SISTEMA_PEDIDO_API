@@ -161,7 +161,8 @@
         </div>
         
         <div class="header-right">
-            <div><strong>Empresa:</strong> {{ $company->company ?? $company->name ?? '-' }}</div>
+            <div><strong>Empresa:</strong> {{ $quote->company_name ?? $company->company ?? $company->name ?? '-' }}</div>
+            <div><strong>Local:</strong> {{ $quote->location ?? '-' }}</div>
             <div><strong>Usuário:</strong> {{ auth()->user()->nome_completo ?? auth()->user()->name ?? 'SOFTCOM' }}</div>
             <div><strong>Emissão:</strong> {{ now()->format('d/m/Y H:i:s') }}</div>
             <div><strong>Página:</strong> 1 de 1</div>
@@ -215,6 +216,11 @@
         <div class="detail-item">
             <span class="detail-label">Empresa:</span>
             <span class="detail-value">{{ $quote->company_name ?? ($company->company ?? $company->name ?? '-') }}</span>
+        </div>
+
+        <div class="detail-item">
+            <span class="detail-label">Local:</span>
+            <span class="detail-value">{{ $quote->location ?? '-' }}</span>
         </div>
         
         <div class="detail-item">
