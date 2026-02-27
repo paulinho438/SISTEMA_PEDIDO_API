@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -46,5 +47,23 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * Garante que respostas de erro da API incluam cabeçalhos CORS.
+     * Evita que o navegador mostre "CORS error" quando o real problema é 500.
+     */
+    public function render($request, Throwable $e)
+    {
+        $response = parent::render($request, $e);
+
+        if ($request->is('api/*') && $response instanceof Response) {
+            $response->headers->set('Access-Control-Allow-Origin', $request->header('Origin', '*'));
+            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+            $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, company-id');
+            $response->headers->set('Access-Control-Allow-Credentials', 'true');
+        }
+
+        return $response;
     }
 }
