@@ -3745,6 +3745,9 @@ class PurchaseQuoteController extends Controller
      */
     public function imprimir(Request $request, $id)
     {
+        // Cotações grandes podem estourar 128MB no DomPDF
+        ini_set('memory_limit', '256M');
+
         $companyId = $request->header('company-id');
         $companyId = $companyId ? (int) $companyId : null;
         

@@ -206,6 +206,8 @@ class PurchaseOrderController extends Controller
      */
     public function imprimir(Request $request, $id)
     {
+        ini_set('memory_limit', '256M');
+
         $dados = $this->getDadosParaImpressao($request, $id);
         if ($dados instanceof \Illuminate\Http\JsonResponse) {
             return $dados;
