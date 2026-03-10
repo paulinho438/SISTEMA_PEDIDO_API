@@ -29,6 +29,7 @@ class ResponsibilityTerm extends Model
     ];
 
     public const STATUS_ABERTO = 'aberto';
+    public const STATUS_PARCIAL = 'parcial';
     public const STATUS_DEVOLVIDO = 'devolvido';
 
     public function company(): BelongsTo

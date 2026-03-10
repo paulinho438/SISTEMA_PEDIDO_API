@@ -14,10 +14,14 @@ class ResponsibilityTermItem extends Model
         'stock_product_id',
         'stock_id',
         'quantity',
+        'quantity_returned',
+        'returned_at',
     ];
 
     protected $casts = [
         'quantity' => 'decimal:4',
+        'quantity_returned' => 'decimal:4',
+        'returned_at' => 'datetime',
     ];
 
     public function responsibilityTerm(): BelongsTo

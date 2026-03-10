@@ -93,7 +93,7 @@ class ResponsibilityTermController extends Controller
      * Devolver itens do termo (entrada no estoque).
      * Permite: view_estoque_movimentacoes, view_estoque_movimentacoes_create ou view_estoque_almoxarifes.
      */
-    public function devolver(int $id): JsonResponse
+    public function devolver(Request $request, int $id): JsonResponse
     {
         $user = auth()->user();
         $can = $user && ($user->hasPermission('view_estoque_movimentacoes') || $user->hasPermission('view_estoque_movimentacoes_create') || $user->hasPermission('view_estoque_almoxarifes'));
@@ -102,9 +102,18 @@ class ResponsibilityTermController extends Controller
         }
 
         try {
-            $term = $this->service->devolver($id, $user);
+            $payloadItems = $request->input('items', []);
+            if (!is_array($payloadItems)) {
+                return response()->json(['message' => 'Campo items inválido.'], Response::HTTP_BAD_REQUEST);
+            }
+
+            $term = $this->service->devolver($id, $user, $payloadItems);
+            $message = $term->status === ResponsibilityTerm::STATUS_DEVOLVIDO
+                ? 'Termo devolvido. Todos os itens retornaram ao estoque.'
+                : 'Devolução parcial registrada. Itens selecionados retornaram ao estoque.';
+
             return response()->json([
-                'message' => 'Termo devolvido. Os itens retornaram ao estoque.',
+                'message' => $message,
                 'data' => $this->termToArray($term, true),
             ]);
         } catch (\Exception $e) {
@@ -176,6 +185,9 @@ class ResponsibilityTermController extends Controller
                 'id' => $i->id,
                 'stock_product_id' => $i->stock_product_id,
                 'quantity' => (float) $i->quantity,
+                'quantity_returned' => (float) ($i->quantity_returned ?? 0),
+                'quantity_pending' => max((float) $i->quantity - (float) ($i->quantity_returned ?? 0), 0),
+                'returned_at' => $i->returned_at?->format('Y-m-d H:i:s'),
                 'product' => $i->relationLoaded('stockProduct') ? [
                     'id' => $i->stockProduct->id,
                     'code' => $i->stockProduct->code,

@@ -140,6 +140,7 @@ class ResponsibilityTermService
                     'stock_product_id' => $productId,
                     'stock_id' => $stock->id,
                     'quantity' => $quantity,
+                    'quantity_returned' => 0,
                 ]);
             }
 
@@ -151,7 +152,7 @@ class ResponsibilityTermService
         }
     }
 
-    public function devolver(int $id, $user): ResponsibilityTerm
+    public function devolver(int $id, $user, array $returnItems = []): ResponsibilityTerm
     {
         $term = ResponsibilityTerm::with('items')->findOrFail($id);
 
@@ -169,20 +170,70 @@ class ResponsibilityTermService
 
         DB::beginTransaction();
         try {
-            foreach ($term->items as $item) {
+            $itemsById = $term->items->keyBy('id');
+            $movements = [];
+
+            if (empty($returnItems)) {
+                foreach ($term->items as $item) {
+                    $pending = round((float) $item->quantity - (float) ($item->quantity_returned ?? 0), 4);
+                    if ($pending > 0) {
+                        $movements[] = ['item' => $item, 'quantity' => $pending];
+                    }
+                }
+            } else {
+                foreach ($returnItems as $row) {
+                    $itemId = (int) ($row['id'] ?? 0);
+                    $quantity = (float) ($row['quantity'] ?? 0);
+                    $item = $itemsById->get($itemId);
+
+                    if (!$item) {
+                        throw new \Exception('Item informado não pertence ao termo.');
+                    }
+                    if ($quantity <= 0) {
+                        throw new \Exception('Quantidade de devolução deve ser maior que zero.');
+                    }
+
+                    $pending = round((float) $item->quantity - (float) ($item->quantity_returned ?? 0), 4);
+                    if ($pending <= 0) {
+                        throw new \Exception('Um dos itens selecionados já foi devolvido totalmente.');
+                    }
+                    if ($quantity > $pending) {
+                        throw new \Exception('Quantidade de devolução maior que o pendente para um dos itens.');
+                    }
+
+                    $movements[] = ['item' => $item, 'quantity' => $quantity];
+                }
+            }
+
+            if (empty($movements)) {
+                throw new \Exception('Não há itens pendentes para devolução.');
+            }
+
+            foreach ($movements as $movement) {
+                /** @var ResponsibilityTermItem $item */
+                $item = $movement['item'];
+                $quantity = (float) $movement['quantity'];
+
                 $this->stockMovementService->entradaTermoResponsabilidade(
                     (int) $item->stock_id,
-                    (float) $item->quantity,
+                    $quantity,
                     (int) $term->id,
                     $user,
                     $companyId
                 );
+
+                $item->quantity_returned = round((float) ($item->quantity_returned ?? 0) + $quantity, 4);
+                if ($item->quantity_returned >= (float) $item->quantity) {
+                    $item->returned_at = Carbon::now();
+                }
+                $item->save();
             }
 
+            $hasPending = $term->items()->whereRaw('(quantity - quantity_returned) > 0.0000')->exists();
             $term->update([
-                'status' => ResponsibilityTerm::STATUS_DEVOLVIDO,
-                'returned_by' => $user->id,
-                'returned_at' => Carbon::now(),
+                'status' => $hasPending ? ResponsibilityTerm::STATUS_PARCIAL : ResponsibilityTerm::STATUS_DEVOLVIDO,
+                'returned_by' => $hasPending ? null : $user->id,
+                'returned_at' => $hasPending ? null : Carbon::now(),
             ]);
 
             DB::commit();
