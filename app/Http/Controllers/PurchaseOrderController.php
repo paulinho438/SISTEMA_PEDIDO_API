@@ -532,6 +532,54 @@ class PurchaseOrderController extends Controller
                     $signatures[$profileName] = null;
                 }
             }
+
+            // COMPRADOR deve permanecer visível na impressão mesmo quando aprovações são resetadas.
+            if ($quote->buyer && $quote->buyer->signature_path) {
+                $signatures['COMPRADOR'] = [
+                    'user_id' => $quote->buyer->id,
+                    'user_name' => $quote->buyer->nome_completo ?? $quote->buyer_name,
+                    'signature_path' => $quote->buyer->signature_path,
+                    'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $quote->buyer->signature_path
+                ];
+            } else {
+                // Fallback: última aprovação de comprador com assinatura
+                $buyerApproval = $quote->approvals()
+                    ->with('approver')
+                    ->where('approval_level', 'COMPRADOR')
+                    ->where('approved', true)
+                    ->orderByDesc('approved_at')
+                    ->first();
+
+                $buyerApprover = $buyerApproval?->approver;
+                if ($buyerApprover && $buyerApprover->signature_path) {
+                    $signatures['COMPRADOR'] = [
+                        'user_id' => $buyerApprover->id,
+                        'user_name' => $buyerApprover->nome_completo ?? $buyerApproval->approved_by_name,
+                        'signature_path' => $buyerApprover->signature_path,
+                        'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $buyerApprover->signature_path
+                    ];
+                }
+            }
+
+            // Fallback para diretor em aprovação direta por status (aprovado),
+            // quando não houver approval required de DIRETOR preenchido.
+            if (!isset($signatures['DIRETOR']) || !$signatures['DIRETOR']) {
+                $directorStatusApproval = \App\Models\PurchaseQuoteStatusHistory::with('actor')
+                    ->where('purchase_quote_id', $quote->id)
+                    ->where('status_slug', 'aprovado')
+                    ->orderByDesc('acted_at')
+                    ->first();
+
+                $directorActor = $directorStatusApproval?->actor;
+                if ($directorActor && $directorActor->signature_path) {
+                    $signatures['DIRETOR'] = [
+                        'user_id' => $directorActor->id,
+                        'user_name' => $directorActor->nome_completo ?? $directorStatusApproval->acted_by_name,
+                        'signature_path' => $directorActor->signature_path,
+                        'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $directorActor->signature_path
+                    ];
+                }
+            }
         } else {
             // Fallback: buscar por grupo/perfil (método antigo)
             foreach ($profiles as $profileName) {
