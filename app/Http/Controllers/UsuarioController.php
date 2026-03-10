@@ -780,7 +780,7 @@ class UsuarioController extends Controller
 
         // Se há quote_id, buscar apenas níveis de aprovação selecionados para esta cotação
         if ($quoteId) {
-            $quote = \App\Models\PurchaseQuote::find($quoteId);
+            $quote = \App\Models\PurchaseQuote::with('buyer')->find($quoteId);
             
             if ($quote) {
                 // Recarregar a cotação para garantir que as aprovações estejam atualizadas
@@ -835,6 +835,35 @@ class UsuarioController extends Controller
                     } else {
                         // Nível selecionado mas ainda não aprovado (aguardando aprovação)
                         $signatures[$profileName] = null;
+                    }
+                }
+
+                // COMPRADOR deve permanecer visível mesmo quando níveis são resetados/reprovados.
+                // Prioriza o comprador vinculado na cotação.
+                if ($quote->buyer && $quote->buyer->signature_path) {
+                    $signatures['COMPRADOR'] = [
+                        'user_id' => $quote->buyer->id,
+                        'user_name' => $quote->buyer->nome_completo ?? $quote->buyer_name,
+                        'signature_path' => $quote->buyer->signature_path,
+                        'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $quote->buyer->signature_path
+                    ];
+                } else {
+                    // Fallback: última aprovação de comprador com assinatura
+                    $buyerApproval = $quote->approvals()
+                        ->with('approver')
+                        ->where('approval_level', 'COMPRADOR')
+                        ->where('approved', true)
+                        ->orderByDesc('approved_at')
+                        ->first();
+
+                    $buyerApprover = $buyerApproval?->approver;
+                    if ($buyerApprover && $buyerApprover->signature_path) {
+                        $signatures['COMPRADOR'] = [
+                            'user_id' => $buyerApprover->id,
+                            'user_name' => $buyerApprover->nome_completo ?? $buyerApproval->approved_by_name,
+                            'signature_path' => $buyerApprover->signature_path,
+                            'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $buyerApprover->signature_path
+                        ];
                     }
                 }
 
