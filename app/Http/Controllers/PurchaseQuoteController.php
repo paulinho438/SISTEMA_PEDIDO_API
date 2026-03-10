@@ -2090,6 +2090,7 @@ class PurchaseQuoteController extends Controller
             'mensagem' => 'nullable|string',
             'status' => 'nullable|string|in:' . implode(',', $allowedStatuses), // Status opcional
             'signature_only' => 'nullable|boolean',
+            'signature_level' => 'nullable|string|in:ENGENHEIRO,GERENTE_LOCAL,GERENTE_GERAL',
         ];
         
         // Se tem permissão de editar na aprovação, aceitar dados de edição opcionais
@@ -2123,6 +2124,7 @@ class PurchaseQuoteController extends Controller
         
         $currentStatus = $quote->current_status_slug;
         $signatureOnly = (bool) ($validated['signature_only'] ?? false);
+        $signatureLevel = $validated['signature_level'] ?? null;
         $nextLevel = null; // Inicializar variável para evitar erro
         
         // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
@@ -2251,6 +2253,19 @@ class PurchaseQuoteController extends Controller
         }
 
         $note = $validated['observacao'] ?? $defaultNote;
+
+        if (
+            $signatureOnly
+            && $signatureLevel
+            && in_array($signatureLevel, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'], true)
+        ) {
+            if (!$approvalService->userHasLevelPermission($user, $signatureLevel)) {
+                return response()->json([
+                    'message' => 'Você não tem permissão para assinar neste nível.',
+                ], Response::HTTP_FORBIDDEN);
+            }
+            $nextLevel = $signatureLevel;
+        }
 
         // Verificar se há tentativa de aprovar nível ENGENHEIRO sem engenheiro atribuído
         // Se o nível ENGENHEIRO está sendo aprovado e não há engenheiro atribuído, verificar permissão ANTES da transação
