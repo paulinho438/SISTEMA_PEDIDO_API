@@ -867,6 +867,27 @@ class UsuarioController extends Controller
                     }
                 }
 
+                // Fallback para diretor em aprovações diretas:
+                // quando a cotação é aprovada por mudança de status, pode não existir
+                // approval required do nível DIRETOR com approved_by preenchido.
+                if (!isset($signatures['DIRETOR']) || !$signatures['DIRETOR']) {
+                    $directorStatusApproval = \App\Models\PurchaseQuoteStatusHistory::with('actor')
+                        ->where('purchase_quote_id', $quote->id)
+                        ->where('status_slug', 'aprovado')
+                        ->orderByDesc('acted_at')
+                        ->first();
+
+                    $directorActor = $directorStatusApproval?->actor;
+                    if ($directorActor && $directorActor->signature_path) {
+                        $signatures['DIRETOR'] = [
+                            'user_id' => $directorActor->id,
+                            'user_name' => $directorActor->nome_completo ?? $directorStatusApproval->acted_by_name,
+                            'signature_path' => $directorActor->signature_path,
+                            'signature_url' => $request->getSchemeAndHttpHost() . '/storage/' . $directorActor->signature_path
+                        ];
+                    }
+                }
+
                 // Garantir sempre os 6 perfis no retorno para manter o layout completo de assinaturas
                 foreach ($profiles as $profileName) {
                     if (!array_key_exists($profileName, $signatures)) {
