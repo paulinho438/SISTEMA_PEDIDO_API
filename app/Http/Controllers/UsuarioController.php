@@ -837,6 +837,13 @@ class UsuarioController extends Controller
                         $signatures[$profileName] = null;
                     }
                 }
+
+                // Garantir sempre os 6 perfis no retorno para manter o layout completo de assinaturas
+                foreach ($profiles as $profileName) {
+                    if (!array_key_exists($profileName, $signatures)) {
+                        $signatures[$profileName] = null;
+                    }
+                }
                 
                 // Ordenar assinaturas pela ordem de exibição
                 $signatures = $this->sortSignaturesByDisplayOrder($signatures);
