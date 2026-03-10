@@ -2089,6 +2089,7 @@ class PurchaseQuoteController extends Controller
             'observacao' => 'nullable|string',
             'mensagem' => 'nullable|string',
             'status' => 'nullable|string|in:' . implode(',', $allowedStatuses), // Status opcional
+            'signature_only' => 'nullable|boolean',
         ];
         
         // Se tem permissão de editar na aprovação, aceitar dados de edição opcionais
@@ -2121,6 +2122,7 @@ class PurchaseQuoteController extends Controller
         $validated = $request->validate($validationRules);
         
         $currentStatus = $quote->current_status_slug;
+        $signatureOnly = (bool) ($validated['signature_only'] ?? false);
         $nextLevel = null; // Inicializar variável para evitar erro
         
         // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
@@ -2331,6 +2333,36 @@ class PurchaseQuoteController extends Controller
                     // Agora aprovar o nível
                     $approvalService->approveLevel($quote, $nextLevel, $user, $note);
                     $quote->refresh();
+                }
+
+                // Modo assinatura: registra apenas assinatura do nível atual sem alterar status.
+                // Usado para ENGENHEIRO, GERENTE_LOCAL e GERENTE_GERAL.
+                if (
+                    $signatureOnly
+                    && in_array($nextLevel, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'], true)
+                ) {
+                    $currentStatusObj = PurchaseQuoteStatus::where('slug', $currentStatus)->first();
+                    if ($currentStatusObj) {
+                        $this->insertWithStringTimestamps('purchase_quote_status_histories', [
+                            'purchase_quote_id' => $quote->id,
+                            'status_id' => $currentStatusObj->id,
+                            'status_slug' => $currentStatusObj->slug,
+                            'status_label' => $currentStatusObj->label,
+                            'acted_by' => $user->id,
+                            'acted_by_name' => $user->nome_completo ?? $user->name,
+                            'notes' => $validated['observacao'] ?? 'Assinatura registrada.',
+                        ]);
+                    }
+
+                    DB::commit();
+
+                    return response()->json([
+                        'message' => 'Assinatura registrada com sucesso.',
+                        'status' => [
+                            'slug' => $currentStatus,
+                            'label' => $currentStatusObj->label ?? $currentStatus,
+                        ],
+                    ]);
                 }
                 
                 // Identificar qual é o último nível antes do DIRETOR que está requerido
