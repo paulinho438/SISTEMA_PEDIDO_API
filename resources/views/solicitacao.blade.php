@@ -166,7 +166,7 @@
             <div><strong>Usuário:</strong> {{ auth()->user()->nome_completo ?? auth()->user()->name ?? 'SOFTCOM' }}</div>
             <div><strong>Emissão:</strong> {{ now()->format('d/m/Y H:i:s') }}</div>
             <div><strong>Página:</strong> 1 de 1</div>
-            <div><strong>N°:</strong> {{ $quote->id ?? '-' }}</div>
+            <div><strong>N°:</strong> {{ $quote->quote_number ?? $quote->id ?? '-' }}</div>
         </div>
     </div>
 
