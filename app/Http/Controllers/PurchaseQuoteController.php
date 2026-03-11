@@ -2342,11 +2342,46 @@ class PurchaseQuoteController extends Controller
                             'order' => $order[$nextLevel] ?? 999,
                         ]);
                         $quote->refresh();
+                        $approval = $quote->approvals()
+                            ->byLevel($nextLevel)
+                            ->first();
                     }
-                    
-                    // Agora aprovar o nível
-                    $approvalService->approveLevel($quote, $nextLevel, $user, $note);
-                    $quote->refresh();
+
+                    // Modo assinatura para níveis intermediários:
+                    // se já estiver autoaprovado pelo diretor, permite substituir pela assinatura real do usuário.
+                    if (
+                        $signatureOnly
+                        && in_array($nextLevel, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'], true)
+                        && $approval
+                        && $approval->approved
+                    ) {
+                        $approvedByName = mb_strtolower((string) ($approval->approved_by_name ?? ''));
+                        $notesLower = mb_strtolower((string) ($approval->notes ?? ''));
+                        $autoAprovadoDiretor = (
+                            empty($approval->approved_by)
+                            && (
+                                str_contains($approvedByName, 'automaticamente pelo diretor')
+                                || str_contains($notesLower, 'automaticamente pelo diretor')
+                            )
+                        );
+
+                        if ($autoAprovadoDiretor) {
+                            $this->updateModelWithStringTimestamps($approval, [
+                                'approved' => true,
+                                'approved_by' => $user->id,
+                                'approved_by_name' => $user->nome_completo ?? $user->name,
+                                'approved_at' => now()->format('Y-m-d H:i:s'),
+                                'notes' => $note,
+                            ]);
+                            $quote->refresh();
+                        } else {
+                            throw new \Exception('Este nível já foi assinado e não pode ser assinado novamente.');
+                        }
+                    } else {
+                        // Fluxo normal: aprovar nível pendente
+                        $approvalService->approveLevel($quote, $nextLevel, $user, $note);
+                        $quote->refresh();
+                    }
                 }
 
                 // Modo assinatura: registra apenas assinatura do nível atual sem alterar status.
