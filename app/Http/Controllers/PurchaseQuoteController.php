@@ -2125,6 +2125,9 @@ class PurchaseQuoteController extends Controller
         $currentStatus = $quote->current_status_slug;
         $signatureOnly = (bool) ($validated['signature_only'] ?? false);
         $signatureLevel = $validated['signature_level'] ?? null;
+        $signatureOnlyIntermediate = $signatureOnly
+            && $signatureLevel
+            && in_array($signatureLevel, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'], true);
         $nextLevel = null; // Inicializar variável para evitar erro
         
         // Se é diretor com permissão especial, pode aprovar diretamente APENAS se:
@@ -2153,7 +2156,7 @@ class PurchaseQuoteController extends Controller
             }
             $nextStatusSlug = 'autorizado';
             $defaultNote = 'Solicitação autorizada para cotação.';
-        } elseif (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true)) {
+        } elseif (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando', 'aprovado'], true)) {
             // Para aprovar análise, verificar permissão genérica ou nível de aprovação
             $hasGenericPermission = $user->hasPermission('cotacoes_aprovar');
             $approvalService = app(PurchaseQuoteApprovalService::class);
@@ -2223,7 +2226,7 @@ class PurchaseQuoteController extends Controller
                 }
             }
             
-            if (!$hasGenericPermission && $nextLevel === null) {
+            if (!$hasGenericPermission && $nextLevel === null && !$signatureOnlyIntermediate) {
                 return response()->json([
                     'message' => 'Você não tem permissão para aprovar esta solicitação ou não há aprovações pendentes no seu nível.',
                 ], Response::HTTP_FORBIDDEN);
@@ -2254,11 +2257,7 @@ class PurchaseQuoteController extends Controller
 
         $note = $validated['observacao'] ?? $defaultNote;
 
-        if (
-            $signatureOnly
-            && $signatureLevel
-            && in_array($signatureLevel, ['ENGENHEIRO', 'GERENTE_LOCAL', 'GERENTE_GERAL'], true)
-        ) {
+        if ($signatureOnlyIntermediate) {
             if (!$approvalService->userHasLevelPermission($user, $signatureLevel)) {
                 return response()->json([
                     'message' => 'Você não tem permissão para assinar neste nível.',
@@ -2314,7 +2313,7 @@ class PurchaseQuoteController extends Controller
             }
             
             // Se o status é "finalizada", "analisada" ou "analisada_aguardando", primeiro aprovar o nível do usuário
-            if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando'], true) && $nextStatusSlug === null) {
+            if (in_array($currentStatus, ['finalizada', 'analisada', 'analisada_aguardando', 'aprovado'], true) && $nextStatusSlug === null) {
                 // Se o status atual é "finalizada" e foi enviado um status desejado, mudar o status primeiro
                 if ($currentStatus === 'finalizada' && !empty($validated['status'])) {
                     $desiredStatus = PurchaseQuoteStatus::where('slug', $validated['status'])->first();
