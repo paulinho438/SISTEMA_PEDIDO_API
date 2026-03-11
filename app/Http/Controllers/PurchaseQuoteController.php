@@ -257,22 +257,10 @@ class PurchaseQuoteController extends Controller
             }
         }
         
-        // Se o usuário é apenas comprador (tem apenas COMPRADOR e nenhum outro nível), não mostrar solicitações
-        // a menos que seja explicitamente solicitado via my_quotes
+        // Se o usuário é apenas comprador (tem apenas COMPRADOR e nenhum outro nível),
+        // forçar visualização das próprias cotações/solicitações para não retornar lista vazia.
         $isOnlyBuyer = count($userLevels) === 1 && in_array('COMPRADOR', $userLevels);
-        
-        if ($isOnlyBuyer && (!$request->filled('my_quotes') || $request->get('my_quotes') !== 'true')) {
-            // Comprador não deve ver solicitações, retornar vazio
-            return response()->json([
-                'data' => [],
-                'pagination' => [
-                    'current_page' => 1,
-                    'per_page' => $perPage,
-                    'total' => 0,
-                    'last_page' => 1,
-                ],
-            ], Response::HTTP_OK);
-        }
+        $forceMyQuotes = $isOnlyBuyer;
 
         $query = PurchaseQuote::query()->with(['status', 'items'])->orderByDesc('id');
 
@@ -305,7 +293,7 @@ class PurchaseQuoteController extends Controller
         }
 
         // Filtro para mostrar apenas cotações do comprador logado
-        if ($request->filled('my_quotes') && $request->get('my_quotes') === 'true') {
+        if ($forceMyQuotes || ($request->filled('my_quotes') && $request->get('my_quotes') === 'true')) {
             $buyerId = auth()->id();
             $query->whereNotNull('buyer_id')->where('buyer_id', $buyerId);
         }
