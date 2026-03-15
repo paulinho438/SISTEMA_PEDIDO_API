@@ -462,6 +462,11 @@
             white-space: normal;
             overflow-wrap: break-word;
         }
+
+        /* Oculta as linhas da grade dos itens e mantém apenas o conteúdo */
+        .items-table tbody td {
+            border-color: transparent !important;
+        }
         
         .items-table td.number {
             text-align: right;
