@@ -463,9 +463,17 @@
             overflow-wrap: break-word;
         }
 
-        /* Oculta as linhas da grade dos itens e mantém apenas o conteúdo */
+        /* Oculta as linhas internas dos itens e mantém apenas as laterais externas */
         .items-table tbody td {
             border-color: transparent !important;
+        }
+
+        .items-table tbody tr td:first-child {
+            border-left: 1px solid #000 !important;
+        }
+
+        .items-table tbody tr td:last-child {
+            border-right: 1px solid #000 !important;
         }
         
         .items-table td.number {
