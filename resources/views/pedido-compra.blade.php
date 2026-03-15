@@ -669,14 +669,21 @@
                     @if($company->endereco)
                         <div><strong>ENDERECO:</strong> {{ strtoupper($company->endereco) }}@if($company->endereco_numero){{ '-' . $company->endereco_numero }}@endif</div>
                     @endif
-                    @if($company->bairro)
-                        <div><strong>BAIRRO:</strong> {{ strtoupper($company->bairro) }}</div>
+                    @if($company->bairro || $company->cep)
+                        <div>
+                            @if($company->bairro)
+                                <strong>BAIRRO:</strong> {{ strtoupper($company->bairro) }}
+                            @endif
+                            @if($company->bairro && $company->cep)
+                                -
+                            @endif
+                            @if($company->cep)
+                                <strong>CEP:</strong> {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $company->cep) }}
+                            @endif
+                        </div>
                     @endif
                     @if($company->cidade)
                         <div><strong>CIDADE:</strong> {{ strtoupper($company->cidade) }}@if($company->uf){{ ' - ' . strtoupper($company->uf) }}@endif</div>
-                    @endif
-                    @if($company->cep)
-                        <div><strong>CEP:</strong> {{ preg_replace('/(\d{5})(\d{3})/', '$1-$2', $company->cep) }}</div>
                     @endif
                     @if($company->cnpj)
                         <div><strong>CNPJ:</strong> {{ preg_replace('/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/', '$1.$2.$3/$4-$5', $company->cnpj) }}</div>
