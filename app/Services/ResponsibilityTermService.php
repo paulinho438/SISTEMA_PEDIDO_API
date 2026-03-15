@@ -97,7 +97,7 @@ class ResponsibilityTermService
         try {
             $numero = $this->generateNumero($companyId);
 
-            $term = ResponsibilityTerm::create([
+            $termId = $this->insertWithStringTimestamps('responsibility_terms', [
                 'numero' => $numero,
                 'responsible_name' => $request->input('responsible_name'),
                 'cpf' => $request->input('cpf'),
@@ -108,6 +108,7 @@ class ResponsibilityTermService
                 'created_by' => $user->id,
                 'observation' => $request->input('observation'),
             ]);
+            $term = ResponsibilityTerm::findOrFail($termId);
 
             foreach ($request->input('items') as $row) {
                 $productId = (int) $row['stock_product_id'];
@@ -135,7 +136,7 @@ class ResponsibilityTermService
                     $companyId
                 );
 
-                ResponsibilityTermItem::create([
+                $this->insertWithStringTimestamps('responsibility_term_items', [
                     'responsibility_term_id' => $term->id,
                     'stock_product_id' => $productId,
                     'stock_id' => $stock->id,
@@ -222,19 +223,21 @@ class ResponsibilityTermService
                     $companyId
                 );
 
-                $item->quantity_returned = round((float) ($item->quantity_returned ?? 0) + $quantity, 4);
-                if ($item->quantity_returned >= (float) $item->quantity) {
-                    $item->returned_at = Carbon::now();
+                $itemUpdateData = [
+                    'quantity_returned' => round((float) ($item->quantity_returned ?? 0) + $quantity, 4),
+                ];
+                if ($itemUpdateData['quantity_returned'] >= (float) $item->quantity) {
+                    $itemUpdateData['returned_at'] = Carbon::now()->format('Y-m-d H:i:s');
                 }
-                $item->save();
+                $this->updateModelWithStringTimestamps($item, $itemUpdateData, ['returned_at']);
             }
 
             $hasPending = $term->items()->whereRaw('(quantity - quantity_returned) > 0.0000')->exists();
-            $term->update([
+            $this->updateModelWithStringTimestamps($term, [
                 'status' => $hasPending ? ResponsibilityTerm::STATUS_PARCIAL : ResponsibilityTerm::STATUS_DEVOLVIDO,
                 'returned_by' => $hasPending ? null : $user->id,
-                'returned_at' => $hasPending ? null : Carbon::now(),
-            ]);
+                'returned_at' => $hasPending ? null : Carbon::now()->format('Y-m-d H:i:s'),
+            ], ['returned_at']);
 
             DB::commit();
             return $term->fresh(['stockLocation', 'items.stockProduct']);
@@ -254,5 +257,62 @@ class ResponsibilityTermService
 
         $seq = $last ? ((int) preg_replace('/^\D+-?\d+-/', '', $last->numero) + 1) : 1;
         return sprintf('TRM-%s-%05d', $year, $seq);
+    }
+
+    /**
+     * Helper para inserir com timestamps string/cast (padrão SQL Server do projeto)
+     */
+    private function insertWithStringTimestamps(string $table, array $data): int
+    {
+        $createdAt = now()->format('Y-m-d H:i:s');
+        $updatedAt = now()->format('Y-m-d H:i:s');
+
+        $columns = array_keys($data);
+        $placeholders = array_fill(0, count($columns), '?');
+        $values = array_values($data);
+
+        $columns[] = 'created_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $createdAt;
+
+        $columns[] = 'updated_at';
+        $placeholders[] = "CAST(? AS DATETIME2)";
+        $values[] = $updatedAt;
+
+        $columnsBracketed = array_map(fn ($col) => "[{$col}]", $columns);
+        $sql = "INSERT INTO [{$table}] (" . implode(', ', $columnsBracketed) . ") OUTPUT INSERTED.[id] VALUES (" . implode(', ', $placeholders) . ")";
+        $result = DB::select($sql, $values);
+
+        return (int) $result[0]->id;
+    }
+
+    /**
+     * Helper para update com timestamps string/cast (padrão SQL Server do projeto)
+     */
+    private function updateModelWithStringTimestamps($model, array $data, array $dateFields = [])
+    {
+        unset($data['id'], $data['created_at']);
+        $data['updated_at'] = now()->format('Y-m-d H:i:s');
+
+        $table = $model->getTable();
+        $id = $model->getKey();
+        $idColumn = $model->getKeyName();
+
+        $columns = array_keys($data);
+        $setters = [];
+        $values = [];
+
+        foreach ($columns as $column) {
+            $isDateField = $column === 'updated_at' || in_array($column, $dateFields, true);
+            $setters[] = $isDateField ? "[{$column}] = CAST(? AS DATETIME2)" : "[{$column}] = ?";
+            $values[] = $data[$column];
+        }
+
+        $values[] = $id;
+        $sql = "UPDATE [{$table}] SET " . implode(', ', $setters) . " WHERE [{$idColumn}] = ?";
+        DB::statement($sql, $values);
+
+        $model->refresh();
+        return $model;
     }
 }

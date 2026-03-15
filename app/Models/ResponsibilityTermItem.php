@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ResponsibilityTermItem extends Model
 {
     protected $table = 'responsibility_term_items';
+    protected $dateFormat = 'Ymd H:i:s';
 
     protected $fillable = [
         'responsibility_term_id',

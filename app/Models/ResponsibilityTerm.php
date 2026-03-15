@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ResponsibilityTerm extends Model
 {
     protected $table = 'responsibility_terms';
+    protected $dateFormat = 'Ymd H:i:s';
 
     protected $fillable = [
         'numero',
