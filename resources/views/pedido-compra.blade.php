@@ -139,6 +139,12 @@
             justify-content: space-between;
             align-items: baseline;
         }
+
+        .print-header .carrier-row {
+            margin-top: 12px;
+            margin-bottom: 0;
+            text-align: left;
+        }
         
         .print-header .dates-row > div:last-child {
             margin-left: auto;
@@ -710,10 +716,12 @@
                     @endif
                 </div>
             </div>
+            <div class="carrier-row">
+                <strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}
+            </div>
             <div class="dates-row">
                 <div><strong>PRAZO DE ENTREGA:</strong> {{ $order->expected_delivery_date ? $order->expected_delivery_date->format('d/m/Y') : '' }}</div>
                 <div><strong>DATA DE PAGAMENTO:</strong> {{ $order->quoteSupplier && $order->quoteSupplier->payment_condition_description ? $order->quoteSupplier->payment_condition_description : ($order->quote && $order->quote->payment_condition_description ? $order->quote->payment_condition_description : '') }}</div>
-                <div style="text-align: right;"><strong>TRANSPORTADORA:</strong> {{ $order->quote && $order->quote->freight_type ? ($order->quote->freight_type == 'F' ? 'FOB' : ($order->quote->freight_type == 'C' ? 'CIF' : '')) : '' }}</div>
             </div>
         </div>
     </div>
