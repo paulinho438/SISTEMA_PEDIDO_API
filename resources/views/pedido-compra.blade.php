@@ -468,13 +468,6 @@
             border-color: transparent !important;
         }
 
-        .items-table tbody tr td:first-child {
-            border-left: 1px solid #000 !important;
-        }
-
-        .items-table tbody tr td:last-child {
-            border-right: 1px solid #000 !important;
-        }
         
         .items-table td.number {
             text-align: right;
