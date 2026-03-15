@@ -468,6 +468,14 @@
             border-color: transparent !important;
         }
 
+        .items-table tbody tr td:first-child {
+            border-left: 1px solid #000 !important;
+        }
+
+        .items-table tbody tr td:last-child {
+            border-right: 1px solid #000 !important;
+        }
+
         
         .items-table td.number {
             text-align: right;
@@ -481,7 +489,10 @@
         
         /* Totals Section Styles - evita quebrar no meio; linhas com altura mínima para não sobrepor */
         .totals-section {
-            border: 1px solid #000;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            border-left: none;
+            border-right: none;
             padding: 8px;
             margin-top: 15px;
             font-size: 8pt;
@@ -529,7 +540,10 @@
         
         /* Observations Styles */
         .observations {
-            border: 1px solid #000;
+            border-top: 1px solid #000;
+            border-bottom: 1px solid #000;
+            border-left: none;
+            border-right: none;
             padding: 5px;
             margin-top: 10px;
             min-height: 60px;
