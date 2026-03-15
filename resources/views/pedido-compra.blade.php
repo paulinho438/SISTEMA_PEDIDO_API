@@ -134,7 +134,7 @@
             margin-top: 12px;
             margin-bottom: 0;
             padding-top: 6px;
-            border-top: 1px solid #ccc;
+            border-top: none;
             display: flex;
             justify-content: space-between;
             align-items: baseline;
