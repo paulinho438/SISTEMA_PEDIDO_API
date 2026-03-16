@@ -461,7 +461,17 @@ class PurchaseQuoteController extends Controller
             });
         }
 
-        $quotes = $query->withCount('orders')->paginate($perPage);
+        $quotes = $query
+            ->withCount('orders')
+            ->with([
+                'orders' => function ($orderQuery) {
+                    $orderQuery
+                        ->select(['id', 'purchase_quote_id', 'order_number', 'created_at'])
+                        ->orderByDesc('created_at')
+                        ->orderByDesc('id');
+                },
+            ])
+            ->paginate($perPage);
 
         $quotes->getCollection()->transform(function (PurchaseQuote $quote) {
             $firstItem = $quote->items->first();
@@ -537,6 +547,7 @@ class PurchaseQuoteController extends Controller
             return [
                 'id' => $quote->id,
                 'numero' => $quote->quote_number,
+                'pedido_numero' => optional($quote->orders->first())->order_number,
                 'data' => optional($quote->requested_at)->format('d/m/Y'),
                 'solicitante' => $quote->requester_name,
                 'empresa' => $quote->company_name,
