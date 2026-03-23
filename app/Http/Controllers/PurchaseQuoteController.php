@@ -35,8 +35,18 @@ class PurchaseQuoteController extends Controller
         $updatedAt = now()->format('Y-m-d H:i:s');
         
         $columns = array_keys($data);
-        $placeholders = array_fill(0, count($data), '?');
-        $values = array_values($data);
+        $values = [];
+        $placeholders = [];
+
+        foreach ($columns as $column) {
+            // Campos de data precisam de CAST explícito para SQL Server
+            if (in_array($column, ['approved_at', 'reset_at', 'protheus_exported_at'], true)) {
+                $placeholders[] = "CAST(? AS DATETIME2)";
+            } else {
+                $placeholders[] = '?';
+            }
+            $values[] = $data[$column];
+        }
         
         // Adicionar campos de data com CAST
         $columns[] = 'created_at';
